@@ -638,21 +638,39 @@ class ChatCompletionsClient:
 
         raise RewriteError(f"LLM returned an invalid payload after retries: {last_exc}")
 
-    def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
-        """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
-        metadata = PRESET_METADATA[target]
-        payload = {
+    def general_chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_tokens: int = 800,
+        temperature: float = 0.4,
+        response_format_json: bool = True,
+        retries_on_5xx: int = 1,
+    ) -> str:
+        """Generic chat-completions wrapper with HTTPError-aware retry on 5xx.
+
+        Cycle 14: this replaces direct `_transport.post` access from rate_quality and
+        meta_refine. Centralizes:
+          - SSL context resolution
+          - Timeout
+          - Auth header
+          - 5xx retry with exponential backoff (4xx not retried — request itself is bad)
+          - Network-error retry (URLError that isn't HTTPError)
+        Returns the raw `content` string from the first choice's message.
+        """
+        import time as _t
+        from urllib.error import HTTPError, URLError
+
+        payload: dict[str, Any] = {
             "model": self.config.model,
-            "messages": [
-                {"role": "system", "content": build_rate_system_prompt(metadata)},
-                {"role": "user", "content": rewritten},
-            ],
-            "response_format": {"type": "json_object"},
+            "messages": messages,
             "stream": False,
-            "temperature": 0.2,
-            "max_tokens": 100,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "top_p": 0.9,
         }
+        if response_format_json:
+            payload["response_format"] = {"type": "json_object"}
         body = json.dumps(payload).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -660,18 +678,73 @@ class ChatCompletionsClient:
             "Accept": "application/json",
         }
         url = f"{self.config.base_url}/chat/completions"
-        with self._transport.post(
-            url, body, headers, timeout=self.config.timeout_seconds, ssl_context=self.ssl_context
-        ) as response:
-            raw = json.loads(response.read().decode("utf-8"))
-            content = extract_message_content(raw)
+
+        last_exc: Exception | None = None
+        attempts = retries_on_5xx + 1
+        for attempt in range(attempts):
+            try:
+                with self._transport.post(
+                    url,
+                    body,
+                    headers,
+                    timeout=self.config.timeout_seconds,
+                    ssl_context=self.ssl_context,
+                ) as response:
+                    raw = json.loads(response.read().decode("utf-8"))
+                    return extract_message_content(raw)
+            except HTTPError as exc:  # subclass of URLError — must catch first
+                # 5xx → retry; 4xx → fail fast
+                if 500 <= exc.code < 600 and attempt < attempts - 1:
+                    backoff = 2**attempt  # 1s, 2s, 4s
+                    logger.info(
+                        "general_chat HTTP %d on attempt %d/%d; retrying in %ds",
+                        exc.code,
+                        attempt + 1,
+                        attempts,
+                        backoff,
+                    )
+                    last_exc = exc
+                    _t.sleep(backoff)
+                    continue
+                raise RewriteError(f"LLM HTTP {exc.code}: {exc.reason}") from exc
+            except URLError as exc:
+                # Pure network error — retry once
+                if attempt < attempts - 1:
+                    backoff = 2**attempt
+                    logger.info(
+                        "general_chat network error on attempt %d/%d (%s); retrying in %ds",
+                        attempt + 1,
+                        attempts,
+                        exc.reason,
+                        backoff,
+                    )
+                    last_exc = exc
+                    _t.sleep(backoff)
+                    continue
+                raise RewriteError(f"LLM network error: {exc.reason}") from exc
+            except RewriteError:
+                # Transport already wrapped in RewriteError — propagate without retry
+                raise
+        raise RewriteError(f"general_chat exhausted retries: {last_exc}")
+
+    def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
+        """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
+        metadata = PRESET_METADATA[target]
+        # Cycle 14: routes through general_chat, gets free 5xx retry + clean error path
+        content = self.general_chat(
+            [
+                {"role": "system", "content": build_rate_system_prompt(metadata)},
+                {"role": "user", "content": rewritten},
+            ],
+            max_tokens=100,
+            temperature=0.2,
+        )
         if not content or not content.strip():
             raise RewriteError("LLM returned empty content for rate.")
         try:
             parsed = _parse_llm_json(content)
         except (json.JSONDecodeError, RewriteError) as exc:
             raise RewriteError(f"Invalid rate JSON: {exc}") from exc
-        # Coerce + clamp
         try:
             score = float(parsed.get("score", 0))
         except (TypeError, ValueError):
@@ -917,30 +990,16 @@ class RewriteService:
             hi_samples=hi,
             lo_samples=lo,
         )
-        payload = {
-            "model": self._config.model,
-            "messages": [
+        # Cycle 14: route through public general_chat (no more _transport peek).
+        # Inherits 5xx + network retry + clean error wrapping for free.
+        content = self._client.general_chat(
+            [
                 {"role": "system", "content": REFINER_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            "response_format": {"type": "json_object"},
-            "stream": False,
-            "temperature": 0.3,
-            "max_tokens": 800,
-            "top_p": 0.9,
-        }
-        body = json.dumps(payload).encode("utf-8")
-        headers = {
-            "Authorization": f"Bearer {self._config.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        url = f"{self._config.base_url}/chat/completions"
-        with self._client._transport.post(
-            url, body, headers, timeout=self._config.timeout_seconds, ssl_context=self._client.ssl_context
-        ) as response:
-            raw = json.loads(response.read().decode("utf-8"))
-            content = extract_message_content(raw)
+            max_tokens=800,
+            temperature=0.3,
+        )
         try:
             parsed = _parse_llm_json(content)
         except (json.JSONDecodeError, RewriteError) as exc:

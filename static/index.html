@@ -155,15 +155,21 @@
 
             <form id="rewrite-form" class="form-area">
               <label for="text" class="visually-hidden">原文输入</label>
-              <textarea
-                id="text"
-                name="text"
-                rows="9"
-                maxlength="1200"
-                placeholder="把你想表达的话贴在这里。例如：我今天要去超市买东西，路上顺便去趟邮局。"
-                spellcheck="false"
-                autocomplete="off"
-              ></textarea>
+              <div class="text-with-mic">
+                <textarea
+                  id="text"
+                  name="text"
+                  rows="9"
+                  maxlength="1200"
+                  placeholder="把你想表达的话贴在这里。例如：我今天要去超市买东西，路上顺便去趟邮局。"
+                  spellcheck="false"
+                  autocomplete="off"
+                ></textarea>
+                <!-- Cycle 15: voice input. Hidden if SpeechRecognition unavailable. -->
+                <button type="button" class="mic-btn" id="mic-button" aria-label="语音输入" hidden title="点击开始语音输入（中文）">
+                  <i class="fas fa-microphone" aria-hidden="true"></i>
+                </button>
+              </div>
 
               <div class="scenario-row" aria-label="说话场景">
                 <span class="scenario-label">

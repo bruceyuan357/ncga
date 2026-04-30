@@ -1896,13 +1896,20 @@
     } catch (_) { /* ignore — scoring is best-effort */ }
   }
 
+  // Cycle 14: single source of glossary lines. Cached for the duration of one render
+  // pass — invalidated whenever the textarea fires `input`. Three callers (workbench
+  // rewrite, batch run, batch regen) used to each parse from localStorage independently.
+  let _glossaryCache = null;
   function getGlossaryLines() {
+    if (_glossaryCache !== null) return _glossaryCache;
     try {
       const raw = (localStorage.getItem("ncga.glossary.v1") || "").trim();
-      if (!raw) return null;
-      return raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 30);
-    } catch (_) { return null; }
+      if (!raw) { _glossaryCache = null; return null; }
+      _glossaryCache = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).slice(0, 30);
+      return _glossaryCache;
+    } catch (_) { _glossaryCache = null; return null; }
   }
+  function invalidateGlossaryCache() { _glossaryCache = null; }
 
   async function runBatch() {
     const items = getBatchItems();
@@ -2129,6 +2136,110 @@
   }
 
   // ---------------- glossary + AI self-feedback panel (Cycle 9) ----------------
+  // ---------------- Voice input (Cycle 15) ----------------
+  function bindVoiceInput() {
+    const btn = $("#mic-button");
+    if (!btn) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      // Browser doesn't support SpeechRecognition (Firefox at the time of writing,
+      // Safari < 14.1) — keep the button hidden. The aria-label is still there for AT.
+      return;
+    }
+    btn.hidden = false;
+
+    let recognition = null;
+    let recording = false;
+
+    const startRec = () => {
+      try {
+        recognition = new SR();
+      } catch (e) {
+        showToast("浏览器不支持语音识别", "fa-triangle-exclamation");
+        return;
+      }
+      recognition.lang = "zh-CN";
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      // Snapshot the textarea content at start so interim results don't keep replacing
+      // already-finalized text.
+      const existing = textInput.value;
+      const insertionPoint = existing ? existing + (existing.endsWith("\n") ? "" : " ") : "";
+      let lastFinalLen = 0;
+
+      recognition.onstart = () => {
+        recording = true;
+        btn.classList.add("is-recording");
+        btn.title = "再次点击停止";
+        showToast("开始听…说中文", "fa-microphone");
+      };
+      recognition.onresult = (event) => {
+        let interim = "";
+        let final = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) final += transcript;
+          else interim += transcript;
+        }
+        if (final) {
+          // Append final text to textarea; keep interim separate so it doesn't pile up
+          textInput.value = insertionPoint + textInput.value.slice(insertionPoint.length).slice(0, lastFinalLen) + final;
+          lastFinalLen += final.length;
+        } else {
+          // Show interim by appending to existing finalized portion
+          const finalSoFar = (insertionPoint || "") + (textInput.value.slice(insertionPoint.length, insertionPoint.length + lastFinalLen) || "");
+          textInput.value = finalSoFar + interim;
+        }
+        textInput.dispatchEvent(new Event("input"));
+      };
+      recognition.onerror = (event) => {
+        const msg = {
+          "not-allowed": "麦克风权限被拒绝，请在浏览器设置中允许",
+          "service-not-allowed": "浏览器或系统禁用了语音服务",
+          "no-speech": "没听到声音，请再试一次",
+          "audio-capture": "找不到麦克风设备",
+          "aborted": null,  // user pressed stop — silent
+          "network": "语音识别服务网络异常",
+        }[event.error] || `语音识别错误：${event.error}`;
+        if (msg) showToast(msg, "fa-triangle-exclamation");
+      };
+      recognition.onend = () => {
+        recording = false;
+        btn.classList.remove("is-recording");
+        btn.title = "点击开始语音输入（中文）";
+        recognition = null;
+      };
+      try {
+        recognition.start();
+      } catch (e) {
+        showToast(`语音输入启动失败：${e.message}`, "fa-triangle-exclamation");
+        btn.classList.remove("is-recording");
+        recording = false;
+      }
+    };
+
+    const stopRec = () => {
+      if (recognition && recording) {
+        try { recognition.stop(); } catch (_) { /* ignore */ }
+      }
+    };
+
+    btn.addEventListener("click", () => {
+      if (recording) stopRec();
+      else startRec();
+    });
+
+    // Esc while recording stops it
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && recording) {
+        e.preventDefault();
+        stopRec();
+      }
+    });
+  }
+
   function bindGlossary() {
     const ta = $("#glossary-input");
     const hint = $("#glossary-hint");
@@ -2136,6 +2247,7 @@
     try { ta.value = localStorage.getItem("ncga.glossary.v1") || ""; } catch (_) {}
     const update = () => {
       try { localStorage.setItem("ncga.glossary.v1", ta.value); } catch (_) {}
+      invalidateGlossaryCache();  // Cycle 14: keep cache fresh after edit
       const lines = ta.value.split(/\r?\n/).filter((l) => l.trim()).length;
       if (hint) hint.textContent = lines === 0 ? "未启用" : `已启用 · ${lines} 条术语将注入 prompt`;
     };
@@ -2559,6 +2671,7 @@
   bindWorkbench();
   bindBatch();
   bindGlossary();
+  bindVoiceInput();
 
   Promise.all([loadPresets(), loadScenarios()])
     .then(() => {

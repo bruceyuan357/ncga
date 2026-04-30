@@ -48,6 +48,19 @@ from native_chinese_assistant.web import (
     stop_server,
 )
 
+# Cycle 14: tests must not inherit production .env's NCGA_AUTH_TOKEN. We set it to
+# empty string (not pop) because load_dotenv() uses os.environ.setdefault — popping
+# would let .env re-inject, but setting to "" wins the setdefault check, and
+# `_check_auth` treats empty string as auth-disabled.
+os.environ["NCGA_AUTH_TOKEN"] = ""
+os.environ["NCGA_DATA_KEY"] = ""  # tests use plaintext store; no leftover crypto state
+
+
+def setUpModule():
+    os.environ["NCGA_AUTH_TOKEN"] = ""
+    os.environ["NCGA_DATA_KEY"] = ""
+
+
 # ---------------- helpers ----------------
 
 
@@ -1429,6 +1442,75 @@ class LifecycleTests(unittest.TestCase):
         out = buf.getvalue()
         self.assertIn("(none)", out)
         self.assertIn("free", out)
+
+
+class GeneralChatRetryTests(unittest.TestCase):
+    """Cycle 14: rate_quality / meta_refine route through general_chat which retries 5xx."""
+
+    def test_general_chat_retries_on_500(self) -> None:
+        from urllib.error import HTTPError
+
+        # Custom transport: first call raises HTTP 500, second returns ok
+        responses_iter = iter(
+            [
+                "raise:500",
+                json.dumps({"choices": [{"message": {"content": '{"score": 4, "reason": "ok"}'}}]}).encode(),
+            ]
+        )
+
+        class FlakeyTransport(FakeTransport):
+            def post(self, url, body, headers, *, timeout, ssl_context):
+                self.calls.append({"url": url})
+                action = next(responses_iter)
+                if action == "raise:500":
+                    raise HTTPError(url, 500, "Server Error", {}, None)
+                return FakeStreamResponse(action)
+
+        cfg = LLMConfig(
+            provider="deepseek",
+            api_key="test",
+            model="x",
+            base_url="https://test",
+            streaming=False,
+            ca_bundle=None,
+            skip_ssl_verify=False,
+            timeout_seconds=5.0,
+        )
+        client = ChatCompletionsClient(cfg, transport=FlakeyTransport(b""))
+        # Patch sleep to make test fast
+        with mock.patch("native_chinese_assistant.rewrite.time") as mt:
+            mt.sleep = mock.Mock()
+            mt.perf_counter = __import__("time").perf_counter
+            # Actually we want time.sleep inside general_chat to be fast.
+            # general_chat uses `import time as _t` locally, so patch the time module globally
+            with mock.patch("time.sleep"):
+                result = client.rate_quality("测试", VarietyPreset.BEIJING_MANDARIN)
+        self.assertEqual(result["score"], 4.0)
+
+    def test_general_chat_does_not_retry_on_400(self) -> None:
+        """4xx is the request's own fault — retrying just wastes time."""
+        from urllib.error import HTTPError
+
+        class BadTransport(FakeTransport):
+            def post(self, url, body, headers, *, timeout, ssl_context):
+                self.calls.append({"url": url})
+                raise HTTPError(url, 400, "Bad Request", {}, None)
+
+        cfg = LLMConfig(
+            provider="deepseek",
+            api_key="test",
+            model="x",
+            base_url="https://test",
+            streaming=False,
+            ca_bundle=None,
+            skip_ssl_verify=False,
+            timeout_seconds=5.0,
+        )
+        client = ChatCompletionsClient(cfg, transport=BadTransport(b""))
+        with mock.patch("time.sleep"), self.assertRaises(RewriteError):
+            client.rate_quality("x", VarietyPreset.BEIJING_MANDARIN)
+        # 400 hits exactly once (no retry)
+        self.assertEqual(len(client._transport.calls), 1)
 
 
 class SecurityCycle13Tests(unittest.TestCase):
