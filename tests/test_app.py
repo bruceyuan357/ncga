@@ -1054,7 +1054,7 @@ class GlossaryAndOverrideTests(unittest.TestCase):
         service.rate_quality(
             "测试",
             VarietyPreset.BEIJING_MANDARIN,
-            record_for=("beijing_mandarin", "friends_casual"),
+            scenario=Scenario.FRIENDS_CASUAL,
             original="原",
         )
         bucket = store.get_bucket("beijing_mandarin", "friends_casual")

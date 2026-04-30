@@ -537,7 +537,7 @@ class App:
             data = self.rewrite_service.rate_quality(
                 rewritten,
                 target,
-                record_for=(target.value, scenario.value),
+                scenario=scenario,
                 original=original,
             )
         except ValueError as exc:
@@ -993,12 +993,17 @@ def _pid_alive(pid: int) -> bool:
 
 
 def _port_in_use(host: str, port: int) -> bool:
-    """Bind-based probe: attempts to bind to the port; if that fails with EADDRINUSE,
-    something is holding it. More reliable than connect-based probes (which can
-    misreport when a listener's accept queue is full)."""
+    """Bind-based probe with SO_REUSEADDR: returns True iff a real listener holds the port.
+
+    Cycle 17: SO_REUSEADDR added so a TIME_WAIT 4-tuple (left over from SIGKILL ~1s
+    ago) is NOT misreported as "in use". Without it, `app.py stop` printed a false
+    "port still occupied" right after a successful kill. With SO_REUSEADDR the
+    semantics match what we actually want: "can a new listener bind here?".
+    """
     import socket
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         s.bind((host, port))
         return False

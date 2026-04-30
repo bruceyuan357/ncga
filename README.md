@@ -44,6 +44,17 @@ pytest
 
 测试**完全离线**——LLM 请求被注入 fake client。
 
+### 真 LLM 冒烟测试
+
+离线测试覆盖不到「LLM 端协议变了」这一类回归（Cycle 17 发现 DeepSeek-V4 升级后 `/api/rate` 因 `max_tokens` 太小静默坏掉，离线 mock 测试全绿）。每次发布后跑一次：
+
+```bash
+tools/smoke.sh                           # 默认 http://127.0.0.1:8000
+BASE=https://ncga.example.com tools/smoke.sh
+```
+
+`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 14 项：所有 GET、auth gating、3 个 LLM 走通、Cycle 16 的 4xx 诊断。建议挂 cron 每日跑一次。
+
 ## 生产部署
 
 `wsgiref.simple_server` 是开发服务器。生产用 `waitress`：

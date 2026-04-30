@@ -730,13 +730,15 @@ class ChatCompletionsClient:
     def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
         """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
         metadata = PRESET_METADATA[target]
-        # Cycle 14: routes through general_chat, gets free 5xx retry + clean error path
+        # Cycle 14: routes through general_chat, gets free 5xx retry + clean error path.
+        # Cycle 17: max_tokens bumped 100→400. DeepSeek-V4 family burns reasoning tokens
+        # before emitting JSON; 100 truncated the response to '' and rate silently broke.
         content = self.general_chat(
             [
                 {"role": "system", "content": build_rate_system_prompt(metadata)},
                 {"role": "user", "content": rewritten},
             ],
-            max_tokens=100,
+            max_tokens=400,
             temperature=0.2,
         )
         if not content or not content.strip():
@@ -932,13 +934,16 @@ class RewriteService:
         rewritten: str,
         target: VarietyPreset,
         *,
-        record_for: tuple[str, str] | None = None,
+        scenario: Scenario | None = None,
         original: str = "",
     ) -> dict[str, Any]:
         """Service wrapper: rate the native-ness of `rewritten` in `target`.
 
-        If `record_for=(variety_value, scenario_value)` and a quality_store is attached,
-        the result is recorded for the self-improving loop.
+        Cycle 17: replaced the awkward `record_for=(variety_value, scenario_value)`
+        tuple — the caller had to pass both `target` and `target.value`. Now the
+        caller passes the `scenario` enum directly; we derive the storage keys.
+        If `scenario` is provided and a quality_store is attached, the result is
+        recorded for the self-improving loop.
         """
         if self._client is None:
             raise RewriteError("评分功能需要 LLM 服务。请先配置 LLM_API_KEY 后再试。")
@@ -947,10 +952,10 @@ class RewriteService:
         if len(rewritten) > MAX_OUTPUT_CHARS:
             raise ValueError("rewritten too long")
         result = self._client.rate_quality(rewritten, target)
-        if self.quality_store is not None and record_for:
+        if self.quality_store is not None and scenario is not None:
             self.quality_store.record(
-                variety=record_for[0],
-                scenario=record_for[1],
+                variety=target.value,
+                scenario=scenario.value,
                 score=float(result.get("score", 0)),
                 original=original,
                 rewritten=rewritten,

@@ -1108,10 +1108,11 @@
     if (streamError) return null;  // server-side error mid-stream — caller falls back
     if (!finalResult) return null;
     // Normalize to the same shape as /api/rewrite returns. The stream's done event
-    // carries `rewritten_text` and `target_variety`; we synthesize the rest.
+    // carries `rewritten_text`, `target_variety`, and (Cycle 16) `effective_scenario`.
     return {
       rewritten_text: finalResult.rewritten_text || lastPartial,
       target_variety: finalResult.target_variety || varietyKey,
+      effective_scenario: finalResult.effective_scenario,
       script: VARIETIES[varietyKey]?.script,
       degraded: false,
       _from_stream: true,
@@ -1202,6 +1203,15 @@
       // Stale-binding guard: if user fired a newer rewrite while we were waiting,
       // myController is no longer the active one — bail without mutating UI.
       if (rewriteAbortController !== myController) return;
+
+      // Cycle 17: surface silent scenario fallback. Backend defaults unknown
+      // scenarios to friends_casual silently; if that happens (stale frontend
+      // cache, typo'd value, future scenario removed), tell the user with a toast.
+      if (frozenScenario && data.effective_scenario && data.effective_scenario !== frozenScenario) {
+        const got = SCENARIOS[data.effective_scenario]?.label || data.effective_scenario;
+        const want = SCENARIOS[frozenScenario]?.label || frozenScenario;
+        showToast(`场景「${want}」未识别，已退化到「${got}」`, "fa-triangle-exclamation");
+      }
 
       const elapsed = Math.round(performance.now() - startedAt);
       const v = frozenVariety;
