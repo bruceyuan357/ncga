@@ -437,6 +437,37 @@ class QualityStore:
         except OSError as exc:
             logger.warning("Could not persist QualityStore: %s", exc)
 
+    def _quarantine(self, reason: str) -> None:
+        """Cycle 17: rename a load-failed file aside instead of letting the next
+        persist() overwrite it. We learned this the hard way — silent return-on-
+        decrypt-fail meant subsequent record() calls clobbered legitimate data
+        encrypted under a now-rotated/mismatched key. Quarantining preserves the
+        bytes so the user can recover (or at least diagnose) what happened.
+        """
+        try:
+            from datetime import datetime
+
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            backup = self.path.with_suffix(self.path.suffix + f".corrupt-{stamp}")
+            self.path.rename(backup)
+            logger.error(
+                "QualityStore at %s could not be loaded (%s); quarantined to %s. "
+                "Inspect / restore manually; a fresh empty store will be used until then.",
+                self.path,
+                reason,
+                backup,
+            )
+        except OSError as exc:
+            logger.error(
+                "QualityStore at %s could not be loaded (%s) AND quarantine failed (%s); "
+                "refusing to start with an empty store that would clobber the file. "
+                "Move or delete the file by hand.",
+                self.path,
+                reason,
+                exc,
+            )
+            raise RuntimeError(f"QualityStore unreadable and quarantine failed at {self.path}") from exc
+
     def _load(self) -> None:
         from native_chinese_assistant.crypto import decrypt, is_encrypted, resolve_key
 
@@ -448,24 +479,21 @@ class QualityStore:
         if is_encrypted(blob):
             key = resolve_key()
             if key is None:
-                logger.warning(
-                    "QualityStore at %s is encrypted but no key available; refusing to load",
-                    self.path,
+                # No key — don't quarantine (user might just need to set the env var).
+                # Refuse to start so we don't overwrite the encrypted file with empty plaintext.
+                raise RuntimeError(
+                    f"QualityStore at {self.path} is encrypted but NCGA_DATA_KEY is not set. "
+                    f"Set the key env var or remove/rename the file to start fresh."
                 )
-                return
             try:
                 blob = decrypt(blob, key)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Could not decrypt QualityStore at %s: %s — file may be tampered or wrong key",
-                    self.path,
-                    exc,
-                )
+                self._quarantine(f"decrypt failed: {exc}")
                 return
         try:
             data = json.loads(blob.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            logger.warning("Could not parse QualityStore from %s: %s", self.path, exc)
+            self._quarantine(f"parse failed: {exc}")
             return
         for key_str, payload in data.items():
             v, s = self._from_key_str(key_str)

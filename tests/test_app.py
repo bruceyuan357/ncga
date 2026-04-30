@@ -942,10 +942,11 @@ class FeedbackStoreTests(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix="ncga-fb-")) / "store.json"
 
     def tearDown(self) -> None:
-        if self.tmp.exists():
-            self.tmp.unlink()
+        # Cycle 17: clean up any quarantine siblings left by load-failure tests
+        import shutil
+
         if self.tmp.parent.exists():
-            self.tmp.parent.rmdir()
+            shutil.rmtree(self.tmp.parent, ignore_errors=True)
 
     def test_welford_matches_hand_computed_on_simple_series(self) -> None:
         from native_chinese_assistant.feedback import WelfordStats
@@ -1015,6 +1016,31 @@ class FeedbackStoreTests(unittest.TestCase):
         hi, lo = s.hi_lo_examples("v", "sc", n_each=2)
         self.assertEqual([h.score for h in hi], [5.0, 4.0])
         self.assertEqual([lr.score for lr in lo], [1.0, 2.0])
+
+    def test_load_failure_quarantines_file_instead_of_clobbering(self) -> None:
+        """Cycle 17: an unreadable store file (e.g., wrong key, parse error) must NOT
+        be silently overwritten with an empty store on the next persist. It gets
+        renamed aside so the user can recover the original bytes.
+        Ground truth: this exact pattern destroyed 14 real samples on 2026-04-30 when
+        a stale ~/.local/share/ncga/data.key drifted from .env's NCGA_DATA_KEY.
+        """
+        from native_chinese_assistant.feedback import QualityStore
+
+        # Plant a file that will fail to parse (not encrypted, not valid JSON).
+        self.tmp.write_bytes(b"this is not valid quality data")
+        s = QualityStore(path=self.tmp)
+        # Store starts empty
+        self.assertEqual(s.stats_snapshot(), [])
+        # File was quarantined, NOT silently truncated
+        siblings = list(self.tmp.parent.glob(self.tmp.name + ".corrupt-*"))
+        self.assertEqual(len(siblings), 1, f"expected 1 quarantine, got {siblings}")
+        self.assertEqual(siblings[0].read_bytes(), b"this is not valid quality data")
+        self.assertFalse(self.tmp.exists())
+        # A fresh round-trip works
+        s.record("v", "sc", 4.0, "o", "r", "")
+        s2 = QualityStore(path=self.tmp)
+        snap = s2.stats_snapshot()
+        self.assertEqual(snap[0]["stats"]["count"], 1)
 
 
 class GlossaryAndOverrideTests(unittest.TestCase):
