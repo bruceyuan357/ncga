@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>地道中文 · 多方言重写工作台</title>
+    <meta name="description" content="专业的中文方言重写工具：普通话、北京话、东北话、川渝话、粤语、闽南语等 10+ 风格，配地区实景背景，带历史记录与对照视图。">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="color-scheme" content="dark light">
+
+    <!-- FOUC 防抖：在样式 / JS 加载前先把 v1/v2 主题与字号写入根元素，
+         避免上一次保存的「古朴」版闪一下「墨韵」黑底再切回。 -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("ncga.settings.v2");
+          var s = raw ? JSON.parse(raw) : null;
+          var v = (s && s.version) || "v2";
+          var fs = (s && s.fontScale) || "1";
+          document.documentElement.setAttribute("data-version", v);
+          document.documentElement.style.setProperty("--font-scale", fs);
+        } catch (e) { /* ignore — fall back to defaults */ }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="/static/styles.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    >
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=Noto+Serif+SC:wght@400;500;600;700;900&family=Ma+Shan+Zheng&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body data-route="workbench">
+    <div class="boot-screen" id="boot-screen">
+      <div class="boot-flower">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="boot-text">正在沏一壶茶 · 准备好乡音</p>
+    </div>
+
+    <div class="bg-stage" aria-hidden="true">
+      <div class="bg-image" id="bg-image"></div>
+      <div class="bg-image bg-image-next" id="bg-image-next"></div>
+      <div class="bg-vignette"></div>
+      <div class="bg-grain"></div>
+    </div>
+
+    <aside class="sidebar" role="navigation" aria-label="主导航">
+      <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="收起 / 展开侧栏">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+
+      <a class="brand" href="#workbench" aria-label="地道中文">
+        <span class="brand-seal" aria-hidden="true">语</span>
+        <div class="brand-text">
+          <strong>地道中文</strong>
+          <span class="brand-sub">Native Chinese · v2</span>
+        </div>
+      </a>
+
+      <nav class="nav-rail" role="tablist">
+        <a href="#workbench" class="nav-item is-active" data-route="workbench" role="tab" aria-selected="true">
+          <i class="fas fa-feather-pointed" aria-hidden="true"></i>
+          <span>重写台</span>
+          <kbd>1</kbd>
+        </a>
+        <a href="#batch" class="nav-item" data-route="batch" role="tab" aria-selected="false">
+          <i class="fas fa-table-list" aria-hidden="true"></i>
+          <span>批量工作台</span>
+          <kbd>2</kbd>
+        </a>
+        <a href="#atlas" class="nav-item" data-route="atlas" role="tab" aria-selected="false">
+          <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+          <span>方言图鉴</span>
+          <kbd>3</kbd>
+        </a>
+        <a href="#history" class="nav-item" data-route="history" role="tab" aria-selected="false">
+          <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+          <span>历史记录</span>
+          <kbd>4</kbd>
+        </a>
+        <a href="#settings" class="nav-item" data-route="settings" role="tab" aria-selected="false">
+          <i class="fas fa-sliders" aria-hidden="true"></i>
+          <span>设置</span>
+          <kbd>5</kbd>
+        </a>
+        <a href="#about" class="nav-item" data-route="about" role="tab" aria-selected="false">
+          <i class="fas fa-circle-info" aria-hidden="true"></i>
+          <span>关于</span>
+          <kbd>6</kbd>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="version-switch" role="tablist" aria-label="界面版本">
+          <button type="button" class="version-btn" data-version="v1" role="tab" title="古朴米白版">古朴</button>
+          <button type="button" class="version-btn is-active" data-version="v2" role="tab" title="墨韵深色版（推荐）">墨韵</button>
+        </div>
+        <p class="sidebar-meta">让一字一句都带乡音</p>
+      </div>
+    </aside>
+
+    <main class="app-main">
+
+      <header class="cmdbar">
+        <div class="cmdbar-left">
+          <button type="button" class="cmd-btn ghost" id="mobile-menu-btn" aria-label="打开菜单">
+            <i class="fas fa-bars" aria-hidden="true"></i>
+          </button>
+          <h1 class="cmdbar-title" id="page-title">重写台</h1>
+          <span class="cmdbar-subtitle" id="page-subtitle">把任意中文揉成你想要的乡音</span>
+        </div>
+        <div class="cmdbar-right">
+          <button type="button" class="bg-mode-pill" id="bg-mode-pill" title="背景模式（点击循环切换）">
+            <i class="fas fa-image" aria-hidden="true"></i>
+            <span id="bg-mode-label">轮播</span>
+          </button>
+          <button type="button" class="cmd-btn primary" id="cmdbar-rewrite">
+            <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> 立即重写
+            <kbd class="kbd-hint">⌘↵</kbd>
+          </button>
+        </div>
+      </header>
+
+      <section class="page page-workbench is-active" id="page-workbench">
+        <div class="workbench">
+          <div class="card card-input">
+            <header class="card-head">
+              <div class="card-head-title">
+                <i class="fas fa-pen-nib" aria-hidden="true"></i>
+                <h2>原文</h2>
+              </div>
+              <div class="card-head-tools">
+                <span class="char-count" title="字符计数">
+                  <span id="char-count">0</span>
+                  <span class="char-divider">/</span>
+                  <span class="char-max">1200</span>
+                </span>
+              </div>
+            </header>
+
+            <div class="example-chips" aria-label="示例文本">
+              <span class="chip-label"><i class="fas fa-lightbulb" aria-hidden="true"></i> 示例</span>
+              <button type="button" class="chip" data-example="我今天要去超市买点东西，顺便取个快递。">日常出门</button>
+              <button type="button" class="chip" data-example="老板，这道菜能再加点辣吗？我们都是无辣不欢。">下馆子</button>
+              <button type="button" class="chip" data-example="这件事你别太担心，慢慢来，办法总比困难多。">安慰朋友</button>
+              <button type="button" class="chip" data-example="周末有空一起出来喝一杯吗？我请客。">朋友邀约</button>
+              <button type="button" class="chip" data-example="这个项目截止日期太赶了，我担心质量没法保证。">职场表达</button>
+            </div>
+
+            <form id="rewrite-form" class="form-area">
+              <label for="text" class="visually-hidden">原文输入</label>
+              <textarea
+                id="text"
+                name="text"
+                rows="9"
+                maxlength="1200"
+                placeholder="把你想表达的话贴在这里。例如：我今天要去超市买东西，路上顺便去趟邮局。"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+
+              <div class="scenario-row" aria-label="说话场景">
+                <span class="scenario-label">
+                  <i class="fas fa-comments" aria-hidden="true"></i>
+                  场景
+                  <span class="scenario-hint" title="不同场景下，同一种方言的语气也不同。选个最贴近的。">
+                    <i class="fas fa-circle-info" aria-hidden="true"></i>
+                  </span>
+                </span>
+                <div class="scenario-chips" id="scenario-chips" role="radiogroup" aria-label="说话场景">
+                  <!-- populated by JS from /api/scenarios -->
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="select-wrap">
+                  <i class="fas fa-map-signs select-icon" aria-hidden="true"></i>
+                  <label for="target_variety" class="visually-hidden">目标方言</label>
+                  <select id="target_variety" name="target_variety">
+                    <option value="" disabled selected>选择方言风格…</option>
+                  </select>
+                </div>
+                <button id="submit-button" type="submit" class="btn-rewrite">
+                  <span class="btn-spinner" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                  </span>
+                  <i class="fas fa-wand-magic-sparkles btn-icon" aria-hidden="true"></i>
+                  <span class="button-label">立即重写</span>
+                </button>
+              </div>
+            </form>
+
+            <div class="variety-card" id="variety-card" hidden>
+              <div class="variety-card-header">
+                <span class="variety-badge" id="variety-badge">当前风味</span>
+                <span class="variety-trial" id="variety-trial" hidden>
+                  <i class="fas fa-flask" aria-hidden="true"></i> 试用版
+                </span>
+                <span class="variety-script" id="variety-script">简体</span>
+              </div>
+              <h3 id="variety-title">—</h3>
+              <p id="variety-register" class="variety-register">选一种方言，这里会显示它的语体定位。</p>
+              <p id="variety-style" class="variety-style"></p>
+            </div>
+          </div>
+
+          <div class="card card-output">
+            <header class="card-head">
+              <div class="card-head-title">
+                <i class="fas fa-feather-pointed" aria-hidden="true"></i>
+                <h2>重写结果</h2>
+                <span class="landmark-tag" id="landmark-tag" hidden>
+                  <i class="fas fa-location-dot" aria-hidden="true"></i>
+                  <span id="landmark-name">—</span>
+                </span>
+                <span class="degraded-tag" id="degraded-tag" hidden title="此次回退到本地启发式重写">
+                  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i> 已降级
+                </span>
+              </div>
+              <div class="card-head-tools">
+                <button type="button" class="icon-btn" id="compare-toggle" title="并排对照原文" aria-pressed="false">
+                  <i class="fas fa-table-columns" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="icon-btn" id="speak-button" disabled title="朗读结果">
+                  <i class="fas fa-volume-up" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="icon-btn" id="download-button" disabled title="导出为 .txt">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="icon-btn primary-icon" id="copy-button" disabled title="复制">
+                  <i class="far fa-copy" aria-hidden="true"></i>
+                </button>
+              </div>
+            </header>
+
+            <div class="status-row">
+              <p id="status" class="status" aria-live="polite">
+                <i class="fas fa-info-circle" aria-hidden="true"></i> 选择方言风格并点击"立即重写"
+              </p>
+            </div>
+            <p id="warning" class="warning" aria-live="polite"></p>
+
+            <div class="result-stage" id="result-stage">
+              <pre id="result" class="result" tabindex="0"></pre>
+              <div class="result-watermark" aria-hidden="true">
+                <span>地</span><span>道</span><span>中</span><span>文</span>
+              </div>
+            </div>
+
+            <div class="result-stats" id="result-stats" hidden>
+              <div class="result-stat">
+                <span class="result-stat-label">输出字数</span>
+                <span class="result-stat-value" id="result-char-count">0</span>
+              </div>
+              <div class="result-stat">
+                <span class="result-stat-label">字形</span>
+                <span class="result-stat-value" id="result-script">—</span>
+              </div>
+              <div class="result-stat">
+                <span class="result-stat-label">耗时</span>
+                <span class="result-stat-value" id="result-elapsed">—</span>
+              </div>
+              <div class="result-stat">
+                <span class="result-stat-label">方言关键词</span>
+                <span class="result-stat-value" id="result-keywords">—</span>
+              </div>
+            </div>
+
+            <div class="result-foot">
+              <button type="button" class="ghost-btn" id="clear-button" title="清空原文与结果">
+                <i class="fas fa-eraser" aria-hidden="true"></i> 清空
+              </button>
+              <button type="button" class="ghost-btn" id="favorite-button" disabled title="收藏当前结果（再次点击取消）" aria-pressed="false">
+                <i class="far fa-star" aria-hidden="true"></i> <span id="favorite-label">收藏</span>
+              </button>
+              <button type="button" class="ghost-btn" id="explain-button" disabled title="让 AI 解释一下这次改写改了什么、为什么">
+                <i class="fas fa-magnifying-glass-chart" aria-hidden="true"></i> 解释这次改写
+              </button>
+              <button type="button" class="ghost-btn" id="compare-other-button" disabled title="挑几个其他方言对比同一句话">
+                <i class="fas fa-shuffle" aria-hidden="true"></i> 对比其它方言
+              </button>
+            </div>
+
+            <!-- AI Explain drawer -->
+            <section class="explain-drawer" id="explain-drawer" hidden>
+              <header class="drawer-head">
+                <h3><i class="fas fa-magnifying-glass-chart" aria-hidden="true"></i> AI 改写解析</h3>
+                <button type="button" class="icon-btn" id="explain-close" title="关闭">
+                  <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+              </header>
+              <div class="explain-body" id="explain-body">
+                <p class="explain-loading"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> AI 正在分析…</p>
+              </div>
+            </section>
+
+            <!-- Multi-variety compare panel -->
+            <section class="compare-panel" id="compare-panel" hidden>
+              <header class="drawer-head">
+                <h3><i class="fas fa-table-columns" aria-hidden="true"></i> 同一句话 · 多方言对比</h3>
+                <button type="button" class="icon-btn" id="compare-close" title="关闭">
+                  <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+              </header>
+              <p class="compare-hint">挑下面任意方言（最多 3 个），看同一段原文在不同方言里的样子。</p>
+              <div class="compare-chips" id="compare-chips" role="group" aria-label="对比方言选择"></div>
+              <div class="compare-grid" id="compare-grid"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 页面：批量工作台 ==================== -->
+      <section class="page page-batch" id="page-batch">
+        <div class="batch-pane">
+          <header class="batch-header">
+            <h2><i class="fas fa-table-list" aria-hidden="true"></i> 批量工作台</h2>
+            <p>一行一条原文，最多 100 条，并选 1-3 种方言一次跑完。可导出 CSV / JSON。</p>
+          </header>
+
+          <div class="batch-input-row">
+            <div class="batch-textarea-wrap">
+              <label for="batch-input" class="visually-hidden">批量原文</label>
+              <textarea
+                id="batch-input"
+                rows="8"
+                placeholder="一行一条，例如：
+今天的报告我下午发给您。
+这道菜请少放点辣。
+我朋友说他周末不一定有空。
+（最多 100 行）"
+                spellcheck="false"
+              ></textarea>
+              <div class="batch-input-tools">
+                <span class="batch-line-count" id="batch-line-count">0 行</span>
+                <button type="button" class="ghost-btn" id="batch-paste-csv" title="从剪贴板自动识别 CSV / 一行一条">
+                  <i class="fas fa-paste" aria-hidden="true"></i> 智能粘贴
+                </button>
+                <button type="button" class="ghost-btn" id="batch-clear" title="清空输入">
+                  <i class="fas fa-eraser" aria-hidden="true"></i> 清空
+                </button>
+              </div>
+            </div>
+
+            <aside class="batch-config">
+              <div class="batch-config-group">
+                <label class="batch-label">方言（可多选，最多 3 个）</label>
+                <div class="batch-variety-chips" id="batch-variety-chips"></div>
+              </div>
+              <div class="batch-config-group">
+                <label class="batch-label">场景</label>
+                <div class="batch-scenario-chips" id="batch-scenario-chips"></div>
+              </div>
+              <div class="batch-config-group">
+                <label class="batch-toggle">
+                  <input type="checkbox" id="batch-score-toggle">
+                  <span>开启质量评分（每条额外耗 1 次 LLM）</span>
+                </label>
+              </div>
+              <div class="batch-actions">
+                <button type="button" class="primary-btn batch-run" id="batch-run">
+                  <i class="fas fa-play" aria-hidden="true"></i>
+                  <span>开始批量重写</span>
+                  <kbd class="kbd-hint">⌘↵</kbd>
+                </button>
+                <button type="button" class="ghost-btn danger" id="batch-abort" hidden>
+                  <i class="fas fa-stop" aria-hidden="true"></i> 中止
+                </button>
+              </div>
+            </aside>
+          </div>
+
+          <!-- Progress + summary bar -->
+          <div class="batch-progress" id="batch-progress" hidden>
+            <div class="batch-progress-bar"><div class="batch-progress-fill" id="batch-progress-fill"></div></div>
+            <div class="batch-progress-text" id="batch-progress-text">准备中…</div>
+          </div>
+
+          <!-- Result table -->
+          <div class="batch-table-wrap" id="batch-table-wrap" hidden>
+            <div class="batch-toolbar">
+              <span class="batch-toolbar-info" id="batch-toolbar-info">—</span>
+              <div class="batch-toolbar-actions">
+                <label class="history-filter" title="导出时只导出每行被标记的赢家方言">
+                  <input type="checkbox" id="batch-winners-only">
+                  <i class="fas fa-crown" aria-hidden="true"></i> 只导赢家
+                </label>
+                <button type="button" class="ghost-btn" id="batch-export-csv">
+                  <i class="fas fa-file-csv" aria-hidden="true"></i> 导出 CSV
+                </button>
+                <button type="button" class="ghost-btn" id="batch-export-json">
+                  <i class="fas fa-file-code" aria-hidden="true"></i> 导出 JSON
+                </button>
+                <button type="button" class="ghost-btn" id="batch-export-md">
+                  <i class="fab fa-markdown" aria-hidden="true"></i> 导出 Markdown
+                </button>
+              </div>
+            </div>
+            <div class="batch-table-scroll">
+              <table class="batch-table" id="batch-table">
+                <thead>
+                  <tr id="batch-table-head"><th>#</th><th>原文</th></tr>
+                </thead>
+                <tbody id="batch-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Empty / onboarding state -->
+          <div class="batch-empty" id="batch-empty">
+            <i class="fas fa-table-list" aria-hidden="true"></i>
+            <h3>把要批量改写的句子粘进上面的框</h3>
+            <p>一行一条，挑 1-3 个方言；点开始重写后这里会变成一张表，每一行 = 一条原文，每一列 = 一种方言。</p>
+            <p class="batch-empty-tip">支持 ⌘↵ 启动 · ⌘E 导出 · Esc 中止 · 大数据建议每批 ≤ 50</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="page page-atlas" id="page-atlas">
+        <div class="variety-grid" id="atlas-grid"></div>
+      </section>
+
+      <section class="page page-history" id="page-history">
+        <header class="page-section-head">
+          <h2>历史记录</h2>
+          <p>本地保留最近 50 条重写结果，仅存在你的浏览器里。相同原文+方言会自动去重。</p>
+          <div class="history-tools">
+            <input type="search" id="history-search" placeholder="搜索原文 / 结果 / 方言…" class="search-input" aria-label="搜索历史">
+            <label class="history-filter">
+              <input type="checkbox" id="history-favorites-only"> 只看收藏
+            </label>
+            <button type="button" class="ghost-btn" id="history-export">
+              <i class="fas fa-file-export" aria-hidden="true"></i> 导出全部
+            </button>
+            <button type="button" class="ghost-btn danger" id="history-clear">
+              <i class="fas fa-trash" aria-hidden="true"></i> 清空历史
+            </button>
+          </div>
+        </header>
+        <div class="history-list" id="history-list"></div>
+        <div class="empty-state" id="history-empty" hidden>
+          <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+          <h3>暂无历史</h3>
+          <p>每次成功重写后，结果会自动保存在这里。你也可以在重写台手动收藏。</p>
+        </div>
+      </section>
+
+      <section class="page page-settings" id="page-settings">
+        <div class="settings-grid">
+          <article class="settings-card">
+            <header><i class="fas fa-image" aria-hidden="true"></i> 背景模式</header>
+            <p>每种方言都准备了 5 张地标实景图，你可以让它自动轮播，也可以挑一张你最爱的固定。</p>
+            <div class="seg-control" data-setting="bgMode">
+              <button type="button" data-value="rotate" class="is-active">轮播（每 12 秒）</button>
+              <button type="button" data-value="static">固定单张</button>
+              <button type="button" data-value="off">关闭背景</button>
+            </div>
+            <p class="settings-hint">在「方言图鉴」页面点选某张地标即可设为该方言的固定背景。</p>
+          </article>
+
+          <article class="settings-card">
+            <header><i class="fas fa-text-height" aria-hidden="true"></i> 字号</header>
+            <p>调整结果区的中文字号，让阅读更舒服。</p>
+            <div class="seg-control" data-setting="fontScale">
+              <button type="button" data-value="0.92">小</button>
+              <button type="button" data-value="1" class="is-active">中</button>
+              <button type="button" data-value="1.12">大</button>
+              <button type="button" data-value="1.24">特大</button>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <header><i class="fas fa-highlighter" aria-hidden="true"></i> 关键词高亮</header>
+            <p>把重写结果中带方言风味的词（如"巴适"、"係"、"嘎嘎"）自动标黄。</p>
+            <div class="seg-control" data-setting="highlight">
+              <button type="button" data-value="on" class="is-active">开启</button>
+              <button type="button" data-value="off">关闭</button>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <header><i class="fas fa-palette" aria-hidden="true"></i> 界面主题</header>
+            <p>古朴米白 vs 墨韵深色，按你眼睛舒服的来。</p>
+            <div class="seg-control" data-setting="version">
+              <button type="button" data-value="v1">古朴</button>
+              <button type="button" data-value="v2" class="is-active">墨韵</button>
+            </div>
+          </article>
+
+          <article class="settings-card wide">
+            <header><i class="fas fa-book-open" aria-hidden="true"></i> 品牌语调字典 / Glossary</header>
+            <p>每行一条术语映射，格式 <code>原词 → 改写时必须用的词</code>。系统会把它注入 prompt 强制执行。</p>
+            <textarea id="glossary-input" class="glossary-textarea" rows="5" spellcheck="false"
+              placeholder="例如：
+ride-sharing → 拼车
+deadline → 截止日期
+我们公司 → 咱厂"></textarea>
+            <p class="settings-hint" id="glossary-hint">未启用</p>
+          </article>
+
+          <article class="settings-card wide">
+            <header><i class="fas fa-brain" aria-hidden="true"></i> AI 自反馈（实验）</header>
+            <p>每次评分都被记录；当某 (方言, 场景) 的平均分低于 3.5 (≥8 个样本时)，可触发 DeepSeek
+              对照高分/低分例子重写【场景指引】，从此使用新指引。</p>
+            <div class="quality-stats" id="quality-stats">
+              <p class="settings-hint">还没有评分数据。在重写台勾选「评分」，或在批量工作台开启「质量评分」。</p>
+            </div>
+          </article>
+
+          <article class="settings-card wide">
+            <header><i class="fas fa-database" aria-hidden="true"></i> 数据</header>
+            <p>所有历史与设置都只保存在你的浏览器 localStorage 中，不会上传服务器。</p>
+            <div class="settings-actions">
+              <button type="button" class="ghost-btn" id="settings-export-all">
+                <i class="fas fa-file-export" aria-hidden="true"></i> 导出全部数据（JSON）
+              </button>
+              <button type="button" class="ghost-btn danger" id="settings-reset">
+                <i class="fas fa-rotate-left" aria-hidden="true"></i> 重置所有偏好
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page page-about" id="page-about">
+        <article class="about-hero">
+          <span class="eyebrow"><i class="fas fa-seal" aria-hidden="true"></i> About</span>
+          <h2>把每一字，都揉回它该有的乡音</h2>
+          <p>地道中文是一个把任意中文文本按方言重新组织语气、词汇与句式的小工具。
+          它不替换主题，只换说法——希望你写出去的话，读起来像本地朋友亲口讲的。</p>
+        </article>
+
+        <section class="about-grid">
+          <article class="about-block">
+            <h3><i class="fas fa-feather" aria-hidden="true"></i> 写作贴士</h3>
+            <ol class="tips-list">
+              <li><strong>原文写顺</strong> · 越自然，输出越地道。</li>
+              <li><strong>给出场景</strong> · "跟领导汇报"、"跟发小开玩笑"，写在原文里。</li>
+              <li><strong>别一次贪多</strong> · 一段段来，方言细节才不会被平均掉。</li>
+              <li><strong>朗读验味儿</strong> · 看不出像不像，就用朗读按钮听一遍（粤语用粤语 TTS，闽南语暂不支持朗读）。</li>
+            </ol>
+          </article>
+
+          <article class="about-block">
+            <h3><i class="fas fa-comments" aria-hidden="true"></i> 常见疑问</h3>
+            <details open>
+              <summary>它能完美还原我家乡的口音吗？</summary>
+              <p>它努力还原"写下来的方言味儿"，但口音、声调得靠耳朵。所以提供了朗读按钮做参考。</p>
+            </details>
+            <details>
+              <summary>为什么闽南话标成"试用版"？</summary>
+              <p>闽南话与普通话语法、词汇差异极大，AI 训练语料较少，输出会比其他方言不稳定，仅供参考体验。我们不提供闽南语 TTS（避免普通话发音误读）。</p>
+            </details>
+            <details>
+              <summary>粤语 / 闽南语为什么是繁体？</summary>
+              <p>这两种语言长期使用繁体汉字书写，许多本字（如"係、唔、㗎、毋"）在简体里没有通用对应。</p>
+            </details>
+            <details>
+              <summary>历史记录会上传吗？</summary>
+              <p>不会。所有历史与偏好都只存在你的浏览器本地。</p>
+            </details>
+            <details>
+              <summary>"已降级"标签是什么意思？</summary>
+              <p>当 LLM 不可用（无 API key、网络故障、返回格式异常）时，本工具会回退到本地启发式重写——只做有限的词替换，效果远不如 LLM。"已降级"角标提醒你：当前这条结果不可作为最终成品使用。</p>
+            </details>
+          </article>
+
+          <article class="about-block">
+            <h3><i class="fas fa-keyboard" aria-hidden="true"></i> 键盘快捷键</h3>
+            <table class="kbd-table">
+              <tr><td><kbd>⌘</kbd> + <kbd>↵</kbd></td><td>立即重写</td></tr>
+              <tr><td><kbd>⌘</kbd> + <kbd>K</kbd></td><td>清空原文</td></tr>
+              <tr><td><kbd>⌘</kbd> + <kbd>C</kbd></td><td>结果区聚焦时复制</td></tr>
+              <tr><td><kbd>1</kbd>~<kbd>5</kbd></td><td>切换页面</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>关闭弹窗</td></tr>
+            </table>
+          </article>
+        </section>
+
+        <footer class="about-foot">
+          <p>地道中文 · v2 「墨韵」 &copy; 2025 · 言之有味，听之有乡</p>
+        </footer>
+      </section>
+
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+      <i class="fas fa-circle-check" aria-hidden="true"></i>
+      <span id="toast-text">操作成功</span>
+    </div>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Cycle 10 — Override review modal (human-in-the-loop gate) -->
+    <div class="landmark-modal" id="override-modal" role="dialog" aria-modal="true" aria-labelledby="override-modal-title" hidden>
+      <div class="landmark-modal-content override-modal-content">
+        <button class="landmark-close" id="override-modal-close" type="button" aria-label="关闭">
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+        <header>
+          <h3 id="override-modal-title">AI 自反馈：审核草稿</h3>
+          <p id="override-modal-sub">DeepSeek 根据样本提议了新【场景指引】。请审核后再启用。</p>
+        </header>
+        <div class="override-diff">
+          <div class="override-block override-block-old">
+            <h4>当前指引</h4>
+            <pre id="override-modal-old"></pre>
+          </div>
+          <div class="override-block override-block-new">
+            <h4>AI 提议（可编辑）</h4>
+            <textarea id="override-modal-new" rows="10" spellcheck="false"></textarea>
+          </div>
+        </div>
+        <div class="override-meta">
+          <span>诊断：<strong id="override-modal-reason">—</strong></span>
+          <span>样本基线 μ = <strong id="override-modal-baseline">—</strong></span>
+        </div>
+        <footer>
+          <button type="button" class="ghost-btn danger" id="override-reject-btn">
+            <i class="fas fa-xmark" aria-hidden="true"></i> 拒绝草稿
+          </button>
+          <button type="button" class="ghost-btn" id="override-modal-cancel">取消</button>
+          <button type="button" class="primary-btn" id="override-activate-btn">
+            <i class="fas fa-circle-check" aria-hidden="true"></i> 启用此指引
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <div
+      class="landmark-modal"
+      id="landmark-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="landmark-modal-title"
+      hidden
+    >
+      <div class="landmark-modal-content">
+        <button class="landmark-close" id="landmark-close" type="button" aria-label="关闭">
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+        <header>
+          <h3 id="landmark-modal-title">—</h3>
+          <p id="landmark-modal-sub">挑一张你最爱的地标，把它设为该方言的固定背景。</p>
+        </header>
+        <div class="landmark-modal-grid" id="landmark-modal-grid"></div>
+        <footer>
+          <button type="button" class="ghost-btn" id="landmark-rotate-btn">
+            <i class="fas fa-rotate" aria-hidden="true"></i> 设为轮播（默认）
+          </button>
+          <button type="button" class="primary-btn" id="landmark-use-btn">
+            <i class="fas fa-feather-pointed" aria-hidden="true"></i> 用此方言开始重写
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

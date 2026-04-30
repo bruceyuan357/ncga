@@ -1,0 +1,35 @@
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Quality store (contains user data — encrypted but still don't ship)
+.ncga-quality.json
+.ncga-quality.json.tmp
+
+# Lifecycle / runtime artefacts
+.ncga.pid
+ncga.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project-local Claude Code state
+.claude/

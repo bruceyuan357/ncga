@@ -1,0 +1,2 @@
+certifi>=2024.2.2
+cryptography>=42.0  # AES-GCM at-rest encryption for quality store (Cycle 13)

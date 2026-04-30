@@ -1,0 +1,20 @@
+# Don't bake secrets / dev artefacts into the image
+.env
+.ncga.pid
+.ncga-quality.json
+.git
+.github
+.gitignore
+.ruff_cache
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.idea
+.vscode
+*.swp
+.DS_Store
+tests
+README.md
+# Memory / scratch
+.claude
