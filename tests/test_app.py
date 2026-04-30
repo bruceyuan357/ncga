@@ -683,10 +683,15 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(status, "400 Bad Request")
 
     def test_rewrite_endpoint_unknown_scenario_falls_back_silently(self) -> None:
-        """Unknown scenario must not 400 — it silently falls back to FRIENDS_CASUAL."""
+        """Unknown scenario must not 400 — it silently falls back to FRIENDS_CASUAL.
+
+        Cycle 16: the fallback is now visible in the response body via
+        `effective_scenario`, so a stale-frontend / typo'd scenario doesn't
+        silently misroute output without leaving a trace the caller can inspect.
+        """
         client, transport = _build_client(_llm_json("ok"))
         app = App(rewrite_service=RewriteService(client=client))
-        status, _, _ = call_app(
+        status, _, body = call_app(
             app,
             "POST",
             "/api/rewrite",
@@ -694,9 +699,12 @@ class WebAppTests(unittest.TestCase):
                 {"text": "你好", "target_variety": "beijing_mandarin", "scenario": "mars_chat"}
             ).encode("utf-8"),
         )
+        payload = json.loads(body.decode("utf-8"))
         self.assertEqual(status, "200 OK")
         # Friends casual addendum
         self.assertIn("同辈", self._system_prompt(transport))
+        # The chosen scenario is echoed so the caller can detect the silent fallback.
+        self.assertEqual(payload["effective_scenario"], Scenario.FRIENDS_CASUAL.value)
 
     def test_security_headers_present_on_static(self) -> None:
         app = self._make_app()
@@ -704,6 +712,143 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertIn("Content-Security-Policy", headers)
         self.assertEqual(headers["X-Frame-Options"], "DENY")
+
+
+# ---------------- Cycle 16: validation diagnostics ----------------
+#
+# Each user-correctable 4xx must carry a precise, actionable string (RFC 7807 spirit).
+# These tests lock that in so the regression of "Invalid JSON payload" cannot recur.
+
+
+class ValidationDiagnosticsTests(unittest.TestCase):
+    def _make_app(self) -> App:
+        client, _ = _build_client(_llm_json("好的（mocked）"))
+        return App(rewrite_service=RewriteService(client=client))
+
+    def test_rewrite_missing_text_field_names_the_field(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"target_variety": "beijing_mandarin"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Missing required field", payload["error"])
+        self.assertIn("text", payload["error"])
+
+    def test_rewrite_missing_target_variety_field_names_the_field(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "你好"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Missing required field", payload["error"])
+        self.assertIn("target_variety", payload["error"])
+
+    def test_rewrite_malformed_json_reports_parse_location(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body='{"text": "你好",,,, broken'.encode(),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Malformed JSON", payload["error"])
+        # the parser surfaces a line/column so the caller can find the typo
+        self.assertIn("line", payload["error"])
+
+    def test_rewrite_non_dict_body_rejects_with_object_message(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=b"[1, 2, 3]",
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("JSON object", payload["error"])
+
+    def test_rewrite_invalid_utf8_body_reports_utf8(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=b"\xff\xfe\xff",  # not valid UTF-8
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("UTF-8", payload["error"])
+
+    def test_rewrite_unknown_variety_echoes_offending_value(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "你好", "target_variety": "klingon_mandarin"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Unsupported target variety", payload["error"])
+        self.assertIn("klingon_mandarin", payload["error"])
+
+    def test_rewrite_response_includes_effective_scenario(self) -> None:
+        """A successful /api/rewrite response always names the scenario actually applied."""
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rewrite",
+            body=json.dumps(
+                {
+                    "text": "你好",
+                    "target_variety": "beijing_mandarin",
+                    "scenario": "workplace",
+                }
+            ).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(payload["effective_scenario"], "workplace")
+
+    def test_rate_endpoint_missing_field_names_it(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/rate",
+            body=json.dumps({"target_variety": "beijing_mandarin"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Missing required field", payload["error"])
+        self.assertIn("rewritten", payload["error"])
+
+    def test_explain_endpoint_missing_field_names_it(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/explain",
+            body=json.dumps({"original": "hi", "rewritten": "hi"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Missing required field", payload["error"])
+        self.assertIn("target_variety", payload["error"])
+
+    def test_meta_refine_invalid_variety_echoes_value(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/meta-refine",
+            body=json.dumps({"target_variety": "not_a_dialect"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Unsupported target variety", payload["error"])
+        self.assertIn("not_a_dialect", payload["error"])
 
 
 # ---------------- rate limiter ----------------
@@ -1156,6 +1301,31 @@ class StreamingRewriteEndpointTests(unittest.TestCase):
         # The final partial in done should contain the rewritten text
         self.assertIn("你好", text)
 
+    def test_rewrite_stream_done_event_includes_effective_scenario(self) -> None:
+        """Cycle 16: streaming `done` event echoes the chosen scenario, mirroring /api/rewrite."""
+        sse = b"".join(
+            [
+                b'data: {"choices":[{"delta":{"content":"{\\"rewritten_text\\": \\""}}]}\n',
+                b'data: {"choices":[{"delta":{"content":"\xe4\xbd\xa0\xe5\xa5\xbd"}}]}\n',
+                b'data: {"choices":[{"delta":{"content":"\\", \\"warning\\": \\"\\"}"}}]}\n',
+                b"data: [DONE]\n",
+            ]
+        )
+        client, _ = _build_client(sse, streaming=True)
+        app = App(rewrite_service=RewriteService(client=client))
+        _, _, body = call_app(
+            app,
+            "POST",
+            "/api/rewrite-stream",
+            body=json.dumps(
+                {"text": "你好", "target_variety": "standard_putonghua", "scenario": "mars_chat"}
+            ).encode("utf-8"),
+        )
+        text = body.decode("utf-8")
+        # The done event JSON includes effective_scenario; mars_chat is unknown so it
+        # falls back to friends_casual — and that fallback is now visible.
+        self.assertIn('"effective_scenario": "friends_casual"', text)
+
 
 class RateEndpointTests(unittest.TestCase):
     def test_rate_endpoint_happy_path(self) -> None:
@@ -1280,6 +1450,26 @@ class BatchEndpointTests(unittest.TestCase):
         # 2 result events, regardless of individual outcome
         self.assertEqual(text.count("event: result"), 2)
         self.assertIn('"summary"', text)
+
+    def test_batch_meta_event_includes_effective_scenario(self) -> None:
+        """Cycle 16: batch `meta` event echoes the chosen scenario (visible silent fallback)."""
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        _, _, body = call_app(
+            app,
+            "POST",
+            "/api/rewrite-batch",
+            body=json.dumps(
+                {
+                    "items": ["你好"],
+                    "target_varieties": ["beijing_mandarin"],
+                    "scenario": "intergalactic_summit",
+                }
+            ).encode("utf-8"),
+        )
+        text = body.decode("utf-8")
+        # "intergalactic_summit" is unknown → falls back to friends_casual; that fallback is visible.
+        self.assertIn('"effective_scenario": "friends_casual"', text)
 
 
 class LifecycleTests(unittest.TestCase):

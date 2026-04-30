@@ -343,33 +343,22 @@ class App:
                 {"error": "Rate limit exceeded. Please slow down."},
             )
 
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
         try:
-            length = int(environ.get("CONTENT_LENGTH") or "0")
-        except ValueError:
-            length = 0
-        if length < 0 or length > self.max_body_bytes:
-            return json_response(
-                start_response,
-                "413 Payload Too Large",
-                {"error": f"Request body exceeds {self.max_body_bytes} bytes."},
-            )
-        raw_body = environ["wsgi.input"].read(length) if length else b""
-        if len(raw_body) > self.max_body_bytes:
-            return json_response(
-                start_response,
-                "413 Payload Too Large",
-                {"error": f"Request body exceeds {self.max_body_bytes} bytes."},
-            )
-
-        try:
-            payload = json.loads(raw_body.decode("utf-8"))
             text = payload["text"]
             target = parse_variety(payload["target_variety"])
             # Scenario is optional — silently default to FRIENDS_CASUAL if missing/unknown.
+            # Cycle 16: the chosen scenario is now echoed in the response as `effective_scenario`
+            # so a stale-frontend / typo'd scenario surfaces visibly without breaking the contract.
             scenario = parse_scenario(payload.get("scenario"))
             glossary_lines = _coerce_glossary(payload.get("glossary"))
-        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
 
@@ -385,7 +374,9 @@ class App:
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
 
-        return json_response(start_response, "200 OK", result.as_dict())
+        data = result.as_dict()
+        data["effective_scenario"] = scenario.value
+        return json_response(start_response, "200 OK", data)
 
     def handle_explain(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Take {original, rewritten, target_variety} and return {summary, points[]}."""
@@ -399,25 +390,18 @@ class App:
                 {"error": "Rate limit exceeded. Please slow down."},
             )
 
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
         try:
-            length = int(environ.get("CONTENT_LENGTH") or "0")
-        except ValueError:
-            length = 0
-        if length < 0 or length > self.max_body_bytes:
-            return json_response(
-                start_response,
-                "413 Payload Too Large",
-                {"error": f"Request body exceeds {self.max_body_bytes} bytes."},
-            )
-        raw_body = environ["wsgi.input"].read(length) if length else b""
-
-        try:
-            payload = json.loads(raw_body.decode("utf-8"))
             original = payload["original"]
             rewritten = payload["rewritten"]
             target = parse_variety(payload["target_variety"])
-        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
 
@@ -440,7 +424,11 @@ class App:
     # ------------------ streaming + batch (Cycle 7-8) ------------------
 
     def _read_json_body(self, environ: dict, start_response: Callable):
-        """Common: read+parse JSON body. Returns (payload_dict, error_response_or_none)."""
+        """Common: read+parse JSON body. Returns (payload_dict, error_response_or_none).
+
+        Cycle 16: each failure class gets a distinct, actionable message
+        (RFC 7807 spirit). Replaces the prior generic 'Invalid JSON payload.'.
+        """
         try:
             length = int(environ.get("CONTENT_LENGTH") or "0")
         except ValueError:
@@ -453,9 +441,26 @@ class App:
             )
         raw = environ["wsgi.input"].read(length) if length else b""
         try:
-            return json.loads(raw.decode("utf-8")), None
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return None, json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return None, json_response(
+                start_response, "400 Bad Request", {"error": "Request body must be valid UTF-8."}
+            )
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            return None, json_response(
+                start_response,
+                "400 Bad Request",
+                {"error": f"Malformed JSON: {exc.msg} at line {exc.lineno} column {exc.colno}."},
+            )
+        if not isinstance(payload, dict):
+            return None, json_response(
+                start_response,
+                "400 Bad Request",
+                {"error": "Request body must be a JSON object."},
+            )
+        return payload, None
 
     def handle_rewrite_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint. Streams partial rewrite text as the LLM emits tokens."""
@@ -475,8 +480,11 @@ class App:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
             glossary_lines = _coerce_glossary(payload.get("glossary"))
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         if not isinstance(text, str):
@@ -514,8 +522,11 @@ class App:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
             original = str(payload.get("original", "") or "")
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         if not isinstance(rewritten, str):
@@ -559,8 +570,11 @@ class App:
             scenario = parse_scenario(payload.get("scenario"))
             glossary_lines = _coerce_glossary(payload.get("glossary"))
             max_parallel = int(payload.get("max_parallel") or 3)
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         if not isinstance(items, list) or not items:
@@ -629,8 +643,11 @@ class App:
         try:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         try:
@@ -649,8 +666,11 @@ class App:
         try:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         # Optional user override of the addendum text (lets them edit before activating)
@@ -677,8 +697,11 @@ class App:
         try:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         rejected = self.quality_store.reject_draft(target.value, scenario.value)
@@ -692,8 +715,11 @@ class App:
         try:
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
-        except (KeyError, TypeError):
-            return json_response(start_response, "400 Bad Request", {"error": "Invalid JSON payload."})
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         cleared = self.quality_store.clear_override(target.value, scenario.value)
@@ -738,6 +764,7 @@ def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=Non
                     {
                         "rewritten_text": partial,
                         "target_variety": target.value,
+                        "effective_scenario": scenario.value,
                     },
                 )
                 return
@@ -772,6 +799,7 @@ def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, ma
             "items": len(items),
             "varieties": [v.value for v in varieties],
             "parallel": max_parallel,
+            "effective_scenario": scenario.value,
         },
     )
 

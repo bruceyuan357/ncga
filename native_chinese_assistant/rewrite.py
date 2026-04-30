@@ -89,7 +89,7 @@ def parse_variety(value: str) -> VarietyPreset:
     try:
         return VarietyPreset(value)
     except ValueError as exc:
-        raise ValueError("Unsupported target variety.") from exc
+        raise ValueError(f"Unsupported target variety: {value!r}.") from exc
 
 
 # ---------- prompt construction ----------
