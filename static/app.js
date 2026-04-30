@@ -620,6 +620,15 @@
         showToast("已复制结果", "fa-clipboard-check");
       });
       node.querySelector('[data-act="reuse"]').addEventListener("click", () => {
+        // Cycle 18: history "放回" used to clobber a draft in the workbench.
+        // Confirm if the user has unsaved content that's not just the same item.
+        const current = (textInput.value || "").trim();
+        if (current && current !== item.original.trim()) {
+          const ok = window.confirm(
+            `重写台里有内容会被替换：\n\n当前：${current.slice(0, 40)}${current.length > 40 ? "…" : ""}\n\n要换成这条历史的原文吗？`
+          );
+          if (!ok) return;
+        }
         textInput.value = item.original;
         targetSelect.value = item.target_variety;
         updateCharCount();
@@ -891,6 +900,13 @@
   }
 
   function clearAll() {
+    // Cycle 18: don't silently nuke a draft. If there's input or a result, confirm.
+    const hasInput = (textInput.value || "").trim().length > 0;
+    const hasResult = (resultEl.textContent || "").trim().length > 0;
+    if (hasInput || hasResult) {
+      const ok = window.confirm("确认清空原文与结果？");
+      if (!ok) return;
+    }
     textInput.value = "";
     resultEl.textContent = "";
     setStatus(STATUS_TEXT.idle);
@@ -2579,7 +2595,19 @@
   function bindExampleChips() {
     $$(".chip[data-example]").forEach((chip) => {
       chip.addEventListener("click", () => {
-        textInput.value = chip.dataset.example;
+        const incoming = chip.dataset.example;
+        const current = textInput.value;
+        // Cycle 18: example chips used to nuke whatever the user had typed.
+        // Their labels (安慰朋友 / 职场表达) overlap conceptually with scenario
+        // chips below, so users misclicked and lost drafts. Now: empty → fill
+        // silently; non-empty → confirm before replacing.
+        if (current.trim() && current.trim() !== incoming.trim()) {
+          const ok = window.confirm(
+            `已有内容会被替换：\n\n当前：${current.slice(0, 40)}${current.length > 40 ? "…" : ""}\n\n要换成示例「${chip.textContent.trim()}」吗？`
+          );
+          if (!ok) return;
+        }
+        textInput.value = incoming;
         updateCharCount();
         textInput.focus();
       });
