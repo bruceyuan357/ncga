@@ -680,6 +680,7 @@ class ChatCompletionsClient:
         temperature: float = 0.4,
         response_format_json: bool = True,
         retries_on_5xx: int = 1,
+        retry_on_empty: bool = True,
     ) -> str:
         """Generic chat-completions wrapper with HTTPError-aware retry on 5xx.
 
@@ -691,21 +692,37 @@ class ChatCompletionsClient:
           - 5xx retry with exponential backoff (4xx not retried — request itself is bad)
           - Network-error retry (URLError that isn't HTTPError)
         Returns the raw `content` string from the first choice's message.
+
+        Cycle 19 (defensive): when `retry_on_empty=True` (default) and the LLM
+        returns 200-OK with empty `content` (DeepSeek-V4 reasoning ran out of
+        tokens before emitting JSON), we retry ONCE with `max_tokens × 2`.
+        This kills a class of bug we hit twice — Cycle 17 R1 (rate at 100) and
+        Cycle 19 (rate at 400) — both times the cause was V4 reasoning headroom
+        we hadn't budgeted for. Cost on the failure path doubles, which is
+        acceptable since failures are rare. Caller can disable via
+        `retry_on_empty=False` for paths where empty is meaningful.
         """
         import time as _t
         from urllib.error import HTTPError, URLError
 
-        payload: dict[str, Any] = {
-            "model": self.config.model,
-            "messages": messages,
-            "stream": False,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "top_p": 0.9,
-        }
-        if response_format_json:
-            payload["response_format"] = {"type": "json_object"}
-        body = json.dumps(payload).encode("utf-8")
+        def _post(tokens: int) -> str:
+            payload: dict[str, Any] = {
+                "model": self.config.model,
+                "messages": messages,
+                "stream": False,
+                "temperature": temperature,
+                "max_tokens": tokens,
+                "top_p": 0.9,
+            }
+            if response_format_json:
+                payload["response_format"] = {"type": "json_object"}
+            body_inner = json.dumps(payload).encode("utf-8")
+            with self._transport.post(
+                url, body_inner, headers, timeout=self.config.timeout_seconds, ssl_context=self.ssl_context
+            ) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+                return extract_message_content(raw)
+
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
@@ -717,15 +734,17 @@ class ChatCompletionsClient:
         attempts = retries_on_5xx + 1
         for attempt in range(attempts):
             try:
-                with self._transport.post(
-                    url,
-                    body,
-                    headers,
-                    timeout=self.config.timeout_seconds,
-                    ssl_context=self.ssl_context,
-                ) as response:
-                    raw = json.loads(response.read().decode("utf-8"))
-                    return extract_message_content(raw)
+                content = _post(max_tokens)
+                # Cycle 19 defensive layer: empty content under V4 means reasoning
+                # ate the budget. One double-or-nothing retry rescues most cases.
+                if retry_on_empty and (not content or not content.strip()):
+                    logger.info(
+                        "general_chat got empty content at max_tokens=%d; retrying with %d",
+                        max_tokens,
+                        max_tokens * 2,
+                    )
+                    content = _post(max_tokens * 2)
+                return content
             except HTTPError as exc:  # subclass of URLError — must catch first
                 # 5xx → retry; 4xx → fail fast
                 if 500 <= exc.code < 600 and attempt < attempts - 1:
@@ -764,15 +783,22 @@ class ChatCompletionsClient:
     def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
         """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
         metadata = PRESET_METADATA[target]
-        # Cycle 14: routes through general_chat, gets free 5xx retry + clean error path.
-        # Cycle 17: max_tokens bumped 100→400. DeepSeek-V4 family burns reasoning tokens
-        # before emitting JSON; 100 truncated the response to '' and rate silently broke.
+        # Cycle 14: routes through general_chat → free 5xx retry + clean error path.
+        # Cycle 17: bumped max_tokens 100 → 400 because DeepSeek-V4 burns reasoning
+        #           tokens before emitting JSON; 100 truncated the response to ''.
+        # Cycle 19: bumped 400 → 800. Same bug class re-surfaced when rating LONGER
+        #           rewrites (e.g. shanghai_mandarin_style of a 50-char input ≈ 150
+        #           output chars): the model needs ~600 reasoning tokens for the
+        #           harder dialects, so the JSON tail got truncated empty again.
+        #           Lesson: V4 reasoning isn't a constant — it scales with input
+        #           complexity. Pick max_tokens with comfortable headroom, not the
+        #           "smallest that worked in one test".
         content = self.general_chat(
             [
                 {"role": "system", "content": build_rate_system_prompt(metadata)},
                 {"role": "user", "content": rewritten},
             ],
-            max_tokens=400,
+            max_tokens=800,
             temperature=0.2,
         )
         if not content or not content.strip():

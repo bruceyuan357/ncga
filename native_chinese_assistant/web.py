@@ -349,9 +349,7 @@ class App:
         )
         self.characterize_limiter = RateLimiter(per_minute=crl)
         # Cycle 18 v2: shared daily ceiling across all LLM-spending endpoints.
-        daily_cap = int(
-            os.environ.get("NCGA_DAILY_LLM_CAP_PER_IP", DEFAULT_DAILY_LLM_CAP_PER_IP)
-        )
+        daily_cap = int(os.environ.get("NCGA_DAILY_LLM_CAP_PER_IP", DEFAULT_DAILY_LLM_CAP_PER_IP))
         self.daily_counter = DailyCounter(per_day=daily_cap)
         self.max_body_bytes = (
             max_body_bytes
@@ -366,25 +364,20 @@ class App:
             )
         )
 
-    def _check_daily_cap(
-        self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1
-    ):
+    def _check_daily_cap(self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1):
         """Cycle 18 v2: shared per-IP daily ceiling check. Call this in every
         LLM-spending handler BEFORE the per-minute limiter. `units` is the
         expected number of LLM calls this request will generate — most endpoints
         pass 1; batch passes items*varieties. Returns the 429 response on cap,
         else None."""
         if not self.daily_counter.allow(ip, units=units):
-            logger.info(
-                "daily_cap_exceeded ip=%s endpoint=%s units=%d", ip, endpoint, units
-            )
+            logger.info("daily_cap_exceeded ip=%s endpoint=%s units=%d", ip, endpoint, units)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
                 {
                     "error": (
-                        "今日 LLM 调用上限已到（每个 IP 每日 "
-                        f"{self.daily_counter.per_day} 次）。明天再试。"
+                        f"今日 LLM 调用上限已到（每个 IP 每日 {self.daily_counter.per_day} 次）。明天再试。"
                     )
                 },
             )
