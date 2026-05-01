@@ -129,6 +129,44 @@
 
       <section class="page page-workbench is-active" id="page-workbench">
         <div class="workbench">
+          <!-- Cycle 18 — 今日方言一句 (Function 2). Hidden until /api/phrase-of-the-day responds.
+               Dismissible per-day; reappears the next calendar day. Core idea: same wisdom, ten voices —
+               highlights that this whole project is about the shared core under regional variation. -->
+          <div class="card card-daily-phrase" id="daily-phrase-card" hidden>
+            <header class="daily-phrase-head">
+              <div class="daily-phrase-title">
+                <i class="fas fa-feather-pointed" aria-hidden="true"></i>
+                <h2>今日方言一句</h2>
+                <span class="daily-phrase-date" id="daily-phrase-date">—</span>
+              </div>
+              <div class="daily-phrase-tools">
+                <button type="button" class="ghost-btn small" id="daily-phrase-fav" title="收藏到本地">
+                  <i class="far fa-bookmark" aria-hidden="true"></i> 收藏
+                </button>
+                <button type="button" class="ghost-btn small" id="daily-phrase-dismiss" title="今天不再显示">
+                  <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+              </div>
+            </header>
+            <div class="daily-phrase-body">
+              <figure class="daily-phrase-figure" id="daily-phrase-figure">
+                <!-- Cycle 18 v2 (per A2): the 12 most representative Chinese landmarks
+                     rotate as a fast slideshow under the daily phrase. JS injects 12
+                     <img> children below; CSS only the active one is visible. -->
+                <div class="daily-phrase-slides" id="daily-phrase-slides"></div>
+                <figcaption id="daily-phrase-image-caption">—</figcaption>
+              </figure>
+              <div class="daily-phrase-text">
+                <blockquote class="daily-phrase-original" id="daily-phrase-original">—</blockquote>
+                <p class="daily-phrase-meaning" id="daily-phrase-meaning">—</p>
+                <details class="daily-phrase-translations">
+                  <summary>看看十种方言里这句怎么说 <span id="daily-phrase-translations-count" class="muted"></span></summary>
+                  <ul id="daily-phrase-translations-list"></ul>
+                </details>
+              </div>
+            </div>
+          </div>
+
           <div class="card card-input">
             <header class="card-head">
               <div class="card-head-title">
@@ -182,6 +220,10 @@
                 <div class="scenario-chips" id="scenario-chips" role="radiogroup" aria-label="说话场景">
                   <!-- populated by JS from /api/scenarios -->
                 </div>
+                <!-- Cycle 18: explicit-button entry to the 情境向导 (Function 1) -->
+                <button type="button" class="ghost-btn small" id="context-wizard-open" title="告诉系统更多背景，让它推荐场景和语气">
+                  <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> 情境向导
+                </button>
               </div>
 
               <div class="form-row">
@@ -603,6 +645,87 @@ deadline → 截止日期
     </div>
 
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Cycle 18 — example-overwrite confirm modal (replaces window.confirm) -->
+    <div class="landmark-modal" id="example-overwrite-modal" role="dialog" aria-modal="true" aria-labelledby="example-overwrite-title" hidden>
+      <div class="landmark-modal-content small-modal">
+        <header>
+          <h3 id="example-overwrite-title">是否替换原文？</h3>
+          <p id="example-overwrite-sub">你的原文框已经有内容了。要换成下面这个示例吗？</p>
+        </header>
+        <div class="example-overwrite-body">
+          <div class="example-overwrite-block">
+            <h4>当前原文</h4>
+            <pre id="example-overwrite-current"></pre>
+          </div>
+          <div class="example-overwrite-block">
+            <h4>示例</h4>
+            <pre id="example-overwrite-incoming"></pre>
+          </div>
+        </div>
+        <footer>
+          <button type="button" class="ghost-btn" id="example-overwrite-keep">
+            <i class="fas fa-shield" aria-hidden="true"></i> 保留原文
+          </button>
+          <button type="button" class="ghost-btn" id="example-overwrite-cancel">取消</button>
+          <button type="button" class="primary-btn" id="example-overwrite-load">
+            <i class="fas fa-download" aria-hidden="true"></i> 套用示例
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Cycle 18 — 情境向导 (Function 1: Conversational Setup) -->
+    <div class="landmark-modal" id="context-wizard-modal" role="dialog" aria-modal="true" aria-labelledby="context-wizard-title" hidden>
+      <div class="landmark-modal-content small-modal">
+        <button class="landmark-close" id="context-wizard-close" type="button" aria-label="关闭">
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+        <header>
+          <h3 id="context-wizard-title">情境向导</h3>
+          <p id="context-wizard-sub">告诉系统两件事，它会帮你挑场景、调语气，还能给一些品牌词建议。</p>
+        </header>
+        <div class="context-wizard-body" id="context-wizard-step-input">
+          <label>
+            <span>1） 这段话要发给谁？</span>
+            <input type="text" id="context-wizard-recipient" maxlength="240" placeholder="例：我妈 / 老板 / 一个大学同学 / 邻居张阿姨" autocomplete="off">
+          </label>
+          <label>
+            <span>2） 你现在的心情或目的是？</span>
+            <input type="text" id="context-wizard-mood" maxlength="240" placeholder="例：很气但要克制 / 真心感谢 / 有点尴尬要圆场" autocomplete="off">
+          </label>
+          <p class="context-wizard-cost-note"><i class="fas fa-info-circle" aria-hidden="true"></i> 这一步会调一次 LLM。每分钟最多 6 次。</p>
+        </div>
+        <div class="context-wizard-body" id="context-wizard-step-result" hidden>
+          <div class="cw-result-row">
+            <strong>建议场景</strong>
+            <span id="cw-result-scenario">—</span>
+            <button type="button" class="ghost-btn small" id="cw-apply-scenario">用这个场景</button>
+          </div>
+          <div class="cw-result-row">
+            <strong>语气提示</strong>
+            <span id="cw-result-register">—</span>
+          </div>
+          <div class="cw-result-row">
+            <strong>情感色彩</strong>
+            <span id="cw-result-tone">—</span>
+          </div>
+          <div class="cw-result-glossary">
+            <strong>建议品牌词（点 + 加入字典）</strong>
+            <div id="cw-result-glossary-chips"></div>
+          </div>
+        </div>
+        <footer>
+          <button type="button" class="ghost-btn" id="context-wizard-cancel">取消</button>
+          <button type="button" class="primary-btn" id="context-wizard-submit">
+            <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> 让 AI 分析
+          </button>
+          <button type="button" class="primary-btn" id="context-wizard-done" hidden>
+            <i class="fas fa-circle-check" aria-hidden="true"></i> 完成
+          </button>
+        </footer>
+      </div>
+    </div>
 
     <!-- Cycle 10 — Override review modal (human-in-the-loop gate) -->
     <div class="landmark-modal" id="override-modal" role="dialog" aria-modal="true" aria-labelledby="override-modal-title" hidden>

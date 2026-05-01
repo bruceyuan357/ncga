@@ -30,7 +30,13 @@ STATIC_DIR = (BASE_DIR / "static").resolve()
 
 DEFAULT_RATE_LIMIT_PER_MIN = 30
 DEFAULT_BATCH_RATE_LIMIT_PER_MIN = 6  # batch is heavy; 6 batches/min/IP is generous
+DEFAULT_CHARACTERIZE_RATE_LIMIT_PER_MIN = 6  # Cycle 18 — wizard is opt-in; tight cap
 DEFAULT_MAX_BODY_BYTES = 64 * 1024  # 64 KB — bumped to fit batch inputs (≤100 items × short text)
+# Cycle 18 v2 (per A5): bumped 1KB → 4KB so users can paste a longer background blurb.
+# Still much smaller than the main rewrite cap, since recipient + mood are bounded fields.
+DEFAULT_CHARACTERIZE_MAX_BODY_BYTES = 4 * 1024  # 4 KB
+# Cycle 18 v2 (per A6): bumped 120 → 240 so users can write a real sentence per field.
+CHARACTERIZE_FIELD_MAX_CHARS = 240
 
 
 def _const_eq(a: str, b: str) -> bool:
@@ -274,11 +280,60 @@ class App:
             else int(os.environ.get("NCGA_BATCH_RATE_LIMIT_PER_MIN", DEFAULT_BATCH_RATE_LIMIT_PER_MIN))
         )
         self.batch_limiter = RateLimiter(per_minute=brl)
+        # Cycle 18 (Function 1): dedicated tight bucket for /api/characterize.
+        # Each call costs one LLM round; users opt-in by clicking the wizard. A
+        # leaky/abusive client could otherwise drain the API key — keep the cap
+        # below the interactive rewrite limit.
+        crl = int(
+            os.environ.get(
+                "NCGA_CHARACTERIZE_RATE_LIMIT_PER_MIN",
+                DEFAULT_CHARACTERIZE_RATE_LIMIT_PER_MIN,
+            )
+        )
+        self.characterize_limiter = RateLimiter(per_minute=crl)
         self.max_body_bytes = (
             max_body_bytes
             if max_body_bytes is not None
             else int(os.environ.get("NCGA_MAX_BODY_BYTES", DEFAULT_MAX_BODY_BYTES))
         )
+        # Smaller body cap on /api/characterize — recipient + mood are short.
+        self.characterize_max_body_bytes = int(
+            os.environ.get(
+                "NCGA_CHARACTERIZE_MAX_BODY_BYTES",
+                DEFAULT_CHARACTERIZE_MAX_BODY_BYTES,
+            )
+        )
+
+    def _route_table(self) -> dict[tuple[str, str], Callable]:
+        """Cycle 18 architecture cleanup: replace the 16-line if-chain dispatch with
+        a (method, path) → handler table. Lookup is O(1) and adding a new endpoint
+        is one tuple insertion. GET handlers are wrapped in lambdas because they
+        are simple closures over instance state (no separate `handle_*` method
+        was worth defining for them)."""
+        return {
+            ("GET", "/"): lambda env, sr: static_response(sr, STATIC_DIR / "index.html"),
+            ("GET", "/api/presets"): lambda env, sr: json_response(
+                sr, "200 OK", {"presets": preset_options()}
+            ),
+            ("GET", "/api/scenarios"): lambda env, sr: json_response(
+                sr, "200 OK", {"scenarios": scenario_options()}
+            ),
+            ("GET", "/api/healthz"): lambda env, sr: json_response(sr, "200 OK", {"status": "ok"}),
+            ("GET", "/api/quality-stats"): lambda env, sr: json_response(
+                sr, "200 OK", {"buckets": self.quality_store.stats_snapshot()}
+            ),
+            ("GET", "/api/phrase-of-the-day"): self.handle_phrase_of_the_day,
+            ("POST", "/api/rewrite"): self.handle_rewrite,
+            ("POST", "/api/rewrite-stream"): self.handle_rewrite_stream,
+            ("POST", "/api/rewrite-batch"): self.handle_rewrite_batch,
+            ("POST", "/api/rate"): self.handle_rate,
+            ("POST", "/api/explain"): self.handle_explain,
+            ("POST", "/api/characterize"): self.handle_characterize,
+            ("POST", "/api/meta-refine"): self.handle_meta_refine,
+            ("POST", "/api/quality-stats/clear-override"): self.handle_clear_override,
+            ("POST", "/api/override-activate"): self.handle_override_activate,
+            ("POST", "/api/override-reject"): self.handle_override_reject,
+        }
 
     def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         method = environ["REQUEST_METHOD"]
@@ -294,43 +349,16 @@ class App:
                 {"error": "Authentication required (Bearer token)."},
             )
 
-        if method == "GET" and path == "/":
-            return static_response(start_response, STATIC_DIR / "index.html")
+        # Static files (prefix match — distinct from the table's exact lookup)
         if method == "GET" and path.startswith("/static/"):
             file_path = _safe_static_path(path.removeprefix("/static/"))
             if file_path is None:
                 return json_response(start_response, "404 Not Found", {"error": "Not found."})
             return static_response(start_response, file_path)
-        if method == "GET" and path == "/api/presets":
-            return json_response(start_response, "200 OK", {"presets": preset_options()})
-        if method == "GET" and path == "/api/scenarios":
-            return json_response(start_response, "200 OK", {"scenarios": scenario_options()})
-        if method == "GET" and path == "/api/healthz":
-            return json_response(start_response, "200 OK", {"status": "ok"})
-        if method == "GET" and path == "/api/quality-stats":
-            return json_response(
-                start_response,
-                "200 OK",
-                {"buckets": self.quality_store.stats_snapshot()},
-            )
-        if method == "POST" and path == "/api/meta-refine":
-            return self.handle_meta_refine(environ, start_response)
-        if method == "POST" and path == "/api/quality-stats/clear-override":
-            return self.handle_clear_override(environ, start_response)
-        if method == "POST" and path == "/api/override-activate":
-            return self.handle_override_activate(environ, start_response)
-        if method == "POST" and path == "/api/override-reject":
-            return self.handle_override_reject(environ, start_response)
-        if method == "POST" and path == "/api/rewrite":
-            return self.handle_rewrite(environ, start_response)
-        if method == "POST" and path == "/api/rewrite-stream":
-            return self.handle_rewrite_stream(environ, start_response)
-        if method == "POST" and path == "/api/rewrite-batch":
-            return self.handle_rewrite_batch(environ, start_response)
-        if method == "POST" and path == "/api/rate":
-            return self.handle_rate(environ, start_response)
-        if method == "POST" and path == "/api/explain":
-            return self.handle_explain(environ, start_response)
+
+        handler = self._route_table().get((method, path))
+        if handler is not None:
+            return handler(environ, start_response)
         return json_response(start_response, "404 Not Found", {"error": "Not found."})
 
     def handle_rewrite(self, environ: dict, start_response: Callable) -> list[bytes]:
@@ -421,23 +449,88 @@ class App:
 
         return json_response(start_response, "200 OK", data)
 
+    # ------------------ Cycle 18 (Function 1): 情境向导 ------------------
+
+    def handle_characterize(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Two-question wizard → structured profile.
+        Security posture (matches issue #3 + the user's emphasis on cost+abuse risk):
+          * Auth gate (already enforced upstream by _check_auth)
+          * Dedicated tight rate limiter (default 6/min/IP, separate bucket)
+          * 1 KB body cap (recipient + mood are <120 chars each)
+          * recipient + mood individually clipped to 120 chars in the service layer
+          * One LLM call per request — no fan-out
+          * No persistence (no PII storage)
+        """
+        ip = client_ip(environ)
+        if not self.characterize_limiter.allow(ip):
+            logger.info("rate_limited ip=%s endpoint=characterize", ip)
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "情境向导每分钟最多 6 次。请稍候再试。"},
+            )
+        payload, err = self._read_json_body(
+            environ, start_response, max_bytes=self.characterize_max_body_bytes
+        )
+        if err is not None:
+            return err
+        recipient = payload.get("recipient", "")
+        mood = payload.get("mood", "")
+        if not isinstance(recipient, str) or not isinstance(mood, str):
+            return json_response(
+                start_response,
+                "400 Bad Request",
+                {"error": "`recipient` and `mood` must be strings."},
+            )
+        try:
+            data = self.rewrite_service.characterize(recipient, mood)
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        except RewriteError as exc:
+            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
+        return json_response(start_response, "200 OK", data)
+
+    # ------------------ Cycle 18 (Function 2): 今日方言一句 ------------------
+
+    def handle_phrase_of_the_day(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Daily wisdom phrase rewritten into all 10 varieties + a landmark image.
+        Cached per calendar day in ~/.local/share/ncga/phrase-cache.json — only the
+        first call of the day pays the LLM cost (10 rewrites)."""
+        from native_chinese_assistant.daily_phrase import get_phrase_of_the_day
+
+        try:
+            data = get_phrase_of_the_day(self.rewrite_service)
+        except RewriteError as exc:
+            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("phrase-of-the-day failed: %s", exc)
+            return json_response(
+                start_response,
+                "503 Service Unavailable",
+                {"error": "phrase-of-the-day temporarily unavailable"},
+            )
+        return json_response(start_response, "200 OK", data)
+
     # ------------------ streaming + batch (Cycle 7-8) ------------------
 
-    def _read_json_body(self, environ: dict, start_response: Callable):
+    def _read_json_body(self, environ: dict, start_response: Callable, max_bytes: int | None = None):
         """Common: read+parse JSON body. Returns (payload_dict, error_response_or_none).
 
         Cycle 16: each failure class gets a distinct, actionable message
         (RFC 7807 spirit). Replaces the prior generic 'Invalid JSON payload.'.
+        Cycle 18: optional `max_bytes` lets endpoints with tiny payloads (like
+        /api/characterize) enforce a tighter cap than the default 64 KB.
         """
+        cap = max_bytes if max_bytes is not None else self.max_body_bytes
         try:
             length = int(environ.get("CONTENT_LENGTH") or "0")
         except ValueError:
             length = 0
-        if length < 0 or length > self.max_body_bytes:
+        if length < 0 or length > cap:
             return None, json_response(
                 start_response,
                 "413 Payload Too Large",
-                {"error": f"Request body exceeds {self.max_body_bytes} bytes."},
+                {"error": f"Request body exceeds {cap} bytes."},
             )
         raw = environ["wsgi.input"].read(length) if length else b""
         try:

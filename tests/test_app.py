@@ -144,6 +144,14 @@ def _llm_json(rewritten: str, warning: str = "") -> bytes:
     return json.dumps(payload).encode("utf-8")
 
 
+def _llm_json_raw(content: str) -> bytes:
+    """Wrap an arbitrary content string in the chat-completions response shape.
+    Used by Cycle 18 tests where the LLM is supposed to return characterize JSON,
+    not the rewrite envelope."""
+    payload = {"choices": [{"message": {"content": content}}]}
+    return json.dumps(payload).encode("utf-8")
+
+
 def _build_client(
     response_body: bytes, *, streaming: bool = False
 ) -> tuple[ChatCompletionsClient, FakeTransport]:
@@ -849,6 +857,239 @@ class ValidationDiagnosticsTests(unittest.TestCase):
         self.assertEqual(status, "400 Bad Request")
         self.assertIn("Unsupported target variety", payload["error"])
         self.assertIn("not_a_dialect", payload["error"])
+
+
+# ---------------- Cycle 18 — Function 1: 情境向导 ----------------
+
+
+class CharacterizeEndpointTests(unittest.TestCase):
+    """Two-question wizard → JSON profile (suggested_scenario / register_hint /
+    emotional_tone / glossary_suggestions). Locks in the security posture: tight
+    rate limiter, body cap, validation messages."""
+
+    def _make_app(self, wizard_response: dict | None = None) -> App:
+        body = (
+            wizard_response
+            if wizard_response is not None
+            else {
+                "suggested_scenario": "with_elders",
+                "register_hint": "温和而尊敬",
+                "emotional_tone": "歉意而真诚",
+                "glossary_suggestions": ["道歉 → 不好意思", "晚到 → 来晚了"],
+            }
+        )
+        client, _ = _build_client(_llm_json_raw(json.dumps(body, ensure_ascii=False)))
+        return App(rewrite_service=RewriteService(client=client))
+
+    def test_characterize_happy_path_returns_structured_profile(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/characterize",
+            body=json.dumps({"recipient": "我妈", "mood": "迟到了想道歉"}).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(payload["suggested_scenario"], "with_elders")
+        self.assertIn("尊敬", payload["register_hint"])
+        self.assertEqual(len(payload["glossary_suggestions"]), 2)
+
+    def test_characterize_unknown_scenario_falls_back_to_friends_casual(self) -> None:
+        """LLM hallucinated scenario must be coerced — same forgiving contract as
+        parse_scenario in presets.py — so the frontend never crashes on bad output."""
+        app = self._make_app(
+            {
+                "suggested_scenario": "mars_chat",  # not a real scenario
+                "register_hint": "x",
+                "emotional_tone": "y",
+                "glossary_suggestions": [],
+            }
+        )
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/characterize",
+            body=json.dumps({"recipient": "boss", "mood": "ok"}).encode("utf-8"),
+        )
+        self.assertEqual(status, "200 OK")
+        payload = json.loads(body.decode("utf-8"))
+        self.assertEqual(payload["suggested_scenario"], Scenario.FRIENDS_CASUAL.value)
+
+    def test_characterize_glossary_capped_at_5(self) -> None:
+        app = self._make_app(
+            {
+                "suggested_scenario": "friends_casual",
+                "register_hint": "",
+                "emotional_tone": "",
+                "glossary_suggestions": [f"item{i} → x{i}" for i in range(20)],
+            }
+        )
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/characterize",
+            body=json.dumps({"recipient": "x", "mood": "y"}).encode("utf-8"),
+        )
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(len(json.loads(body.decode("utf-8"))["glossary_suggestions"]), 5)
+
+    def test_characterize_both_fields_empty_400(self) -> None:
+        status, _, body = call_app(
+            self._make_app(),
+            "POST",
+            "/api/characterize",
+            body=json.dumps({"recipient": "  ", "mood": ""}).encode("utf-8"),
+        )
+        self.assertEqual(status, "400 Bad Request")
+
+    def test_characterize_dedicated_rate_limiter(self) -> None:
+        """Dedicated bucket (default 6/min) — burst limit is independent of /api/rewrite."""
+        client, _ = _build_client(
+            _llm_json_raw(
+                '{"suggested_scenario":"friends_casual","register_hint":"","emotional_tone":"","glossary_suggestions":[]}'
+            )
+        )
+        app = App(rewrite_service=RewriteService(client=client))
+        # Hammer it: characterize bucket = 6/min default. 7th must 429.
+        body = json.dumps({"recipient": "a", "mood": "b"}).encode("utf-8")
+        codes = [call_app(app, "POST", "/api/characterize", body=body)[0] for _ in range(7)]
+        self.assertEqual(codes.count("200 OK"), 6)
+        self.assertEqual(codes.count("429 Too Many Requests"), 1)
+
+    def test_characterize_body_cap(self) -> None:
+        """1KB cap — prevents large-prompt smuggling via this cheaper endpoint."""
+        # Pad recipient with 2KB worth of chars
+        big = json.dumps({"recipient": "x" * 2000, "mood": "y"}).encode("utf-8")
+        client, _ = _build_client(_llm_json_raw('{"suggested_scenario":"friends_casual"}'))
+        app = App(rewrite_service=RewriteService(client=client))
+        status, _, body = call_app(app, "POST", "/api/characterize", body=big)
+        self.assertEqual(status, "413 Payload Too Large")
+
+
+# ---------------- Cycle 18 — Function 2: 今日方言一句 ----------------
+
+
+class PhraseOfTheDayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Override the cache path env var so tests don't pollute ~/.local/share
+        self._tmpdir = Path(tempfile.mkdtemp(prefix="ncga-phrase-"))
+        os.environ["XDG_DATA_HOME"] = str(self._tmpdir)
+
+    def tearDown(self) -> None:
+        import shutil
+
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+        os.environ.pop("XDG_DATA_HOME", None)
+
+    def test_phrase_endpoint_returns_all_10_varieties(self) -> None:
+        client, _ = _build_client(_llm_json("好的（mocked）"))
+        app = App(rewrite_service=RewriteService(client=client))
+        status, _, body = call_app(app, "GET", "/api/phrase-of-the-day")
+        self.assertEqual(status, "200 OK")
+        payload = json.loads(body.decode("utf-8"))
+        self.assertIn("date", payload)
+        self.assertIn("original_phrase", payload)
+        self.assertIn("meaning", payload)
+        self.assertEqual(len(payload["translations"]), len(VarietyPreset))
+        # Cycle 18 v2 (A2): exactly 12 representative landmarks rotate as a slideshow.
+        self.assertIn("images", payload)
+        self.assertEqual(len(payload["images"]), 12)
+        for img in payload["images"]:
+            self.assertIn("url", img)
+            self.assertIn("caption", img)
+            self.assertIn("·", img["caption"])
+            self.assertIn("commons.wikimedia.org", img["url"])
+        # Cycle 18 v2 (A1): pool generation surfaced — gen 0 today (within first 30 days)
+        self.assertIn("pool_generation", payload)
+        self.assertEqual(payload["pool_generation"], 0)
+
+    def test_phrase_caches_within_a_day(self) -> None:
+        """Second hit on the same day must NOT trigger 10 more LLM calls."""
+        client, transport = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        call_app(app, "GET", "/api/phrase-of-the-day")
+        first_calls = len(transport.calls)
+        self.assertEqual(first_calls, len(VarietyPreset))  # 10 LLM calls
+        call_app(app, "GET", "/api/phrase-of-the-day")
+        second_calls = len(transport.calls)
+        self.assertEqual(second_calls, first_calls)  # cached, no new LLM
+
+    def test_pool_refresh_after_30_days_calls_llm_and_persists(self) -> None:
+        """A1 contract: generation 0 = curated seed pool (free); generations 1+ are
+        LLM-authored, cached on disk so each pool refresh costs exactly 1 LLM call.
+        This test reaches under the public surface to verify the gen→LLM pathway."""
+        from native_chinese_assistant.daily_phrase import (
+            POOL_LENGTH,
+            _generate_fresh_pool,
+            _get_or_generate_pool,
+            _pool_path,
+        )
+
+        # 30 phrases as a JSON array string; client gets one chat-completions call.
+        fake_pool = [{"original": f"训{i}", "meaning": f"意思{i}"} for i in range(30)]
+        body = _llm_json_raw(json.dumps(fake_pool, ensure_ascii=False))
+        client, transport = _build_client(body)
+        service = RewriteService(client=client)
+
+        # Generation 0 must NOT call the LLM at all
+        pool0 = _get_or_generate_pool(service, 0)
+        self.assertEqual(len(transport.calls), 0)
+        self.assertEqual(len(pool0), POOL_LENGTH)
+
+        # Generation 1: cache miss → 1 LLM call → persist
+        self.assertFalse(_pool_path(1).exists())
+        pool1 = _get_or_generate_pool(service, 1)
+        self.assertEqual(len(transport.calls), 1)
+        self.assertEqual(len(pool1), POOL_LENGTH)
+        self.assertEqual(pool1[0].original, "训0")
+        self.assertTrue(_pool_path(1).exists())
+
+        # Calling again for generation 1 must NOT re-issue the LLM call
+        pool1_again = _get_or_generate_pool(service, 1)
+        self.assertEqual(len(transport.calls), 1)
+        self.assertEqual(pool1_again[0].original, "训0")
+
+        # Direct call _generate_fresh_pool with bad LLM output → falls back to seed
+        bad_client, bad_transport = _build_client(_llm_json_raw("not valid json at all"))
+        bad_service = RewriteService(client=bad_client)
+        fallback_pool = _generate_fresh_pool(bad_service)
+        self.assertEqual(len(fallback_pool), POOL_LENGTH)  # fell back to _SEED_POOL
+
+    def test_phrase_per_variety_failure_does_not_kill_others(self) -> None:
+        """One variety's LLM failure must not block the other 9 from rendering."""
+        from native_chinese_assistant.daily_phrase import get_phrase_of_the_day
+        from native_chinese_assistant.rewrite import RewriteError
+
+        class FlakyService:
+            quality_store = None
+            _calls = 0
+
+            def rewrite(self, text, variety, *, scenario=None, glossary_lines=None):
+                FlakyService._calls += 1
+                if FlakyService._calls == 3:
+                    raise RewriteError("synthetic failure")
+                from dataclasses import dataclass
+
+                from native_chinese_assistant.presets import Script
+
+                @dataclass
+                class R:
+                    rewritten_text: str
+                    target_variety: VarietyPreset
+                    script: Script
+                    warning: str | None = None
+                    degraded: bool = False
+
+                return R(
+                    rewritten_text=f"ok_{variety.value}", target_variety=variety, script=Script.SIMPLIFIED
+                )
+
+        data = get_phrase_of_the_day(FlakyService())
+        # 1 of 10 varieties should be marked __error__, the rest are OK
+        errs = [v for v in data["translations"].values() if v.startswith("__error__")]
+        oks = [v for v in data["translations"].values() if not v.startswith("__error__")]
+        self.assertEqual(len(errs), 1)
+        self.assertEqual(len(oks), len(VarietyPreset) - 1)
 
 
 # ---------------- rate limiter ----------------
@@ -1727,6 +1968,68 @@ class GeneralChatRetryTests(unittest.TestCase):
             client.rate_quality("x", VarietyPreset.BEIJING_MANDARIN)
         # 400 hits exactly once (no retry)
         self.assertEqual(len(client._transport.calls), 1)
+
+
+class ExampleOverwriteModalRegressionTests(unittest.TestCase):
+    """Cycle 18: regression guards for the example-chip overwrite modal.
+
+    The bug: clicking an example chip used to silently nuke whatever the user
+    had typed (visually-similar to scenario chips → frequent misclick → lost
+    drafts). Fix introduced a 3-button modal: 套用示例 / 保留原文 / 取消, and
+    only opens the modal when the textarea is non-empty AND content differs.
+
+    These are STATIC tests over the served HTML+JS — they verify the modal
+    elements and code branches exist, so a future refactor that drops them
+    fails CI loudly. They are NOT behavior tests (those need a browser; see
+    Future Work for the Playwright proposal). The four scenarios from your
+    spec map onto the four assertions below.
+    """
+
+    def setUp(self) -> None:
+        self.html = (Path(__file__).resolve().parent.parent / "static" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        self.js = (Path(__file__).resolve().parent.parent / "static" / "app.js").read_text(encoding="utf-8")
+
+    def test_modal_html_present(self) -> None:
+        """Scenario coverage anchor: the modal must exist with all 3 action buttons."""
+        self.assertIn('id="example-overwrite-modal"', self.html)
+        self.assertIn('id="example-overwrite-load"', self.html)  # 套用示例
+        self.assertIn('id="example-overwrite-keep"', self.html)  # 保留原文
+        self.assertIn('id="example-overwrite-cancel"', self.html)  # 取消
+        self.assertIn('id="example-overwrite-current"', self.html)  # current preview slot
+        self.assertIn('id="example-overwrite-incoming"', self.html)  # incoming preview slot
+
+    def test_empty_textarea_fills_silently_no_modal(self) -> None:
+        """Scenario 1: empty textarea → sample loads with no modal.
+
+        Branch: the chip handler must check `current.trim()` first and
+        short-circuit with a direct fill when empty.
+        """
+        # The fast path must do "value = incoming" without opening the modal.
+        self.assertRegex(
+            self.js,
+            r"if \(!current\.trim\(\)[^{]*?\)\s*\{[^}]*?textInput\.value\s*=\s*incoming",
+        )
+
+    def test_nonempty_different_opens_modal(self) -> None:
+        """Scenario 2: non-empty + different content → modal opens (no silent overwrite).
+
+        Branch: must call openOverwriteModal(current, incoming).
+        """
+        self.assertIn("openOverwriteModal(current, incoming)", self.js)
+
+    def test_keep_button_makes_no_textarea_change(self) -> None:
+        """Scenario 3: 保留原文 button must NOT touch textInput.value."""
+        # The keep handler is `closeOverwriteModal` directly — no value mutation.
+        self.assertIn('btnKeep.addEventListener("click", closeOverwriteModal)', self.js)
+
+    def test_load_button_replaces_textarea(self) -> None:
+        """Scenario 4: 套用示例 button must replace textarea with the pending incoming."""
+        self.assertRegex(
+            self.js,
+            r"btnLoad\.addEventListener\(\"click\",[\s\S]*?textInput\.value\s*=\s*pendingIncoming",
+        )
 
 
 class SecurityCycle13Tests(unittest.TestCase):

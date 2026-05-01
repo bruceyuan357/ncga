@@ -2593,25 +2593,287 @@
 
   // ---------------- bindings ----------------
   function bindExampleChips() {
+    // Cycle 18 v2 — the prior `window.confirm` was rough UX and easy to misread.
+    // Replaced with a dedicated 3-button modal: 套用示例 / 保留原文 / 取消.
+    // Empty textarea or identical text → fill silently with no prompt.
+    const modal = $("#example-overwrite-modal");
+    const elCurrent = $("#example-overwrite-current");
+    const elIncoming = $("#example-overwrite-incoming");
+    const btnLoad = $("#example-overwrite-load");
+    const btnKeep = $("#example-overwrite-keep");
+    const btnCancel = $("#example-overwrite-cancel");
+    let pendingIncoming = "";
+
+    function openOverwriteModal(currentText, incomingText) {
+      pendingIncoming = incomingText;
+      elCurrent.textContent = currentText;
+      elIncoming.textContent = incomingText;
+      modal.hidden = false;
+      requestAnimationFrame(() => btnLoad.focus());
+    }
+    function closeOverwriteModal() {
+      modal.hidden = true;
+      pendingIncoming = "";
+      textInput.focus();
+    }
+    btnLoad.addEventListener("click", () => {
+      if (pendingIncoming) {
+        textInput.value = pendingIncoming;
+        updateCharCount();
+      }
+      closeOverwriteModal();
+    });
+    btnKeep.addEventListener("click", closeOverwriteModal);
+    btnCancel.addEventListener("click", closeOverwriteModal);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeOverwriteModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (!modal.hidden && e.key === "Escape") { e.preventDefault(); closeOverwriteModal(); }
+    });
+
     $$(".chip[data-example]").forEach((chip) => {
       chip.addEventListener("click", () => {
         const incoming = chip.dataset.example;
         const current = textInput.value;
-        // Cycle 18: example chips used to nuke whatever the user had typed.
-        // Their labels (安慰朋友 / 职场表达) overlap conceptually with scenario
-        // chips below, so users misclicked and lost drafts. Now: empty → fill
-        // silently; non-empty → confirm before replacing.
-        if (current.trim() && current.trim() !== incoming.trim()) {
-          const ok = window.confirm(
-            `已有内容会被替换：\n\n当前：${current.slice(0, 40)}${current.length > 40 ? "…" : ""}\n\n要换成示例「${chip.textContent.trim()}」吗？`
-          );
-          if (!ok) return;
+        if (!current.trim() || current.trim() === incoming.trim()) {
+          textInput.value = incoming;
+          updateCharCount();
+          textInput.focus();
+          return;
         }
-        textInput.value = incoming;
-        updateCharCount();
-        textInput.focus();
+        openOverwriteModal(current, incoming);
       });
     });
+  }
+
+  // ---------------- Cycle 18 — 情境向导 (Function 1) ----------------
+  function bindContextWizard() {
+    const openBtn = $("#context-wizard-open");
+    const modal = $("#context-wizard-modal");
+    if (!openBtn || !modal) return;
+    const closeBtn = $("#context-wizard-close");
+    const cancelBtn = $("#context-wizard-cancel");
+    const submitBtn = $("#context-wizard-submit");
+    const doneBtn = $("#context-wizard-done");
+    const stepInput = $("#context-wizard-step-input");
+    const stepResult = $("#context-wizard-step-result");
+    const recipientEl = $("#context-wizard-recipient");
+    const moodEl = $("#context-wizard-mood");
+    const outScenario = $("#cw-result-scenario");
+    const outRegister = $("#cw-result-register");
+    const outTone = $("#cw-result-tone");
+    const outChips = $("#cw-result-glossary-chips");
+    const applyScenarioBtn = $("#cw-apply-scenario");
+
+    function reset() {
+      stepInput.hidden = false;
+      stepResult.hidden = true;
+      submitBtn.hidden = false;
+      doneBtn.hidden = true;
+      recipientEl.value = "";
+      moodEl.value = "";
+      outScenario.textContent = "—";
+      outRegister.textContent = "—";
+      outTone.textContent = "—";
+      outChips.innerHTML = "";
+      applyScenarioBtn.dataset.scenario = "";
+    }
+    function open() {
+      reset();
+      modal.hidden = false;
+      requestAnimationFrame(() => recipientEl.focus());
+    }
+    function close() {
+      modal.hidden = true;
+    }
+    openBtn.addEventListener("click", open);
+    closeBtn.addEventListener("click", close);
+    cancelBtn.addEventListener("click", close);
+    doneBtn.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    document.addEventListener("keydown", (e) => {
+      if (!modal.hidden && e.key === "Escape") { e.preventDefault(); close(); }
+    });
+
+    submitBtn.addEventListener("click", async () => {
+      const recipient = recipientEl.value.trim();
+      const mood = moodEl.value.trim();
+      if (!recipient && !mood) { showToast("两个问题至少填一个", "fa-circle-exclamation"); return; }
+      submitBtn.disabled = true;
+      const oldHtml = submitBtn.innerHTML;
+      submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 分析中…';
+      try {
+        const res = await fetch("/api/characterize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipient, mood }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 429) { showToast("情境向导用得太快了，等一分钟再试", "fa-hourglass"); return; }
+        if (!res.ok) { showToast(data.error || "分析失败", "fa-circle-exclamation"); return; }
+        // Render results
+        const scenarioMeta = SCENARIOS[data.suggested_scenario];
+        outScenario.textContent = scenarioMeta ? scenarioMeta.label : (data.suggested_scenario || "—");
+        applyScenarioBtn.dataset.scenario = data.suggested_scenario || "";
+        outRegister.textContent = data.register_hint || "—";
+        outTone.textContent = data.emotional_tone || "—";
+        outChips.innerHTML = "";
+        (data.glossary_suggestions || []).slice(0, 5).forEach((entry) => {
+          const text = String(entry || "").trim();
+          if (!text) return;
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "cw-glossary-chip";
+          chip.innerHTML = `<i class="fas fa-plus"></i> ${escapeHtml(text)}`;
+          chip.addEventListener("click", () => {
+            if (chip.classList.contains("is-added")) return;
+            const ta = $("#glossary-textarea");
+            const cur = (ta?.value || (localStorage.getItem("ncga.glossary.v1") || "")).trim();
+            const lines = cur ? cur.split(/\r?\n/) : [];
+            if (!lines.includes(text)) lines.push(text);
+            const next = lines.slice(0, 30).join("\n");
+            if (ta) ta.value = next;
+            localStorage.setItem("ncga.glossary.v1", next);
+            invalidateGlossaryCache();
+            chip.classList.add("is-added");
+            chip.innerHTML = `<i class="fas fa-check"></i> ${escapeHtml(text)} 已加入字典`;
+          });
+          outChips.appendChild(chip);
+        });
+        stepInput.hidden = true;
+        stepResult.hidden = false;
+        submitBtn.hidden = true;
+        doneBtn.hidden = false;
+      } catch (err) {
+        showToast("网络异常：" + (err?.message || ""), "fa-circle-exclamation");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = oldHtml;
+      }
+    });
+
+    applyScenarioBtn.addEventListener("click", () => {
+      const v = applyScenarioBtn.dataset.scenario;
+      if (!v || !SCENARIOS[v]) { showToast("没有可用的场景建议", "fa-circle-exclamation"); return; }
+      SETTINGS.scenario = v;
+      saveSettings();
+      // Re-render scenario chips so the active one updates
+      renderScenarioChips();
+      showToast(`场景已切换到「${SCENARIOS[v].label}」`, "fa-comments");
+      // F5 fix (Cycle 18 v2): auto-close after a beat so the toast has time to start
+      // and the user gets explicit feedback that the scenario was applied. Without
+      // this, the wizard window stayed open and the apply step felt like a no-op.
+      setTimeout(close, 380);
+    });
+  }
+
+  // ---------------- Cycle 18 — 今日方言一句 (Function 2) ----------------
+  function bindDailyPhrase() {
+    const card = $("#daily-phrase-card");
+    if (!card) return;
+    const dateEl = $("#daily-phrase-date");
+    const slidesEl = $("#daily-phrase-slides");
+    const imgCap = $("#daily-phrase-image-caption");
+    const origEl = $("#daily-phrase-original");
+    const meanEl = $("#daily-phrase-meaning");
+    const listEl = $("#daily-phrase-translations-list");
+    const countEl = $("#daily-phrase-translations-count");
+    const dismissBtn = $("#daily-phrase-dismiss");
+    const favBtn = $("#daily-phrase-fav");
+    const favIcon = favBtn?.querySelector("i");
+    const DISMISS_KEY = "ncga.daily-phrase.dismissed-on";
+    const FAV_KEY = "ncga.daily-phrase.saved.v1";
+    let slideTimer = null;
+
+    function startSlideshow(images) {
+      // Cycle 18 v2 (per A2): rotate 12 landmarks fast, ~3.2s per slide so the full
+      // sweep finishes in ~38s — enough to be noticed without distracting from the
+      // text, and lazy-loads via the browser's <img loading="lazy">.
+      slidesEl.innerHTML = "";
+      if (!images || !images.length) {
+        slidesEl.parentElement.style.display = "none";
+        return;
+      }
+      images.forEach((img, i) => {
+        const el = document.createElement("img");
+        el.src = img.url;
+        el.alt = img.caption || "";
+        el.loading = "lazy";
+        if (i === 0) el.classList.add("is-active");
+        slidesEl.appendChild(el);
+      });
+      imgCap.textContent = images[0].caption || "";
+      let idx = 0;
+      const all = slidesEl.querySelectorAll("img");
+      if (slideTimer) clearInterval(slideTimer);
+      slideTimer = setInterval(() => {
+        all[idx].classList.remove("is-active");
+        idx = (idx + 1) % all.length;
+        all[idx].classList.add("is-active");
+        imgCap.textContent = images[idx].caption || "";
+      }, 3200);
+    }
+
+    async function load() {
+      // Don't show again if already dismissed today
+      const today = new Date().toISOString().slice(0, 10);
+      if (localStorage.getItem(DISMISS_KEY) === today) return;
+      let res, data;
+      try {
+        res = await fetch("/api/phrase-of-the-day");
+        if (!res.ok) return;  // silently fail — landing card is non-critical
+        data = await res.json();
+      } catch { return; }
+      if (!data || !data.original_phrase) return;
+      dateEl.textContent = data.date || today;
+      origEl.textContent = data.original_phrase;
+      meanEl.textContent = data.meaning || "";
+      // Cycle 18 v2 — backend now sends `images: [{url, caption}, ...]` (12 entries)
+      if (Array.isArray(data.images) && data.images.length) {
+        startSlideshow(data.images);
+      } else {
+        slidesEl.parentElement.style.display = "none";
+      }
+      const translations = data.translations || {};
+      const items = Object.entries(translations);
+      countEl.textContent = `（${items.length} 种）`;
+      listEl.innerHTML = items.map(([variety, text]) => {
+        const meta = VARIETIES[variety];
+        const label = meta?.label || variety;
+        const isErr = !text || text.startsWith("__error__");
+        return `<li class="${isErr ? "is-error" : ""}">
+          <strong>${escapeHtml(label)}</strong>
+          <span>${isErr ? "（生成失败）" : escapeHtml(text)}</span>
+        </li>`;
+      }).join("");
+      // Favorite state
+      const saved = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+      const isFav = saved.some((s) => s.date === data.date);
+      if (favIcon) favIcon.className = isFav ? "fas fa-bookmark" : "far fa-bookmark";
+      favBtn.onclick = () => {
+        const list = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+        const idx = list.findIndex((s) => s.date === data.date);
+        if (idx >= 0) {
+          list.splice(idx, 1);
+          if (favIcon) favIcon.className = "far fa-bookmark";
+          showToast("已取消收藏", "fa-bookmark");
+        } else {
+          list.unshift({
+            date: data.date, original_phrase: data.original_phrase,
+            meaning: data.meaning, translations: data.translations,
+          });
+          if (favIcon) favIcon.className = "fas fa-bookmark";
+          showToast("已收藏到本地", "fa-bookmark");
+        }
+        localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, 60)));
+      };
+      dismissBtn.onclick = () => {
+        localStorage.setItem(DISMISS_KEY, today);
+        card.hidden = true;
+      };
+      card.hidden = false;
+    }
+    // Defer to next tick so VARIETIES + SCENARIOS load first
+    setTimeout(load, 50);
   }
 
   function bindShortcuts() {
@@ -2710,6 +2972,8 @@
   bindBatch();
   bindGlossary();
   bindVoiceInput();
+  bindContextWizard();   // Cycle 18 — Function 1
+  bindDailyPhrase();     // Cycle 18 — Function 2
 
   Promise.all([loadPresets(), loadScenarios()])
     .then(() => {

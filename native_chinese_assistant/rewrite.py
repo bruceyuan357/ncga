@@ -202,6 +202,40 @@ def build_explain_user_prompt(original: str, rewritten: str) -> str:
     return f"原文：\n{original}\n\n改写：\n{rewritten}"
 
 
+# --- Cycle 18 (Function 1): 情境向导 — Conversational Setup ---
+# User answers two questions (recipient + mood). LLM returns a small JSON with
+# scenario suggestion, register hint, emotion tone, and up to 5 glossary entries.
+_CHARACTERIZE_SYSTEM_PROMPT = (
+    "你是中文方言重写助手的情境分析师。用户准备把一段话改成方言版本，"
+    "他先告诉了你 (1) 这话要发给谁、(2) 他的心情/目的。"
+    "你的任务：根据这两条信息，从下列固定枚举里挑一个最贴的【场景】，"
+    "并给一段话的语气提示、情感色彩、最多 5 条品牌词建议。\n\n"
+    "硬性规则：\n"
+    "1. scenario 字段必须是下列之一：{scenario_values}\n"
+    "2. register_hint ≤ 24 字，用一句话描述合适的语气（例：'温和但坚定，不要太书面'）。\n"
+    "3. emotional_tone ≤ 12 字（例：'抱怨但克制'、'温暖关切'）。\n"
+    "4. glossary_suggestions：≤ 5 条；每条 ≤ 30 字，格式 '原词 → 推荐词'，"
+    "用于品牌语调字典。如果没有合适的就给空数组 []。\n"
+    "5. 严格 JSON 输出，不要 markdown，不要前导语：\n"
+    '   {{"suggested_scenario": "...", "register_hint": "...", '
+    '"emotional_tone": "...", "glossary_suggestions": ["...", ...]}}\n'
+)
+
+
+def build_characterize_system_prompt(scenario_values: list[str]) -> str:
+    return (
+        _CHARACTERIZE_SYSTEM_PROMPT.replace("{scenario_values}", " / ".join(scenario_values))
+        .replace("{{", "{")
+        .replace("}}", "}")
+    )
+
+
+def build_characterize_user_prompt(recipient: str, mood: str) -> str:
+    return (
+        f"对方是谁：{recipient or '（未填）'}\n我的心情/目的：{mood or '（未填）'}\n请按系统说明给出 JSON。"
+    )
+
+
 def build_user_prompt(text: str, target: VarietyPreset) -> str:
     metadata = PRESET_METADATA[target]
     return f"请改写为{metadata.label}：\n{text}"
@@ -1083,6 +1117,54 @@ class RewriteService:
         if len(original) > MAX_INPUT_CHARS or len(rewritten) > MAX_OUTPUT_CHARS:
             raise ValueError("text too long for explain")
         return self._client.explain(original, rewritten, target)
+
+    def characterize(self, recipient: str, mood: str) -> dict[str, Any]:
+        """Cycle 18 (Function 1): turn a 2-question wizard into a structured profile.
+
+        Returns {suggested_scenario, register_hint, emotional_tone, glossary_suggestions[]}.
+        suggested_scenario is validated against the Scenario enum and falls back to
+        FRIENDS_CASUAL if the LLM hallucinates an unknown value (graceful — same
+        contract as parse_scenario in presets.py).
+        """
+        from native_chinese_assistant.presets import Scenario
+
+        if self._client is None:
+            raise RewriteError("情境向导需要 LLM 服务。请先配置 LLM_API_KEY 后再试。")
+        # Cycle 18 v2 (per A6): 120 → 240 char cap. Long enough for a real sentence
+        # per field; short enough that the prompt stays compact.
+        recipient = (recipient or "").strip()[:240]
+        mood = (mood or "").strip()[:240]
+        if not recipient and not mood:
+            raise ValueError("recipient and mood cannot both be empty")
+        scenario_values = [s.value for s in Scenario]
+        content = self._client.general_chat(
+            [
+                {"role": "system", "content": build_characterize_system_prompt(scenario_values)},
+                {"role": "user", "content": build_characterize_user_prompt(recipient, mood)},
+            ],
+            max_tokens=500,  # Cycle 17 lesson: V4 needs reasoning headroom
+            temperature=0.3,
+        )
+        if not content or not content.strip():
+            raise RewriteError("LLM returned empty content for characterize.")
+        try:
+            parsed = _parse_llm_json(content)
+        except (json.JSONDecodeError, RewriteError) as exc:
+            raise RewriteError(f"Invalid characterize JSON: {exc}") from exc
+        # Validate scenario; coerce unknown to FRIENDS_CASUAL
+        suggested = str(parsed.get("suggested_scenario", "")).strip()
+        if suggested not in scenario_values:
+            suggested = Scenario.FRIENDS_CASUAL.value
+        glossary = parsed.get("glossary_suggestions") or []
+        if not isinstance(glossary, list):
+            glossary = []
+        glossary = [str(x).strip()[:80] for x in glossary if str(x).strip()][:5]
+        return {
+            "suggested_scenario": suggested,
+            "register_hint": str(parsed.get("register_hint", "")).strip()[:120],
+            "emotional_tone": str(parsed.get("emotional_tone", "")).strip()[:60],
+            "glossary_suggestions": glossary,
+        }
 
     def _log_request(self, target: VarietyPreset, started: float, *, degraded: bool) -> None:
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
