@@ -31,6 +31,10 @@ STATIC_DIR = (BASE_DIR / "static").resolve()
 DEFAULT_RATE_LIMIT_PER_MIN = 30
 DEFAULT_BATCH_RATE_LIMIT_PER_MIN = 6  # batch is heavy; 6 batches/min/IP is generous
 DEFAULT_CHARACTERIZE_RATE_LIMIT_PER_MIN = 6  # Cycle 18 — wizard is opt-in; tight cap
+# Cycle 18 v2: aggregate per-IP daily ceiling on LLM-spending endpoints. Shared
+# bucket across rewrite / batch / rate / explain / characterize / phrase-of-the-day.
+# 300 calls is generous for a single user but caps a runaway script at <$1/day.
+DEFAULT_DAILY_LLM_CAP_PER_IP = 300
 DEFAULT_MAX_BODY_BYTES = 64 * 1024  # 64 KB — bumped to fit batch inputs (≤100 items × short text)
 # Cycle 18 v2 (per A5): bumped 1KB → 4KB so users can paste a longer background blurb.
 # Still much smaller than the main rewrite cap, since recipient + mood are bounded fields.
@@ -211,6 +215,59 @@ class RateLimiter:
             self._buckets.pop(k, None)
 
 
+class DailyCounter:
+    """Cycle 18 v2: per-IP per-calendar-day cap, shared across all LLM endpoints.
+
+    Why: the existing per-minute RateLimiter caps burst rate but not aggregate
+    daily volume. A single bearer-token holder, staying within 30/min, can fire
+    43,200 LLM calls per day — meaningful API bill. This class adds a daily
+    ceiling. In-memory; resets at local midnight (key = ISO date string).
+
+    Not persistent: a server restart wipes the counter. That's acceptable —
+    restart is rare, and the per-minute limiter still bounds abuse during the
+    fresh start. If you want persistence, swap the dict for a JSON-on-disk
+    structure under ~/.local/share/ncga/.
+    """
+
+    def __init__(self, *, per_day: int) -> None:
+        self.per_day = per_day
+        # key = (ip, iso_date); value = count
+        self._counts: dict[tuple[str, str], int] = {}
+        self._lock = threading.Lock()
+        self._last_gc_day: str = ""
+
+    def _today(self) -> str:
+        # Local timezone midnight rollover — matches user's calendar expectation.
+        # If you ever go multi-region, switch to UTC and document.
+        from datetime import date as _date
+
+        return _date.today().isoformat()
+
+    def allow(self, ip: str, *, units: int = 1) -> bool:
+        """Atomically check + consume `units` units for `ip` today.
+        Returns True iff post-consumption count would still be ≤ per_day.
+        `units > 1` exists for batch endpoints whose single HTTP request fans
+        out into many LLM calls — they should account honestly."""
+        if self.per_day <= 0:
+            return True
+        if units <= 0:
+            return True
+        today = self._today()
+        with self._lock:
+            if today != self._last_gc_day:
+                self._counts = {k: v for k, v in self._counts.items() if k[1] == today}
+                self._last_gc_day = today
+            cur = self._counts.get((ip, today), 0)
+            if cur + units > self.per_day:
+                return False
+            self._counts[(ip, today)] = cur + units
+        return True
+
+    def remaining(self, ip: str) -> int:
+        with self._lock:
+            return max(0, self.per_day - self._counts.get((ip, self._today()), 0))
+
+
 def _trust_forwarded_for() -> bool:
     """Cycle 13: only trust X-Forwarded-For when explicitly opted in.
     Without this gate, an attacker can rotate the header to bypass per-IP rate limiting."""
@@ -291,6 +348,11 @@ class App:
             )
         )
         self.characterize_limiter = RateLimiter(per_minute=crl)
+        # Cycle 18 v2: shared daily ceiling across all LLM-spending endpoints.
+        daily_cap = int(
+            os.environ.get("NCGA_DAILY_LLM_CAP_PER_IP", DEFAULT_DAILY_LLM_CAP_PER_IP)
+        )
+        self.daily_counter = DailyCounter(per_day=daily_cap)
         self.max_body_bytes = (
             max_body_bytes
             if max_body_bytes is not None
@@ -303,6 +365,30 @@ class App:
                 DEFAULT_CHARACTERIZE_MAX_BODY_BYTES,
             )
         )
+
+    def _check_daily_cap(
+        self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1
+    ):
+        """Cycle 18 v2: shared per-IP daily ceiling check. Call this in every
+        LLM-spending handler BEFORE the per-minute limiter. `units` is the
+        expected number of LLM calls this request will generate — most endpoints
+        pass 1; batch passes items*varieties. Returns the 429 response on cap,
+        else None."""
+        if not self.daily_counter.allow(ip, units=units):
+            logger.info(
+                "daily_cap_exceeded ip=%s endpoint=%s units=%d", ip, endpoint, units
+            )
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {
+                    "error": (
+                        "今日 LLM 调用上限已到（每个 IP 每日 "
+                        f"{self.daily_counter.per_day} 次）。明天再试。"
+                    )
+                },
+            )
+        return None
 
     def _route_table(self) -> dict[tuple[str, str], Callable]:
         """Cycle 18 architecture cleanup: replace the 16-line if-chain dispatch with
@@ -363,6 +449,9 @@ class App:
 
     def handle_rewrite(self, environ: dict, start_response: Callable) -> list[bytes]:
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "rewrite")
+        if cap_err is not None:
+            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s", ip)
             return json_response(
@@ -409,6 +498,9 @@ class App:
     def handle_explain(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Take {original, rewritten, target_variety} and return {summary, points[]}."""
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "explain")
+        if cap_err is not None:
+            return cap_err
         # Reuse the same rate limiter — explain is also LLM-backed and costs money.
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=explain", ip)
@@ -462,6 +554,9 @@ class App:
           * No persistence (no PII storage)
         """
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "characterize")
+        if cap_err is not None:
+            return cap_err
         if not self.characterize_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=characterize", ip)
             return json_response(
@@ -496,7 +591,21 @@ class App:
         """Daily wisdom phrase rewritten into all 10 varieties + a landmark image.
         Cached per calendar day in ~/.local/share/ncga/phrase-cache.json — only the
         first call of the day pays the LLM cost (10 rewrites)."""
-        from native_chinese_assistant.daily_phrase import get_phrase_of_the_day
+        from native_chinese_assistant.daily_phrase import _cache_path, get_phrase_of_the_day
+
+        # Cycle 18 v2: only count against the daily LLM cap if we'll actually
+        # generate today's payload. If the cache is already warm for today,
+        # this is a free read (no LLM call), so skip the counter.
+        ip = client_ip(environ)
+        try:
+            cache_warm = _cache_path().is_file()
+        except OSError:
+            cache_warm = False
+        if not cache_warm:
+            # Generation costs ~10 LLM calls (one per variety); count honestly.
+            cap_err = self._check_daily_cap(ip, start_response, "phrase-of-the-day", units=10)
+            if cap_err is not None:
+                return cap_err
 
         try:
             data = get_phrase_of_the_day(self.rewrite_service)
@@ -558,6 +667,9 @@ class App:
     def handle_rewrite_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint. Streams partial rewrite text as the LLM emits tokens."""
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "rewrite-stream")
+        if cap_err is not None:
+            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=rewrite-stream", ip)
             return json_response(
@@ -600,6 +712,9 @@ class App:
     def handle_rate(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Rate the 'native-ness' of a rewritten text: small LLM call, returns {score, reason}."""
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "rate")
+        if cap_err is not None:
+            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=rate", ip)
             return json_response(
@@ -689,6 +804,13 @@ class App:
             varieties = [parse_variety(v) for v in target_varieties]
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
+        # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
+        cap_err = self._check_daily_cap(
+            ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
+        )
+        if cap_err is not None:
+            return cap_err
         # Validate all items are strings, non-empty, within length cap
         for i, item in enumerate(items):
             if not isinstance(item, str) or not item.strip():
@@ -724,6 +846,9 @@ class App:
     def handle_meta_refine(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Trigger Reflexion-style prompt refinement for (variety, scenario)."""
         ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "meta-refine")
+        if cap_err is not None:
+            return cap_err
         if not self.rate_limiter.allow(ip):
             return json_response(
                 start_response,

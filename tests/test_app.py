@@ -957,13 +957,34 @@ class CharacterizeEndpointTests(unittest.TestCase):
         self.assertEqual(codes.count("429 Too Many Requests"), 1)
 
     def test_characterize_body_cap(self) -> None:
-        """1KB cap — prevents large-prompt smuggling via this cheaper endpoint."""
-        # Pad recipient with 2KB worth of chars
-        big = json.dumps({"recipient": "x" * 2000, "mood": "y"}).encode("utf-8")
+        """4KB cap (Cycle 18 v2 per A5) — still prevents large-prompt smuggling."""
+        big = json.dumps({"recipient": "x" * 5000, "mood": "y"}).encode("utf-8")
         client, _ = _build_client(_llm_json_raw('{"suggested_scenario":"friends_casual"}'))
         app = App(rewrite_service=RewriteService(client=client))
         status, _, body = call_app(app, "POST", "/api/characterize", body=big)
         self.assertEqual(status, "413 Payload Too Large")
+
+    def test_characterize_field_cap_240(self) -> None:
+        """Per A6: each field clipped server-side at 240 chars (was 120). Even within
+        the body cap, an oversize field is silently truncated before the LLM sees it."""
+        long_recipient = "a" * 500
+        client, transport = _build_client(
+            _llm_json_raw(
+                '{"suggested_scenario":"friends_casual","register_hint":"","emotional_tone":"","glossary_suggestions":[]}'
+            )
+        )
+        app = App(rewrite_service=RewriteService(client=client))
+        status, _, _ = call_app(
+            app,
+            "POST",
+            "/api/characterize",
+            body=json.dumps({"recipient": long_recipient, "mood": "ok"}).encode("utf-8"),
+        )
+        self.assertEqual(status, "200 OK")
+        last_call_body = json.loads(transport.calls[0]["body"].decode("utf-8"))
+        user_msg = last_call_body["messages"][1]["content"]
+        self.assertIn("a" * 240, user_msg)
+        self.assertNotIn("a" * 241, user_msg)
 
 
 # ---------------- Cycle 18 — Function 2: 今日方言一句 ----------------
@@ -1093,6 +1114,98 @@ class PhraseOfTheDayTests(unittest.TestCase):
 
 
 # ---------------- rate limiter ----------------
+
+
+class DailyCounterTests(unittest.TestCase):
+    """Cycle 18 v2: per-IP per-day cap on LLM-spending endpoints."""
+
+    def test_under_cap_allows(self) -> None:
+        from native_chinese_assistant.web import DailyCounter
+
+        dc = DailyCounter(per_day=5)
+        for _ in range(5):
+            self.assertTrue(dc.allow("ip-a"))
+        self.assertFalse(dc.allow("ip-a"))
+
+    def test_separate_ips_have_separate_buckets(self) -> None:
+        from native_chinese_assistant.web import DailyCounter
+
+        dc = DailyCounter(per_day=2)
+        self.assertTrue(dc.allow("ip-a"))
+        self.assertTrue(dc.allow("ip-a"))
+        self.assertFalse(dc.allow("ip-a"))
+        self.assertTrue(dc.allow("ip-b"))  # different IP unaffected
+
+    def test_zero_or_negative_disables(self) -> None:
+        from native_chinese_assistant.web import DailyCounter
+
+        dc = DailyCounter(per_day=0)
+        for _ in range(1000):
+            self.assertTrue(dc.allow("ip-x"))
+
+    def test_units_consumed_atomically(self) -> None:
+        """Batch endpoints pass units = items × varieties so they account honestly."""
+        from native_chinese_assistant.web import DailyCounter
+
+        dc = DailyCounter(per_day=10)
+        self.assertTrue(dc.allow("ip-a", units=4))
+        self.assertEqual(dc.remaining("ip-a"), 6)
+        self.assertTrue(dc.allow("ip-a", units=6))
+        self.assertEqual(dc.remaining("ip-a"), 0)
+        self.assertFalse(dc.allow("ip-a"))
+
+    def test_units_overshoot_rejected_atomically(self) -> None:
+        """If units > remaining, allow() returns False AND counter is NOT incremented."""
+        from native_chinese_assistant.web import DailyCounter
+
+        dc = DailyCounter(per_day=10)
+        self.assertTrue(dc.allow("ip-a", units=8))
+        self.assertFalse(dc.allow("ip-a", units=5))  # would overshoot to 13
+        self.assertEqual(dc.remaining("ip-a"), 2)  # unchanged
+
+    def test_app_returns_429_when_daily_cap_hit(self) -> None:
+        """Integration: a low daily cap surfaces as 429 + 中文 message at the API boundary."""
+        # Force NCGA_DAILY_LLM_CAP_PER_IP=2 via env
+        old = os.environ.get("NCGA_DAILY_LLM_CAP_PER_IP")
+        os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "2"
+        try:
+            client, _ = _build_client(_llm_json("ok"))
+            app = App(rewrite_service=RewriteService(client=client))
+            body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode("utf-8")
+            s1, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
+            s2, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
+            s3, _, b3 = call_app(app, "POST", "/api/rewrite", body=body)
+            self.assertEqual(s1, "200 OK")
+            self.assertEqual(s2, "200 OK")
+            self.assertEqual(s3, "429 Too Many Requests")
+            self.assertIn("今日 LLM 调用上限", json.loads(b3.decode("utf-8"))["error"])
+        finally:
+            if old is None:
+                os.environ.pop("NCGA_DAILY_LLM_CAP_PER_IP", None)
+            else:
+                os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = old
+
+    def test_app_batch_charges_full_fanout(self) -> None:
+        """A batch with 3 items × 2 varieties consumes 6 daily units, not 1."""
+        old = os.environ.get("NCGA_DAILY_LLM_CAP_PER_IP")
+        os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "10"
+        try:
+            client, _ = _build_client(_llm_json("ok"))
+            app = App(rewrite_service=RewriteService(client=client))
+            body = json.dumps(
+                {"items": ["a", "b", "c"], "target_varieties": ["beijing_mandarin", "dongbei_mandarin"]}
+            ).encode("utf-8")
+            s1, _, _ = call_app(app, "POST", "/api/rewrite-batch", body=body)
+            self.assertEqual(s1, "200 OK")
+            # Now only 4 units remaining; another batch of 3×2=6 cells must 429.
+            s2, _, b2 = call_app(app, "POST", "/api/rewrite-batch", body=body)
+            self.assertEqual(s2, "429 Too Many Requests")
+            self.assertIn("今日 LLM 调用上限", json.loads(b2.decode("utf-8"))["error"])
+        finally:
+            if old is None:
+                os.environ.pop("NCGA_DAILY_LLM_CAP_PER_IP", None)
+            else:
+                os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = old
 
 
 class RateLimiterTests(unittest.TestCase):

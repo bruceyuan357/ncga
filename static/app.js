@@ -2684,6 +2684,11 @@
     }
     function close() {
       modal.hidden = true;
+      // Cycle 18 v2 (A15): reset on close. Reopening always starts fresh — the
+      // user expects a "new analysis" not "previous analysis still here." Earlier
+      // we only reset on open(); that left a brief flash of stale inputs while
+      // the modal animated in. Resetting on close eliminates the flash entirely.
+      reset();
     }
     openBtn.addEventListener("click", open);
     closeBtn.addEventListener("click", close);
@@ -2780,37 +2785,128 @@
     const dismissBtn = $("#daily-phrase-dismiss");
     const favBtn = $("#daily-phrase-fav");
     const favIcon = favBtn?.querySelector("i");
+    // F2 (Cycle 18 v2): viewer wiring for the localStorage saved list.
+    const savedBtn = $("#daily-phrase-saved");
+    const savedCountEl = $("#daily-phrase-saved-count");
+    const savedModal = $("#saved-phrases-modal");
+    const savedClose = $("#saved-phrases-close");
+    const savedListEl = $("#saved-phrases-list");
+    const savedEmptyEl = $("#saved-phrases-empty");
     const DISMISS_KEY = "ncga.daily-phrase.dismissed-on";
     const FAV_KEY = "ncga.daily-phrase.saved.v1";
     let slideTimer = null;
 
+    function readSaved() {
+      try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); }
+      catch { return []; }
+    }
+    function writeSaved(list) {
+      localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, 60)));
+    }
+    function refreshSavedButton() {
+      const list = readSaved();
+      if (!savedBtn) return;
+      if (list.length > 0) {
+        savedBtn.hidden = false;
+        if (savedCountEl) savedCountEl.textContent = String(list.length);
+      } else {
+        savedBtn.hidden = true;
+      }
+    }
+    function renderSavedList() {
+      const list = readSaved();
+      if (!savedListEl || !savedEmptyEl) return;
+      if (list.length === 0) {
+        savedListEl.innerHTML = "";
+        savedEmptyEl.hidden = false;
+        return;
+      }
+      savedEmptyEl.hidden = true;
+      savedListEl.innerHTML = list.map((s, i) => `
+        <li data-idx="${i}">
+          <div class="saved-phrases-row">
+            <span class="date">${escapeHtml(s.date || "—")}</span>
+            <button type="button" class="delete-btn" data-del="${i}" title="删除">
+              <i class="fas fa-trash" aria-hidden="true"></i>
+            </button>
+          </div>
+          <blockquote class="saved-phrases-quote">${escapeHtml(s.original_phrase || "")}</blockquote>
+          <p class="saved-phrases-meaning">${escapeHtml(s.meaning || "")}</p>
+        </li>
+      `).join("");
+      // Wire per-item delete
+      $$("button.delete-btn", savedListEl).forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = +btn.dataset.del;
+          const cur = readSaved();
+          cur.splice(idx, 1);
+          writeSaved(cur);
+          renderSavedList();
+          refreshSavedButton();
+          // If the currently-shown phrase was just unsaved, flip the bookmark icon back.
+          if (favIcon) favIcon.className = "far fa-bookmark";
+        });
+      });
+    }
+    function openSavedModal() {
+      renderSavedList();
+      savedModal.hidden = false;
+    }
+    function closeSavedModal() { savedModal.hidden = true; }
+    if (savedBtn) savedBtn.addEventListener("click", openSavedModal);
+    if (savedClose) savedClose.addEventListener("click", closeSavedModal);
+    if (savedModal) savedModal.addEventListener("click", (e) => { if (e.target === savedModal) closeSavedModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (savedModal && !savedModal.hidden && e.key === "Escape") { e.preventDefault(); closeSavedModal(); }
+    });
+
     function startSlideshow(images) {
-      // Cycle 18 v2 (per A2): rotate 12 landmarks fast, ~3.2s per slide so the full
-      // sweep finishes in ~38s — enough to be noticed without distracting from the
-      // text, and lazy-loads via the browser's <img loading="lazy">.
+      // Cycle 18 v2 (per A2): on first load, run a FAST sweep through all 12
+      // landmarks (~220ms each ≈ 2.6s total) — visually says "wisdom is shared
+      // across all of these places." THEN settle into a slow 3.2s rotation. The
+      // phrase text fades in only after the sweep completes, so the eye is drawn
+      // to the geographic montage first and the wisdom-line second.
       slidesEl.innerHTML = "";
       if (!images || !images.length) {
         slidesEl.parentElement.style.display = "none";
         return;
       }
+      const textEl = card.querySelector(".daily-phrase-text");
+      if (textEl) textEl.classList.add("is-warming");
       images.forEach((img, i) => {
         const el = document.createElement("img");
         el.src = img.url;
         el.alt = img.caption || "";
-        el.loading = "lazy";
+        el.loading = i === 0 ? "eager" : "lazy";  // first image fast, rest lazy
         if (i === 0) el.classList.add("is-active");
         slidesEl.appendChild(el);
       });
       imgCap.textContent = images[0].caption || "";
-      let idx = 0;
       const all = slidesEl.querySelectorAll("img");
-      if (slideTimer) clearInterval(slideTimer);
-      slideTimer = setInterval(() => {
+      let idx = 0;
+      const SWEEP_MS = 220;   // fast intro
+      const REST_MS = 3200;   // slow rotation after sweep
+      // 1) Fast sweep — i = 1..N-1 (skip 0 since it's already active)
+      let sweepStep = 1;
+      const fast = setInterval(() => {
+        if (sweepStep >= all.length) {
+          clearInterval(fast);
+          if (textEl) textEl.classList.remove("is-warming");
+          // 2) Slow rotation
+          slideTimer = setInterval(() => {
+            all[idx].classList.remove("is-active");
+            idx = (idx + 1) % all.length;
+            all[idx].classList.add("is-active");
+            imgCap.textContent = images[idx].caption || "";
+          }, REST_MS);
+          return;
+        }
         all[idx].classList.remove("is-active");
-        idx = (idx + 1) % all.length;
+        idx = sweepStep;
         all[idx].classList.add("is-active");
         imgCap.textContent = images[idx].caption || "";
-      }, 3200);
+        sweepStep++;
+      }, SWEEP_MS);
     }
 
     async function load() {
@@ -2845,12 +2941,11 @@
           <span>${isErr ? "（生成失败）" : escapeHtml(text)}</span>
         </li>`;
       }).join("");
-      // Favorite state
-      const saved = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
-      const isFav = saved.some((s) => s.date === data.date);
+      // Favorite state — uses readSaved/writeSaved helpers above (F2 viewer wiring).
+      const isFav = readSaved().some((s) => s.date === data.date);
       if (favIcon) favIcon.className = isFav ? "fas fa-bookmark" : "far fa-bookmark";
       favBtn.onclick = () => {
-        const list = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+        const list = readSaved();
         const idx = list.findIndex((s) => s.date === data.date);
         if (idx >= 0) {
           list.splice(idx, 1);
@@ -2864,8 +2959,11 @@
           if (favIcon) favIcon.className = "fas fa-bookmark";
           showToast("已收藏到本地", "fa-bookmark");
         }
-        localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, 60)));
+        writeSaved(list);
+        refreshSavedButton();  // F2 — keeps the viewer chip count in sync
       };
+      // F2 — show "已收藏 (N)" chip if user has anything saved
+      refreshSavedButton();
       dismissBtn.onclick = () => {
         localStorage.setItem(DISMISS_KEY, today);
         card.hidden = true;

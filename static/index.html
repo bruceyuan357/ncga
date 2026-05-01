@@ -140,6 +140,10 @@
                 <span class="daily-phrase-date" id="daily-phrase-date">—</span>
               </div>
               <div class="daily-phrase-tools">
+                <!-- F2 (Cycle 18 v2): viewer entry. Hidden until the saved count > 0. -->
+                <button type="button" class="ghost-btn small" id="daily-phrase-saved" title="查看已收藏" hidden>
+                  <i class="fas fa-list-ul" aria-hidden="true"></i> 已收藏 <span id="daily-phrase-saved-count">0</span>
+                </button>
                 <button type="button" class="ghost-btn small" id="daily-phrase-fav" title="收藏到本地">
                   <i class="far fa-bookmark" aria-hidden="true"></i> 收藏
                 </button>
@@ -672,6 +676,26 @@ deadline → 截止日期
             <i class="fas fa-download" aria-hidden="true"></i> 套用示例
           </button>
         </footer>
+      </div>
+    </div>
+
+    <!-- Cycle 18 v2 (F2) — 收藏的方言一句 viewer. Resolves the broken-promise
+         interaction: 收藏 button used to write to localStorage with no UI to
+         read it back. Click "已收藏 (N)" → this modal lists everything saved,
+         with date, original phrase, and any translations the user wants to expand. -->
+    <div class="landmark-modal" id="saved-phrases-modal" role="dialog" aria-modal="true" aria-labelledby="saved-phrases-title" hidden>
+      <div class="landmark-modal-content small-modal">
+        <button class="landmark-close" id="saved-phrases-close" type="button" aria-label="关闭">
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+        <header>
+          <h3 id="saved-phrases-title">我收藏的方言一句</h3>
+          <p>都存在你这台浏览器本地。换个浏览器或清缓存就会消失。</p>
+        </header>
+        <div class="saved-phrases-body" id="saved-phrases-body">
+          <p class="saved-phrases-empty" id="saved-phrases-empty" hidden>还没有收藏。回到「今日方言一句」点 <i class="fas fa-bookmark"></i> 收藏即可加进来。</p>
+          <ul id="saved-phrases-list"></ul>
+        </div>
       </div>
     </div>
 
