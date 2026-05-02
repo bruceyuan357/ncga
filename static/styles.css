@@ -2142,13 +2142,18 @@ mark.kw-hl {
 }
 .row-output-actions button:hover { color: var(--accent); background: rgba(200,62,42,.1); }
 
+/* Cycle 19 hotfix: previously this had `display: inline-flex` which TURNS A
+   <td> INTO AN INLINE ELEMENT, collapsing all 3 score cells into the first
+   column visually. The data-score-variety lookup was correct; the layout
+   just wasn't rendering as a table-cell anymore. Keep the default table-cell
+   display and move the inner-element spacing onto the `.score-out` span. */
 .row-score {
-  display: inline-flex; align-items: baseline; gap: 0.15rem;
   font-family: var(--mono);
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 .row-score .score-num { color: var(--gold); font-weight: 600; }
-.row-score .score-out { color: var(--ink-muted); font-size: 0.75rem; }
+.row-score .score-out { color: var(--ink-muted); font-size: 0.75rem; margin-left: 0.15rem; }
 
 /* Skeleton row (loading) */
 .skeleton-row {
