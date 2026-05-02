@@ -34,7 +34,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=Noto+Serif+SC:wght@400;500;600;700;900&family=Ma+Shan+Zheng&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   </head>
-  <body data-route="workbench">
+  <body data-route="daily">
     <div class="boot-screen" id="boot-screen">
       <div class="boot-flower">
         <span></span><span></span><span></span><span></span>
@@ -64,35 +64,41 @@
       </a>
 
       <nav class="nav-rail" role="tablist">
-        <a href="#workbench" class="nav-item is-active" data-route="workbench" role="tab" aria-selected="true">
+        <!-- Cycle 19 v2: 今日方言一句 promoted to slot 1 + home/default route. -->
+        <a href="#daily" class="nav-item is-active" data-route="daily" role="tab" aria-selected="true">
           <i class="fas fa-feather-pointed" aria-hidden="true"></i>
-          <span>重写台</span>
+          <span>今日方言</span>
           <kbd>1</kbd>
+        </a>
+        <a href="#workbench" class="nav-item" data-route="workbench" role="tab" aria-selected="false">
+          <i class="fas fa-pen-nib" aria-hidden="true"></i>
+          <span>重写台</span>
+          <kbd>2</kbd>
         </a>
         <a href="#batch" class="nav-item" data-route="batch" role="tab" aria-selected="false">
           <i class="fas fa-table-list" aria-hidden="true"></i>
           <span>批量工作台</span>
-          <kbd>2</kbd>
+          <kbd>3</kbd>
         </a>
         <a href="#atlas" class="nav-item" data-route="atlas" role="tab" aria-selected="false">
           <i class="fas fa-map-location-dot" aria-hidden="true"></i>
           <span>方言图鉴</span>
-          <kbd>3</kbd>
+          <kbd>4</kbd>
         </a>
         <a href="#history" class="nav-item" data-route="history" role="tab" aria-selected="false">
           <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
           <span>历史记录</span>
-          <kbd>4</kbd>
+          <kbd>5</kbd>
         </a>
         <a href="#settings" class="nav-item" data-route="settings" role="tab" aria-selected="false">
           <i class="fas fa-sliders" aria-hidden="true"></i>
           <span>设置</span>
-          <kbd>5</kbd>
+          <kbd>6</kbd>
         </a>
         <a href="#about" class="nav-item" data-route="about" role="tab" aria-selected="false">
           <i class="fas fa-circle-info" aria-hidden="true"></i>
           <span>关于</span>
-          <kbd>6</kbd>
+          <kbd>7</kbd>
         </a>
       </nav>
 
@@ -127,12 +133,12 @@
         </div>
       </header>
 
-      <section class="page page-workbench is-active" id="page-workbench">
-        <div class="workbench">
-          <!-- Cycle 18 — 今日方言一句 (Function 2). Hidden until /api/phrase-of-the-day responds.
-               Dismissible per-day; reappears the next calendar day. Core idea: same wisdom, ten voices —
-               highlights that this whole project is about the shared core under regional variation. -->
-          <div class="card card-daily-phrase" id="daily-phrase-card" hidden>
+      <!-- Cycle 19 v2: 今日方言一句 (Function 2). Promoted from a workbench card to its
+           own home page. Layout: hero quote left, slideshow right (or stacked on mobile);
+           bigger image, expanded 2-column translation list, prominent 古训 typography. -->
+      <section class="page page-daily is-active" id="page-daily">
+        <div class="daily-page-wrap">
+          <div class="card card-daily-phrase card-daily-hero" id="daily-phrase-card">
             <header class="daily-phrase-head">
               <div class="daily-phrase-title">
                 <i class="fas fa-feather-pointed" aria-hidden="true"></i>
@@ -140,36 +146,49 @@
                 <span class="daily-phrase-date" id="daily-phrase-date">—</span>
               </div>
               <div class="daily-phrase-tools">
-                <!-- F2 (Cycle 18 v2): viewer entry. Hidden until the saved count > 0. -->
+                <!-- F2: 收藏 viewer entry. Hidden until the saved count > 0. -->
                 <button type="button" class="ghost-btn small" id="daily-phrase-saved" title="查看已收藏" hidden>
                   <i class="fas fa-list-ul" aria-hidden="true"></i> 已收藏 <span id="daily-phrase-saved-count">0</span>
                 </button>
                 <button type="button" class="ghost-btn small" id="daily-phrase-fav" title="收藏到本地">
                   <i class="far fa-bookmark" aria-hidden="true"></i> 收藏
                 </button>
-                <button type="button" class="ghost-btn small" id="daily-phrase-dismiss" title="今天不再显示">
-                  <i class="fas fa-xmark" aria-hidden="true"></i>
-                </button>
+                <!-- Cycle 19 v2: removed the per-day dismiss button. The page is intentional;
+                     dismiss has no meaning when the user navigated here on purpose. -->
               </div>
             </header>
             <div class="daily-phrase-body">
               <figure class="daily-phrase-figure" id="daily-phrase-figure">
-                <!-- Cycle 18 v2 (per A2): the 12 most representative Chinese landmarks
-                     rotate as a fast slideshow under the daily phrase. JS injects 12
-                     <img> children below; CSS only the active one is visible. -->
+                <!-- 12 representative landmarks rotate as a slideshow.
+                     JS injects 12 <img> children below; CSS shows the active one. -->
                 <div class="daily-phrase-slides" id="daily-phrase-slides"></div>
                 <figcaption id="daily-phrase-image-caption">—</figcaption>
               </figure>
               <div class="daily-phrase-text">
                 <blockquote class="daily-phrase-original" id="daily-phrase-original">—</blockquote>
                 <p class="daily-phrase-meaning" id="daily-phrase-meaning">—</p>
-                <details class="daily-phrase-translations">
-                  <summary>看看十种方言里这句怎么说 <span id="daily-phrase-translations-count" class="muted"></span></summary>
+                <div class="daily-phrase-translations daily-phrase-translations-open">
+                  <h3 class="daily-phrase-translations-title">
+                    <i class="fas fa-globe" aria-hidden="true"></i>
+                    十种方言里这句怎么说
+                    <span id="daily-phrase-translations-count" class="muted"></span>
+                  </h3>
                   <ul id="daily-phrase-translations-list"></ul>
-                </details>
+                </div>
               </div>
             </div>
           </div>
+          <p class="daily-page-cta">
+            想自己改写一段话？去
+            <a href="#workbench" class="link-accent">
+              <i class="fas fa-pen-nib" aria-hidden="true"></i> 重写台
+            </a>
+          </p>
+        </div>
+      </section>
+
+      <section class="page page-workbench" id="page-workbench">
+        <div class="workbench">
 
           <div class="card card-input">
             <header class="card-head">

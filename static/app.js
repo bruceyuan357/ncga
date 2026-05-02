@@ -119,7 +119,9 @@
 
   // ---------------- constants ----------------
   const SCRIPT_LABEL = { simplified: "简体", traditional: "繁體" };
-  const ROUTES = ["workbench", "batch", "atlas", "history", "settings", "about"];
+  // Cycle 19 v2: 今日方言 promoted to slot 1 + home/default route. Shortcut 1 → daily,
+  // 2 → workbench, 3 → batch, 4 → atlas, 5 → history, 6 → settings, 7 → about.
+  const ROUTES = ["daily", "workbench", "batch", "atlas", "history", "settings", "about"];
   const HISTORY_MAX = 50;
 
   const STATUS_TEXT = {
@@ -450,6 +452,9 @@
     });
 
     const titles = {
+      // Cycle 19 v2: 'daily' added — without this entry, t[0] threw on undefined
+      // and crashed the whole init IIFE (boot screen never hid, data never loaded).
+      daily: ["今日方言一句", "同一句智慧 · 十种乡音说出来"],
       workbench: ["重写台", "把任意中文揉成你想要的乡音"],
       batch: ["批量工作台", "一次跑完几十条 × 多方言"],
       atlas: ["方言图鉴", "看看每种方言背后的地标与文化"],
@@ -457,7 +462,7 @@
       settings: ["设置", "调整背景、字号、高亮等偏好"],
       about: ["关于", "关于这只小助手 · 写作贴士 · 快捷键"],
     };
-    const t = titles[route];
+    const t = titles[route] || titles.workbench;
     pageTitle.textContent = t[0];
     pageSubtitle.textContent = t[1];
 
@@ -479,7 +484,8 @@
     window.addEventListener("hashchange", () => {
       gotoRoute(location.hash.replace("#", ""));
     });
-    gotoRoute(location.hash.replace("#", "") || "workbench");
+    // Cycle 19 v2: default landing route is now "daily" (was "workbench").
+    gotoRoute(location.hash.replace("#", "") || "daily");
   }
 
   // ---------------- settings ----------------
@@ -2782,7 +2788,6 @@
     const meanEl = $("#daily-phrase-meaning");
     const listEl = $("#daily-phrase-translations-list");
     const countEl = $("#daily-phrase-translations-count");
-    const dismissBtn = $("#daily-phrase-dismiss");
     const favBtn = $("#daily-phrase-fav");
     const favIcon = favBtn?.querySelector("i");
     // F2 (Cycle 18 v2): viewer wiring for the localStorage saved list.
@@ -2792,7 +2797,7 @@
     const savedClose = $("#saved-phrases-close");
     const savedListEl = $("#saved-phrases-list");
     const savedEmptyEl = $("#saved-phrases-empty");
-    const DISMISS_KEY = "ncga.daily-phrase.dismissed-on";
+    // Cycle 19 v2: DISMISS_KEY removed (no more dismiss-per-day flow).
     const FAV_KEY = "ncga.daily-phrase.saved.v1";
     let slideTimer = null;
 
@@ -2910,13 +2915,14 @@
     }
 
     async function load() {
-      // Don't show again if already dismissed today
+      // Cycle 19 v2: dismiss-per-day removed. Page is now a dedicated route the
+      // user navigates to intentionally — there's nothing to "dismiss." The card
+      // just renders today's phrase whenever the user lands here.
       const today = new Date().toISOString().slice(0, 10);
-      if (localStorage.getItem(DISMISS_KEY) === today) return;
       let res, data;
       try {
         res = await fetch("/api/phrase-of-the-day");
-        if (!res.ok) return;  // silently fail — landing card is non-critical
+        if (!res.ok) return;  // silently fail — page degrades gracefully
         data = await res.json();
       } catch { return; }
       if (!data || !data.original_phrase) return;
@@ -2964,11 +2970,8 @@
       };
       // F2 — show "已收藏 (N)" chip if user has anything saved
       refreshSavedButton();
-      dismissBtn.onclick = () => {
-        localStorage.setItem(DISMISS_KEY, today);
-        card.hidden = true;
-      };
-      card.hidden = false;
+      // Cycle 19 v2: dismiss button removed; card is always visible on its own page.
+      // No `card.hidden` toggling needed.
     }
     // Defer to next tick so VARIETIES + SCENARIOS load first
     setTimeout(load, 50);
@@ -2978,7 +2981,7 @@
     document.addEventListener("keydown", (e) => {
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
-        if (!isInput && /^[1-6]$/.test(e.key)) {
+        if (!isInput && /^[1-7]$/.test(e.key)) {
           location.hash = ROUTES[+e.key - 1];
         }
       }

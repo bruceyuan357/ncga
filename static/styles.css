@@ -2729,55 +2729,76 @@ body[data-version="v1"] .scenario-chip.is-active {
 .cw-glossary-chip i { color: var(--gold); }
 
 /* ============================================================
-   Cycle 18 — 今日方言一句 (Function 2 daily phrase card)
+   Cycle 19 v2 — 今日方言一句 (Function 2) — promoted to its own home page.
+   Hero typography for the 古训 quote, large slideshow, 2-col translations
+   on wide screens. All same building blocks as Cycle 18 v1, just sized up
+   and laid out for a full page rather than a workbench card.
    ============================================================ */
-.card-daily-phrase {
-  margin-bottom: 1.1rem;
-  padding: 1.1rem 1.25rem;
-  background: linear-gradient(180deg, rgba(200, 162, 70, 0.06), rgba(20, 14, 10, 0.3));
-  border: 1px solid rgba(200, 162, 70, 0.22);
-  border-radius: 14px;
+.daily-page-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.4rem 0.6rem 2rem;
+}
+.card-daily-hero {
+  padding: 1.4rem 1.5rem 1.6rem;
+  background: linear-gradient(180deg, rgba(200, 162, 70, 0.08), rgba(20, 14, 10, 0.45));
+  border: 1px solid rgba(200, 162, 70, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
 }
 .daily-phrase-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  margin-bottom: 0.85rem;
+  margin-bottom: 1.1rem;
 }
 .daily-phrase-title {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
+  align-items: baseline;
+  gap: 0.6rem;
 }
 .daily-phrase-title h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-family: var(--serif);
+  font-size: 1.45rem;
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
-.daily-phrase-title i { color: var(--gold); }
-.daily-phrase-date { font-size: 0.78rem; color: var(--gold-soft); opacity: 0.7; }
-.daily-phrase-tools { display: inline-flex; gap: 0.45rem; }
+.daily-phrase-title i { color: var(--gold); font-size: 1.15rem; }
+.daily-phrase-date {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--gold-soft);
+  opacity: 0.78;
+}
+.daily-phrase-tools { display: inline-flex; gap: 0.5rem; }
 .daily-phrase-body {
   display: grid;
-  gap: 1rem;
+  gap: 1.4rem;
   grid-template-columns: 1fr;
 }
-@media (min-width: 720px) {
-  .daily-phrase-body { grid-template-columns: 200px 1fr; }
+@media (min-width: 820px) {
+  /* Hero layout: image right (wider), text left. Image ~42% of width. */
+  .daily-phrase-body { grid-template-columns: 1fr minmax(360px, 0.8fr); align-items: start; }
+  .daily-phrase-figure { order: 2; }
+  .daily-phrase-text { order: 1; }
 }
 .daily-phrase-figure {
   margin: 0;
-  border-radius: 10px;
+  border-radius: 14px;
   overflow: hidden;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
 }
-/* Cycle 18 v2: 12-landmark slideshow. Stack imgs absolute, fade between them. */
 .daily-phrase-slides {
   position: relative;
   width: 100%;
-  height: 140px;
+  height: 280px;  /* Cycle 19 v2: was 140; doubled for hero presence */
+}
+@media (min-width: 820px) {
+  .daily-phrase-slides { height: 320px; }
 }
 .daily-phrase-slides img {
   position: absolute;
@@ -2790,60 +2811,98 @@ body[data-version="v1"] .scenario-chip.is-active {
 }
 .daily-phrase-slides img.is-active { opacity: 1; }
 .daily-phrase-figure figcaption {
-  font-size: 0.74rem;
-  padding: 0.4rem 0.6rem;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.8rem;
   color: var(--gold-soft);
-  opacity: 0.75;
+  opacity: 0.85;
   text-align: center;
+  letter-spacing: 0.02em;
 }
-/* Cycle 18 v2 (A2): phrase text fades in after the 12-landmark intro sweep finishes */
-.daily-phrase-text {
-  transition: opacity 0.6s ease;
-}
+.daily-phrase-text { transition: opacity 0.6s ease; }
 .daily-phrase-text.is-warming { opacity: 0.18; }
+
+/* Cycle 19 v2: hero quote — calligraphic, generous size, top-quote ornament. */
 .daily-phrase-original {
-  margin: 0 0 0.5rem;
-  font-size: 1.18rem;
+  margin: 0 0 0.85rem;
+  padding: 0.4rem 0 0.4rem 1rem;
+  font-family: var(--serif);
+  font-size: 1.85rem;
   line-height: 1.5;
   color: var(--ink);
-  font-weight: 500;
-  border-left: 3px solid var(--gold);
-  padding-left: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-left: 4px solid var(--gold);
+}
+@media (min-width: 820px) {
+  .daily-phrase-original { font-size: 2.15rem; }
 }
 .daily-phrase-meaning {
-  margin: 0 0 0.7rem;
-  font-size: 0.9rem;
+  margin: 0 0 1.4rem;
+  font-size: 1rem;
+  line-height: 1.65;
   color: var(--gold-soft);
 }
-.daily-phrase-translations summary {
-  cursor: pointer;
-  font-size: 0.86rem;
+
+/* Cycle 19 v2: translations always visible (no <details> on its own page) */
+.daily-phrase-translations-title {
+  margin: 0 0 0.7rem;
+  font-size: 0.92rem;
+  font-weight: 500;
   color: var(--gold);
-  padding: 0.3rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
-.daily-phrase-translations summary .muted { opacity: 0.6; margin-left: 0.4rem; font-size: 0.78rem; }
-.daily-phrase-translations ul {
+.daily-phrase-translations-title .muted { opacity: 0.6; font-size: 0.8rem; letter-spacing: 0; text-transform: none; }
+.daily-phrase-translations-open ul {
   list-style: none;
-  margin: 0.5rem 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
 }
-.daily-phrase-translations li {
+@media (min-width: 720px) {
+  /* 2-column translation grid on wide screens — uses the page's full width. */
+  .daily-phrase-translations-open ul { grid-template-columns: 1fr 1fr; }
+}
+.daily-phrase-translations-open li {
   display: grid;
-  grid-template-columns: 8.5rem 1fr;
+  grid-template-columns: 7.5rem 1fr;
   gap: 0.7rem;
-  padding: 0.45rem 0.6rem;
-  background: rgba(255,255,255,0.02);
-  border-radius: 6px;
-  font-size: 0.92rem;
+  padding: 0.55rem 0.75rem;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
-.daily-phrase-translations li > strong {
+.daily-phrase-translations-open li > strong {
   color: var(--gold-soft);
-  font-weight: 400;
+  font-weight: 500;
   font-size: 0.84rem;
+  align-self: center;
 }
-.daily-phrase-translations li.is-error > span { color: var(--warning); opacity: 0.7; }
+.daily-phrase-translations-open li.is-error > span { color: var(--warning); opacity: 0.7; }
+
+.daily-page-cta {
+  text-align: center;
+  margin: 2rem 0 0;
+  font-size: 0.9rem;
+  color: var(--gold-soft);
+  opacity: 0.85;
+}
+.daily-page-cta .link-accent {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px dashed var(--accent);
+  padding: 0 0.2rem;
+}
+.daily-page-cta .link-accent:hover { color: var(--accent-soft); border-bottom-color: var(--accent-soft); }
 
 /* small ghost button used in scenario row + daily phrase */
 .ghost-btn.small { font-size: 0.8rem; padding: 0.32rem 0.7rem; }
