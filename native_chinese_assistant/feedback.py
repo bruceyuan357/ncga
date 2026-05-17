@@ -27,6 +27,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+# Cycle 21 self-audit #10: was a per-call local import inside _persist_unlocked.
+# Persist runs on every record() (the rate-quality hot path); hoist to module
+# scope. Failures here would have surfaced at import time, not at first persist.
+from native_chinese_assistant.crypto import encrypt, resolve_key
+
 logger = logging.getLogger("ncga.feedback")
 
 DEFAULT_TRIGGER_MIN_COUNT = 8  # don't reflect until we have at least N samples
@@ -428,9 +433,8 @@ class QualityStore:
     def _persist_unlocked(self) -> None:
         if not self.path:
             return
-        # Cycle 13: AES-GCM at rest if a key is available
-        from native_chinese_assistant.crypto import encrypt, resolve_key
-
+        # Cycle 13: AES-GCM at rest if a key is available. (Import hoisted to
+        # module scope in Cycle 21 audit #10 — was per-call.)
         key = resolve_key()
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -460,10 +464,16 @@ class QualityStore:
                 }
                 for (v, s), b in self._buckets.items()
             }
-            payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+            # Cycle 21 self-audit #10: drop indent=2 when encrypting. Indent only
+            # helps humans inspecting the plaintext JSON; the encrypted blob is
+            # opaque anyway, and the indent ~doubles bytes-on-disk + bytes-fed-
+            # to-AES-GCM for nothing. Keep indent for the unencrypted path so
+            # the file remains greppable.
             if key is not None:
+                payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 tmp.write_bytes(encrypt(payload, key))
             else:
+                payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
                 tmp.write_bytes(payload)
             os.chmod(tmp, 0o600)  # restrict perms regardless
             tmp.replace(self.path)
