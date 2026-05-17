@@ -1029,14 +1029,13 @@ class App:
             varieties = [parse_variety(v) for v in target_varieties]
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
-        # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
-        cap_err = self._check_daily_cap(
-            ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
-        )
-        if cap_err is not None:
-            return cap_err
-        # Validate all items are strings, non-empty, within length cap
+        # Cycle 21 self-audit #8: validate items BEFORE charging the daily cap.
+        # Old order:
+        #   parse varieties → check_daily_cap(items*varieties) → validate items
+        # If items contained a non-string / empty / too-long row, the 400 still
+        # fired but the user's per-day LLM quota was already consumed (cap is
+        # in-memory and not refunded on later 4xx). Now: validate items first
+        # → 400 free of charge → only then commit the cap.
         for i, item in enumerate(items):
             if not isinstance(item, str) or not item.strip():
                 return json_response(
@@ -1048,6 +1047,13 @@ class App:
                     "400 Bad Request",
                     {"error": f"Item #{i} exceeds {MAX_INPUT_CHARS} characters."},
                 )
+        # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
+        # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
+        cap_err = self._check_daily_cap(
+            ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
+        )
+        if cap_err is not None:
+            return cap_err
 
         start_response(
             "200 OK",

@@ -2077,6 +2077,31 @@ class BatchEndpointTests(unittest.TestCase):
         self.assertEqual(status, "400 Bad Request")
         self.assertIn("Too many items", json.loads(body.decode("utf-8"))["error"])
 
+    def test_batch_invalid_item_does_not_consume_daily_cap(self) -> None:
+        """Cycle 21 self-audit #8: validate items BEFORE charging the daily
+        cap. Old order:
+          check_daily_cap(items*varieties) → validate items
+        meant a bad row still consumed quota even though the 400 fired.
+        New order: items validated first; cap consumed only on success.
+        """
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        # Submit a batch with one bad row (empty string) — must 400 + leave
+        # daily counter untouched.
+        before = app.daily_counter.remaining("127.0.0.1")
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/rewrite-batch",
+            body=json.dumps({"items": ["good", ""], "target_varieties": ["beijing_mandarin"]}).encode(
+                "utf-8"
+            ),
+        )
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("empty", json.loads(body.decode("utf-8"))["error"].lower())
+        after = app.daily_counter.remaining("127.0.0.1")
+        self.assertEqual(before, after, "daily cap was consumed despite 400")
+
     def test_batch_rejects_empty_items(self) -> None:
         client, _ = _build_client(_llm_json("ok"))
         app = App(rewrite_service=RewriteService(client=client))
