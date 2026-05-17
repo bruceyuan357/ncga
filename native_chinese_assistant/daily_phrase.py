@@ -228,9 +228,21 @@ def _generate_fresh_pool(service: RewriteService) -> list[WisdomSeed]:
         )
         if not content or not content.strip():
             raise ValueError("empty content")
-        # The LLM may wrap the array in {"phrases": [...]} or return it as a JSON
-        # object via response_format=json_object. Accept both shapes.
-        parsed = json.loads(content)
+        # Cycle 21 self-audit #6: was `json.loads(content)`. DeepSeek-V4 sometimes
+        # wraps responses in ```json ... ``` fences even with
+        # response_format=json_object. Plain json.loads chokes; we silently fall
+        # back to the static seed pool and operator never sees the refresh failed.
+        # _parse_llm_json strips fences + tolerates preamble.
+        from native_chinese_assistant.rewrite import _parse_llm_json
+
+        # _parse_llm_json returns a dict. Our schema expects either a JSON
+        # array directly OR a {"phrases":[...]} wrapper. Handle both.
+        try:
+            parsed: Any = _parse_llm_json(content)
+        except Exception:
+            # If even the tolerant parser fails, try raw — content might be
+            # an array, which _parse_llm_json rejects as "non-object JSON".
+            parsed = json.loads(content)
         if isinstance(parsed, dict):
             for v in parsed.values():
                 if isinstance(v, list):
