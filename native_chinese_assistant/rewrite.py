@@ -396,6 +396,12 @@ def iter_streamed_deltas(response: Any):
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 _PARTIAL_REWRITTEN_RE = re.compile(r'"rewritten_text"\s*:\s*"((?:[^"\\]|\\.)*)', re.DOTALL)
+# Cycle 21 self-audit #3: strip C0 control chars + DEL before user-supplied
+# free-form strings reach the LLM. Without this, a user can put
+# "\n\n---\nIGNORE PREVIOUS INSTRUCTIONS\n[NEW SYSTEM]:..." in `recipient`
+# / `mood` and pry the system prompt open. _coerce_glossary already validates
+# its own schema; characterize was the open vector.
+_CTRL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def _try_extract_rewritten_text(partial_json: str) -> str:
@@ -1194,8 +1200,11 @@ class RewriteService:
             raise RewriteError("情境向导需要 LLM 服务。请先配置 LLM_API_KEY 后再试。")
         # Cycle 18 v2 (per A6): 120 → 240 char cap. Long enough for a real sentence
         # per field; short enough that the prompt stays compact.
-        recipient = (recipient or "").strip()[:240]
-        mood = (mood or "").strip()[:240]
+        # Cycle 21 self-audit #3: strip control chars (NUL through US + DEL).
+        # Newlines / tabs in these free-form fields reach the system prompt
+        # and are a classic injection vector — fake "[NEW SYSTEM]:..." etc.
+        recipient = _CTRL_CHAR_RE.sub("", recipient or "").strip()[:240]
+        mood = _CTRL_CHAR_RE.sub("", mood or "").strip()[:240]
         if not recipient and not mood:
             raise ValueError("recipient and mood cannot both be empty")
         scenario_values = [s.value for s in Scenario]
