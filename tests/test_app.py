@@ -2549,6 +2549,21 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertNotIn("'unsafe-inline'", csp)
         self.assertNotIn("'unsafe-eval'", csp)
 
+    def test_quality_stats_is_rate_limited(self) -> None:
+        # Cycle 21 self-audit #2: /api/quality-stats used to be a bare
+        # lambda with no rate limit. A leaked cookie / bearer could pull
+        # the full bucket dump (every rating + reason text) as fast as the
+        # network allowed. Now subject to the standard per-IP per-minute
+        # limiter (default 30/min).
+        app = App(rewrite_service=RewriteService(config=None), rate_limit_per_min=2)
+        s1, _, _ = call_app(app, "GET", "/api/quality-stats")
+        self.assertEqual(s1, "200 OK")
+        s2, _, _ = call_app(app, "GET", "/api/quality-stats")
+        self.assertEqual(s2, "200 OK")
+        s3, _, body = call_app(app, "GET", "/api/quality-stats")
+        self.assertEqual(s3, "429 Too Many Requests")
+        self.assertIn("Rate limit", json.loads(body)["error"])
+
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:
         os.environ.pop("NCGA_TRUST_FORWARDED_FOR", None)

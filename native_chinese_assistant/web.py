@@ -622,9 +622,7 @@ class App:
                 sr, "200 OK", {"scenarios": scenario_options()}
             ),
             ("GET", "/api/healthz"): lambda env, sr: json_response(sr, "200 OK", {"status": "ok"}),
-            ("GET", "/api/quality-stats"): lambda env, sr: json_response(
-                sr, "200 OK", {"buckets": self.quality_store.stats_snapshot()}
-            ),
+            ("GET", "/api/quality-stats"): self.handle_quality_stats,
             ("GET", "/api/phrase-of-the-day"): self.handle_phrase_of_the_day,
             ("POST", "/api/rewrite"): self.handle_rewrite,
             ("POST", "/api/rewrite-stream"): self.handle_rewrite_stream,
@@ -1169,6 +1167,20 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         cleared = self.quality_store.clear_override(target.value, scenario.value)
         return json_response(start_response, "200 OK", {"cleared": cleared})
+
+    def handle_quality_stats(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Cycle 21 self-audit #2: was a bare lambda, no rate limit. A leaked
+        cookie / bearer could pull the full bucket dump (all ratings + reasons)
+        as fast as the network allowed. Now subject to the standard per-IP
+        per-minute limiter, same as /api/rewrite."""
+        ip = client_ip(environ)
+        if not self.rate_limiter.allow(ip):
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        return json_response(start_response, "200 OK", {"buckets": self.quality_store.stats_snapshot()})
 
     def handle_feedback(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Cycle 20: accept a reflection-form submission and append to JSONL.
