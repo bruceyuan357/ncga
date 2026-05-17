@@ -1807,6 +1807,54 @@ class MetaRefineTests(unittest.TestCase):
         self.assertAlmostEqual(ab["post_mean"], 4.0, places=2)
         self.assertAlmostEqual(ab["delta"], 2.0, places=2)
 
+    def test_concurrent_record_during_ab_delta_does_not_explode(self) -> None:
+        """Cycle 21 self-audit #5: ab_delta used to slice + iterate
+        bucket.samples without the lock — concurrent record() append could
+        cause `RuntimeError: list changed size during iteration`. Hammer
+        both calls concurrently and assert nothing raises.
+        """
+        import threading
+
+        from native_chinese_assistant.feedback import QualityStore
+
+        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
+        for x in [2.0] * 5:
+            s.record("v", "sc", x, "o", "r", "")
+        s.set_draft("v", "sc", "addendum", "r")
+        s.activate_override("v", "sc")
+
+        stop = threading.Event()
+        errors: list[BaseException] = []
+
+        def writer() -> None:
+            while not stop.is_set():
+                try:
+                    s.record("v", "sc", 4.0, "o", "r", "")
+                except BaseException as e:
+                    errors.append(e)
+                    return
+
+        def reader() -> None:
+            for _ in range(200):
+                try:
+                    s.ab_delta("v", "sc")
+                    s.hi_lo_examples("v", "sc")
+                    s.stats_snapshot()
+                except BaseException as e:
+                    errors.append(e)
+                    return
+
+        ws = [threading.Thread(target=writer) for _ in range(3)]
+        rs = [threading.Thread(target=reader) for _ in range(3)]
+        for t in ws + rs:
+            t.start()
+        for t in rs:
+            t.join()
+        stop.set()
+        for t in ws:
+            t.join()
+        self.assertEqual(errors, [], msg=f"thread errors: {errors[:3]}")
+
     def test_persistence_round_trip_with_new_fields(self) -> None:
         """Cycle 10 schema additions must persist + reload."""
         from native_chinese_assistant.feedback import QualityStore

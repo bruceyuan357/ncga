@@ -139,7 +139,11 @@ class QualityStore:
         self.trigger_min_count = trigger_min_count
         self.trigger_threshold = trigger_threshold
         self.reflect_cooldown_s = reflect_cooldown_s
-        self._lock = threading.Lock()
+        # Cycle 21 self-audit #5: RLock instead of Lock because stats_snapshot()
+        # holds the lock and then calls ab_delta() / needs_reflection(), both of
+        # which now also acquire the lock. Non-reentrant Lock would self-deadlock.
+        # RLock is ~2x slower per acquire but still well under microsecond range.
+        self._lock = threading.RLock()
         self._buckets: dict[tuple[str, str], BucketState] = {}
         if self.path and self.path.is_file():
             self._load()
@@ -285,23 +289,35 @@ class QualityStore:
     # --- accessors ---
 
     def get_override_addendum(self, variety: str, scenario: str) -> str | None:
-        bucket = self._buckets.get(self._key(variety, scenario))
-        return bucket.override_addendum if bucket else None
+        # Cycle 21 self-audit #5: this used to read self._buckets unlocked.
+        # The .get() itself is atomic in CPython (dict lookup holds GIL),
+        # but reading bucket.override_addendum without the lock could race
+        # with activate_override / clear_override mutating that field.
+        # Cheap fix: take the lock for the brief read.
+        with self._lock:
+            bucket = self._buckets.get(self._key(variety, scenario))
+            return bucket.override_addendum if bucket else None
 
     def get_bucket(self, variety: str, scenario: str) -> BucketState | None:
-        return self._buckets.get(self._key(variety, scenario))
+        # Returns a reference, not a snapshot — callers that read multiple
+        # fields should re-acquire the lock themselves. Most callers only
+        # read a single immutable-ish field, so this is fine.
+        with self._lock:
+            return self._buckets.get(self._key(variety, scenario))
 
     def needs_reflection(self, variety: str, scenario: str) -> bool:
         """True if (variety, scenario) bucket has enough data AND mean is below threshold
         AND cooldown has elapsed since last reflection."""
-        bucket = self._buckets.get(self._key(variety, scenario))
-        if not bucket:
-            return False
-        if bucket.stats.n < self.trigger_min_count:
-            return False
-        if bucket.stats.mean >= self.trigger_threshold:
-            return False
-        return time.time() - bucket.last_reflected_at >= self.reflect_cooldown_s
+        # Cycle 21 self-audit #5: hold the lock for the whole multi-field read.
+        with self._lock:
+            bucket = self._buckets.get(self._key(variety, scenario))
+            if not bucket:
+                return False
+            if bucket.stats.n < self.trigger_min_count:
+                return False
+            if bucket.stats.mean >= self.trigger_threshold:
+                return False
+            return time.time() - bucket.last_reflected_at >= self.reflect_cooldown_s
 
     def hi_lo_examples(
         self,
@@ -310,10 +326,18 @@ class QualityStore:
         n_each: int = DEFAULT_HI_LO_PER_REFLECT,
     ) -> tuple[list[Sample], list[Sample]]:
         """Return (hi_score, lo_score) sample lists for Refiner context."""
-        bucket = self._buckets.get(self._key(variety, scenario))
-        if not bucket:
-            return [], []
-        sorted_samples = sorted(bucket.samples, key=lambda s: s.score)
+        # Cycle 21 self-audit #5: snapshot under the lock so a concurrent
+        # record() can't mutate bucket.samples mid-sort. Without this we
+        # could hit `RuntimeError: list changed size during iteration` when
+        # sorted() iterates the list while append() is happening. Sort
+        # itself is CPU-only and runs outside the lock (no need to block
+        # writers).
+        with self._lock:
+            bucket = self._buckets.get(self._key(variety, scenario))
+            if not bucket:
+                return [], []
+            snapshot = list(bucket.samples)
+        sorted_samples = sorted(snapshot, key=lambda s: s.score)
         lo = sorted_samples[:n_each]
         hi = sorted_samples[-n_each:][::-1]
         return hi, lo
@@ -326,24 +350,33 @@ class QualityStore:
         activation_baseline_* fields, falls back to override_baseline_mean which
         Cycle 9 wrote at refine-time (close enough — same mean we'd have snapshotted).
         Returns {post_count: 0, ...} if override is fresh / no new samples yet.
+
+        Cycle 21 self-audit #5: snapshot bucket state under the lock so the
+        list-slice + sum loop below doesn't race with record() append.
         """
-        bucket = self._buckets.get(self._key(variety, scenario))
-        if not bucket or not bucket.override_addendum:
-            return None
-        # Prefer the explicit activation snapshot; fall back for legacy data.
-        if bucket.activation_baseline_count and bucket.activation_baseline_count > 0:
-            baseline_count = bucket.activation_baseline_count
-            baseline = bucket.activation_baseline_mean or 0.0
-        elif bucket.override_baseline_mean is not None:
-            # Legacy: at Cycle 9 we recorded only the mean; we don't know the count.
-            # Treat ALL existing samples in the bucket as post-activation since we
-            # can't tell which were pre vs post. This makes A/B less meaningful for
-            # legacy data — UI should disclose with a "(legacy)" tag.
+        with self._lock:
+            bucket = self._buckets.get(self._key(variety, scenario))
+            if not bucket or not bucket.override_addendum:
+                return None
+            # Snapshot just the fields we need; release lock for CPU work.
+            stats_n = bucket.stats.n
+            override_baseline_mean = bucket.override_baseline_mean
+            activation_baseline_count = bucket.activation_baseline_count
+            activation_baseline_mean = bucket.activation_baseline_mean
+            samples_snapshot = list(bucket.samples)
+        if activation_baseline_count and activation_baseline_count > 0:
+            baseline_count = activation_baseline_count
+            baseline = activation_baseline_mean or 0.0
+        elif override_baseline_mean is not None:
+            # Legacy: at Cycle 9 we recorded only the mean; we don't know
+            # the count. Treat ALL existing samples in the bucket as
+            # post-activation since we can't tell which were pre vs post.
+            # UI should disclose with a "(legacy)" tag.
             baseline_count = 0
-            baseline = bucket.override_baseline_mean
+            baseline = override_baseline_mean
         else:
             return None  # truly no baseline info
-        post_count = bucket.stats.n - baseline_count
+        post_count = stats_n - baseline_count
         if post_count <= 0:
             return {
                 "post_count": 0,
@@ -353,7 +386,11 @@ class QualityStore:
                 "delta": None,
                 "legacy": baseline_count == 0,
             }
-        recent = bucket.samples[-post_count:] if post_count <= len(bucket.samples) else bucket.samples
+        recent = (
+            samples_snapshot[-post_count:]
+            if post_count <= len(samples_snapshot)
+            else samples_snapshot
+        )
         post_mean = sum(s.score for s in recent) / len(recent) if recent else 0.0
         return {
             "post_count": len(recent),
