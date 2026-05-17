@@ -1,6 +1,13 @@
 # 地道中文 · Native Chinese Grammar Assistant (NCGA)
 
-把任意中文文本，揉成 10 种地区方言/语体（普通话、北京话、东北话、川渝话、江淮话、广东普通话、上海话风格、粤语书面语、台湾闽南语、福建闽南语）。
+把任意语言的输入,揉成 10 种地区中文方言/语体(普通话、北京话、东北话、川渝话、江淮话、广东普通话、上海话风格、粤语书面语、台湾闽南语、福建闽南语)。
+
+> **Cycle 20:**
+> - **多语言输入** — 中文/英文/日文/法文… 都可,输出始终是你选的中文方言
+> - **反馈表单** `/api/feedback` — 内嵌浮动按钮 + JSONL 存储
+> - **双轨认证** — SPA 走 HMAC cookie,扩展/脚本走 Bearer header
+> - **`/api/logout`** — cookie 撤销,无需轮转 token
+> - **CSP 锁紧** — `style-src` 不再有 `unsafe-inline`
 
 - 后端：Python 3.10+，零运行时依赖（除 `certifi`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
@@ -30,6 +37,11 @@ python app.py                          # http://127.0.0.1:8000
 | `LLM_SKIP_SSL_VERIFY` | `false` | **危险**：跳过 SSL 校验，仅供调试 |
 | `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟可调 `/api/rewrite` 的次数（0 = 关闭） |
 | `NCGA_MAX_BODY_BYTES` | `16384` | 请求体字节上限 |
+| `NCGA_FEEDBACK_RATE_LIMIT_PER_MIN` | `5` | Cycle 20: 每个 IP 每分钟可提交 `/api/feedback` 的次数 |
+| `NCGA_FEEDBACK_MAX_BODY_BYTES` | `8192` | Cycle 20: 反馈表单请求体上限 |
+| `NCGA_FEEDBACK_STORE` | `~/.local/share/ncga/feedback.jsonl` | Cycle 20: 反馈 JSONL 落地路径 (`0o600`) |
+| `NCGA_AUTH_TOKEN` | — | Cycle 13/20: 设置即开启双轨认证(SPA cookie + Bearer);清空即完全无 auth |
+| `NCGA_TRUST_FORWARDED_FOR` | `false` | 是否信任 `X-Forwarded-For`(部署在 cloudflared/Nginx 后面时设 `true`) |
 | `NCGA_HOST` | `127.0.0.1` | 监听地址 |
 | `NCGA_PORT` | `8000` | 监听端口 |
 | `NCGA_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
@@ -125,6 +137,65 @@ tests/test_app.py     # 离线测试，mock 掉 LLM HTTP
 ## 加一种新方言
 
 只改 [`presets.py`](native_chinese_assistant/presets.py) 一处：在 `VarietyPreset` 加 enum，然后在 `PRESET_METADATA` 加完整元数据（label/register/style_notes/keywords/landmarks/letter/description）。前端会自动加载。
+
+## Cycle 20 · 多语言输入
+
+任何输入语言都被接受 — 系统提示词锁定:
+- **输出语言锁定**:不论用户用中文/英文/日文/法文输入,输出必须是中文方言文字(人名/地名/URL 除外)
+- **跨语言一致性**:同一个意思,无论用哪种语言提问,输出都应高度一致;方言版本由【说话内容】决定,不被【输入语言形式】影响
+
+```bash
+# 英文输入 → 北京话
+curl -X POST http://127.0.0.1:8000/api/rewrite \
+  -H "Authorization: Bearer $NCGA_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello, how is your day?","target_variety":"beijing_mandarin"}'
+# → {"rewritten_text": "嗨喽,今儿过得咋样啊?", ...}
+```
+
+离线 heuristic 兜底针对非中文输入会**诚实拒绝**(不再"给你整成东北那股劲儿:very good"那种翻车)。
+
+## Cycle 20 · 反馈表单
+
+内嵌的「💬 反馈」浮动按钮,采集星级 + 标签 + 自由文字 + 联系方式 → 落地 `~/.local/share/ncga/feedback.jsonl` (模式 `0o600`)。
+
+```bash
+# 实时看反馈进来
+tail -f ~/.local/share/ncga/feedback.jsonl
+
+# 评分分布
+jq -s 'group_by(.rating)|map({rating:.[0].rating,n:length})' \
+  ~/.local/share/ncga/feedback.jsonl
+
+# 抓自由文字
+jq -r 'select(.note != "") | "[\(.rating)★] \(.note)"' \
+  ~/.local/share/ncga/feedback.jsonl
+```
+
+设计要点:
+- IP 用 salted SHA-256 (`_hash_ip`),**不存原始 IP**
+- 控制字符(`\r\n\t` + ANSI escape + DEL)在落地前剥掉 → 防 `tail` 操作员被 terminal injection 攻击
+- 5 次/分钟/IP 限流;无 LLM 调用,不进 daily LLM 上限
+- 文件 `0o600`,本机其它用户读不到
+
+## Cycle 20 · 双轨认证 (HMAC cookie + Bearer token)
+
+| 场景 | 认证轨道 | 怎么传 |
+|---|---|---|
+| 浏览器 SPA | HMAC-signed cookie | 自动 (`credentials: same-origin`) |
+| Chrome 扩展 / curl / 脚本 | Bearer token | `Authorization: Bearer $NCGA_AUTH_TOKEN` |
+
+`_check_auth` 任一通过即放行。一个写定的设计点:**cookie 用 `NCGA_AUTH_TOKEN` 当签名密钥** → 轮转 token 立刻吊销所有 cookie。
+
+cookie 形态:`<unix_timestamp>.<random_nonce>.<hmac_sha256_24>`。无服务端 session 表。
+
+撤销机制(self-audit #6):内存 `_REVOKED_COOKIES` set,30 天自动 GC。`POST /api/logout`:
+```bash
+curl -X POST http://127.0.0.1:8000/api/logout \
+  --cookie "ncga_sess=<your_cookie>"
+# → {"ok": true, "revoked": true}
+# Set-Cookie: ncga_sess=; Max-Age=0 让浏览器丢 cookie
+```
 
 ## 许可
 
