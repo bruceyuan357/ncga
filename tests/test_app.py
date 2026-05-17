@@ -482,6 +482,39 @@ class RewriteServiceTests(unittest.TestCase):
         ]
         self.assertEqual(extract_streamed_content(lines), '{"rewritten_text": "你好", "warning": ""}')
 
+    def test_extract_streamed_content_wraps_unicode_decode_error(self) -> None:
+        """Cycle 21 self-audit #4: a network blip mid-stream can deliver
+        bytes that don't form valid UTF-8 (truncated multibyte sequence).
+        Used to leak UnicodeDecodeError past the caller (which only catches
+        RewriteError). Now wrapped."""
+        lines = [
+            b'data: {"choices":[{"delta":{"content":"x"}}]}\n',
+            b"\xff\xfe\xfd\n",  # garbage bytes mid-stream
+            b"data: [DONE]\n",
+        ]
+        with self.assertRaises(RewriteError) as ctx:
+            extract_streamed_content(lines)
+        self.assertIn("UTF-8", str(ctx.exception))
+
+    def test_iter_streamed_deltas_wraps_unicode_decode_error(self) -> None:
+        """Same UTF-8 guard on the streaming generator path."""
+        from native_chinese_assistant.rewrite import iter_streamed_deltas
+
+        lines = [
+            b'data: {"choices":[{"delta":{"content":"x"}}]}\n',
+            b"\xff\xfe\xfd\n",
+            b"data: [DONE]\n",
+        ]
+        gen = iter_streamed_deltas(lines)
+        # First yield is the legitimate "x" chunk.
+        delta1, done1 = next(gen)
+        self.assertEqual((delta1, done1), ("x", False))
+        # Next iteration hits the garbage bytes and must raise RewriteError,
+        # not UnicodeDecodeError.
+        with self.assertRaises(RewriteError) as ctx:
+            next(gen)
+        self.assertIn("UTF-8", str(ctx.exception))
+
     def test_heuristic_rewriter_includes_real_failure_reason(self) -> None:
         result = HeuristicRewriter().rewrite(
             "你好", VarietyPreset.BEIJING_MANDARIN, reason="LLM request failed."

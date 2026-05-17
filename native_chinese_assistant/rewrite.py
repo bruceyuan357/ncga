@@ -343,7 +343,15 @@ def extract_message_content(raw: dict[str, Any]) -> str:
 def extract_streamed_content(response: Any) -> str:
     chunks: list[str] = []
     for raw_line in response:
-        line = raw_line.decode("utf-8").strip()
+        # Cycle 21 self-audit #4: a network blip mid-stream can deliver bytes
+        # that don't form valid UTF-8. Without this guard, UnicodeDecodeError
+        # leaks past the caller, which only catches `RewriteError`. Wrap so
+        # the failure-mapping is uniform — caller sees RewriteError and falls
+        # back to the heuristic.
+        try:
+            line = raw_line.decode("utf-8").strip()
+        except UnicodeDecodeError as exc:
+            raise RewriteError("LLM stream returned invalid UTF-8.") from exc
         if not line or not line.startswith("data: "):
             continue
         payload = line[6:]
@@ -372,7 +380,11 @@ def iter_streamed_deltas(response: Any):
     terminating event after which the generator stops.
     """
     for raw_line in response:
-        line = raw_line.decode("utf-8").strip()
+        # Cycle 21 self-audit #4: same UTF-8 guard as extract_streamed_content.
+        try:
+            line = raw_line.decode("utf-8").strip()
+        except UnicodeDecodeError as exc:
+            raise RewriteError("LLM stream returned invalid UTF-8.") from exc
         if not line or not line.startswith("data: "):
             continue
         payload = line[6:]
