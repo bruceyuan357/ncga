@@ -64,17 +64,107 @@ def _const_eq(a: str, b: str) -> bool:
 
 
 def _check_auth(environ: dict) -> bool:
-    """Cycle 13: optional bearer-token auth.
-    If NCGA_AUTH_TOKEN env is set, all POST /api/* must carry matching Authorization header.
-    GET endpoints stay open (frontend reads index.html + presets without a token bootstrap).
-    Returns True if request is authorized (or auth is disabled)."""
+    """Cycle 20: dual-track auth.
+
+    A POST /api/* is allowed if EITHER:
+      1. Authorization: Bearer <NCGA_AUTH_TOKEN>  — the "API-key path" used by
+         scripts / Chrome extension / curl. Token stays in .env; operator hands
+         it out manually.
+      2. Cookie: ncga_sess=<HMAC-signed cookie>  — the "browser path". Server
+         sets this cookie when serving / so the SPA never sees the raw token.
+
+    If NCGA_AUTH_TOKEN is unset, auth is disabled (backwards-compatible).
+    """
     expected = os.environ.get("NCGA_AUTH_TOKEN", "").strip()
     if not expected:
-        return True  # auth disabled — backwards compatible
+        return True
+
+    # Track 1 — bearer token. Malformed/wrong header should not block a valid
+    # cookie, so fall through on mismatch.
     auth = environ.get("HTTP_AUTHORIZATION", "").strip()
-    if not auth.lower().startswith("bearer "):
+    if auth.lower().startswith("bearer ") and _const_eq(auth[7:].strip(), expected):
+        return True
+
+    # Track 2 — signed session cookie (SPA).
+    cookie_val = _get_cookie(environ, _SESSION_COOKIE_NAME)
+    return bool(cookie_val and _verify_session_cookie(cookie_val))
+
+
+# Cycle 20 — session cookie helpers.
+#
+# Why HMAC-signed cookie instead of "session ID + server-side store":
+#   We have no DB. The state we need (was-issued-by-us, not-too-old) fits in
+#   a single signed cookie value: <timestamp>.<nonce>.<sig>. Verification is
+#   stateless and O(1). Forgery requires NCGA_AUTH_TOKEN.
+#
+# Why NCGA_AUTH_TOKEN is the signing key:
+#   It's already the gatekeeper for the API. Reusing it means rotating the
+#   token instantly invalidates all outstanding cookies (defense in depth).
+_SESSION_COOKIE_NAME = "ncga_sess"
+_SESSION_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
+
+
+def _make_session_cookie() -> str | None:
+    """Mint a fresh session cookie value. Returns None if auth is disabled."""
+    secret = os.environ.get("NCGA_AUTH_TOKEN", "").strip()
+    if not secret:
+        return None
+    import hashlib
+    import hmac as _hmac
+    import secrets as _secrets
+
+    ts = str(int(time.time()))
+    nonce = _secrets.token_hex(8)
+    msg = f"{ts}.{nonce}".encode()
+    sig = _hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()[:24]
+    return f"{ts}.{nonce}.{sig}"
+
+
+def _verify_session_cookie(value: str) -> bool:
+    """True iff `value` is a well-formed cookie that we minted and isn't expired."""
+    secret = os.environ.get("NCGA_AUTH_TOKEN", "").strip()
+    if not secret or not value:
         return False
-    return _const_eq(auth[7:].strip(), expected)
+    import hashlib
+    import hmac as _hmac
+
+    parts = value.split(".")
+    if len(parts) != 3:
+        return False
+    ts_str, nonce, sig = parts
+    if not ts_str.isdigit() or not sig:
+        return False
+    try:
+        ts = int(ts_str)
+    except ValueError:
+        return False
+    if time.time() - ts > _SESSION_COOKIE_MAX_AGE:
+        return False
+    expected = _hmac.new(secret.encode(), f"{ts_str}.{nonce}".encode(), hashlib.sha256).hexdigest()[:24]
+    return _hmac.compare_digest(sig, expected)
+
+
+def _get_cookie(environ: dict, name: str) -> str | None:
+    raw = environ.get("HTTP_COOKIE") or ""
+    for part in raw.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k == name:
+            return v
+    return None
+
+
+def _format_session_cookie(value: str, *, secure: bool) -> str:
+    """Build a Set-Cookie header value with the right flags."""
+    parts = [
+        f"{_SESSION_COOKIE_NAME}={value}",
+        f"Max-Age={_SESSION_COOKIE_MAX_AGE}",
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Lax",
+    ]
+    if secure:
+        parts.append("Secure")
+    return "; ".join(parts)
 
 
 # Static (header-only) security headers. CSP is built per-request in _security_headers()
@@ -136,7 +226,7 @@ def json_response(start_response: Callable, status: str, payload: dict) -> list[
     return [body]
 
 
-def static_response(start_response: Callable, path: Path) -> list[bytes]:
+def static_response(start_response: Callable, path: Path, *, environ: dict | None = None) -> list[bytes]:
     import base64 as _b64
     import secrets as _secrets
 
@@ -148,24 +238,37 @@ def static_response(start_response: Callable, path: Path) -> list[bytes]:
     )
     csp_nonce = None
     if path.name == "index.html":
-        # Cycle 13: per-response CSP nonce. Inline boot script in index.html must carry
-        # nonce="..." or browser blocks it.
+        # Cycle 13: per-response CSP nonce. Inline boot script in index.html must
+        # carry nonce="..." or the browser blocks it.
         csp_nonce = _b64.urlsafe_b64encode(_secrets.token_bytes(12)).rstrip(b"=").decode("ascii")
         content = content.replace(
             b"<script>",
             f'<script nonce="{csp_nonce}">'.encode(),
             1,  # only the first inline boot script; external <script src=...> are unaffected
         )
-        # Bearer token meta tag (Cycle 13 auth)
-        token = os.environ.get("NCGA_AUTH_TOKEN", "").strip()
-        if token:
-            meta = f'<meta name="ncga-auth" content="{html_escape(token)}">'.encode()
+        # Cycle 20: stop injecting the raw NCGA_AUTH_TOKEN into the served HTML.
+        # The SPA now relies on an HMAC-signed session cookie set below. We
+        # inject a no-secret marker so app.js can detect that auth-is-on and
+        # avoid its own legacy fallback. Cookie-mode is silently activated.
+        if os.environ.get("NCGA_AUTH_TOKEN", "").strip():
+            meta = b'<meta name="ncga-auth-mode" content="cookie">'
             content = content.replace(b"<head>", b"<head>\n    " + meta, 1)
     headers = [
         ("Content-Type", f"{content_type}; charset=utf-8" if is_text else content_type),
         ("Content-Length", str(len(content))),
         ("Cache-Control", "public, max-age=300" if path.name != "index.html" else "no-store"),
     ]
+    # Cycle 20: mint + set the SPA session cookie on every index.html serve.
+    # Cookie is HMAC-signed against NCGA_AUTH_TOKEN so forgery without the
+    # secret is infeasible. Same-site Lax allows top-level navigation from
+    # external links while blocking cross-site POSTs (CSRF-resistant).
+    if path.name == "index.html":
+        cookie_val = _make_session_cookie()
+        if cookie_val:
+            secure_flag = (bool(environ) and environ.get("wsgi.url_scheme") == "https") or (
+                environ and (environ.get("HTTP_X_FORWARDED_PROTO") or "").lower() == "https"
+            )
+            headers.append(("Set-Cookie", _format_session_cookie(cookie_val, secure=bool(secure_flag))))
     start_response("200 OK", _security_headers(headers, csp_nonce=csp_nonce))
     return [content]
 
@@ -472,7 +575,7 @@ class App:
         are simple closures over instance state (no separate `handle_*` method
         was worth defining for them)."""
         return {
-            ("GET", "/"): lambda env, sr: static_response(sr, STATIC_DIR / "index.html"),
+            ("GET", "/"): lambda env, sr: static_response(sr, STATIC_DIR / "index.html", environ=env),
             ("GET", "/api/presets"): lambda env, sr: json_response(
                 sr, "200 OK", {"presets": preset_options()}
             ),
@@ -516,7 +619,7 @@ class App:
             file_path = _safe_static_path(path.removeprefix("/static/"))
             if file_path is None:
                 return json_response(start_response, "404 Not Found", {"error": "Not found."})
-            return static_response(start_response, file_path)
+            return static_response(start_response, file_path, environ=environ)
 
         handler = self._route_table().get((method, path))
         if handler is not None:

@@ -2433,11 +2433,64 @@ class SecurityCycle13Tests(unittest.TestCase):
         )
         self.assertEqual(s, "200 OK")
 
-    def test_index_html_injects_meta_tag_when_token_set(self) -> None:
+    def test_index_html_no_longer_leaks_token(self) -> None:
+        # Cycle 20: the bearer token used to be injected as
+        # <meta name="ncga-auth" content="<token>">. That made anyone who
+        # could GET / a token-holder. Now we only mark auth-mode and set an
+        # HMAC-signed session cookie — token never leaves the server.
         os.environ["NCGA_AUTH_TOKEN"] = "abc-123"
         app = App(rewrite_service=RewriteService(config=None))
-        _, _, body = call_app(app, "GET", "/")
-        self.assertIn(b'<meta name="ncga-auth" content="abc-123">', body)
+        _, headers, body = call_app(app, "GET", "/")
+        self.assertNotIn(b"abc-123", body)
+        self.assertIn(b'<meta name="ncga-auth-mode" content="cookie">', body)
+        set_cookie = headers.get("Set-Cookie", "")
+        self.assertTrue(set_cookie.startswith("ncga_sess="), msg=set_cookie)
+        self.assertIn("HttpOnly", set_cookie)
+        self.assertIn("SameSite=Lax", set_cookie)
+
+    def test_post_api_accepts_session_cookie(self) -> None:
+        # Cycle 20: SPA path. GET / mints the cookie; browser ships it back;
+        # server lets POST through without a bearer header.
+        os.environ["NCGA_AUTH_TOKEN"] = "secret-token-xyz"
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        _, headers, _ = call_app(app, "GET", "/")
+        cookie_pair = headers["Set-Cookie"].split(";", 1)[0].strip()
+        s, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "hi", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_COOKIE": cookie_pair},
+        )
+        self.assertEqual(s, "200 OK")
+
+    def test_post_api_rejects_forged_cookie(self) -> None:
+        os.environ["NCGA_AUTH_TOKEN"] = "real-secret"
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        s, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "hi", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_COOKIE": "ncga_sess=999999.deadbeef.notsignedbyus"},
+        )
+        self.assertEqual(s, "401 Unauthorized")
+
+    def test_bearer_still_works_alongside_cookie(self) -> None:
+        # Extensions / scripts keep the API-key path.
+        os.environ["NCGA_AUTH_TOKEN"] = "ext-token"
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        s, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "hi", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_AUTHORIZATION": "Bearer ext-token"},
+        )
+        self.assertEqual(s, "200 OK")
 
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:

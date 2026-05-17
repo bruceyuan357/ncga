@@ -14,20 +14,34 @@
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
 
-  // Cycle 13: server-injected bearer token. Read once at boot.
-  const _AUTH_TOKEN = document.querySelector('meta[name="ncga-auth"]')?.content || "";
-  // Wrap fetch so every same-origin /api/* request gets the Authorization header.
-  // Keeps existing call sites unchanged.
+  // Cycle 20: SPA no longer reads the raw NCGA_AUTH_TOKEN from a <meta> tag.
+  // Server sets an HMAC-signed HttpOnly cookie when serving /, and `fetch`
+  // ships it automatically with same-origin requests. We just need to ensure
+  // no code path overrides credentials. We also surface 401 → "session
+  // expired" once so the user knows to refresh.
+  const _AUTH_MODE =
+    document.querySelector('meta[name="ncga-auth-mode"]')?.content || "open";
   const _origFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";
-    if (_AUTH_TOKEN && url.startsWith("/api/")) {
+    if (url.startsWith("/api/")) {
       init = init || {};
-      const headers = new Headers(init.headers || {});
-      if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + _AUTH_TOKEN);
-      init.headers = headers;
+      if (!init.credentials) init.credentials = "same-origin";
     }
-    return _origFetch(input, init);
+    return _origFetch(input, init).then((res) => {
+      if (res && res.status === 401 && url.startsWith("/api/")) {
+        const now = Date.now();
+        if (!window.__ncga401At || now - window.__ncga401At > 5000) {
+          window.__ncga401At = now;
+          try {
+            if (typeof showToast === "function") {
+              showToast("会话已过期,刷新页面重新登录", "fa-arrow-rotate-left");
+            }
+          } catch (_) { /* showToast may not be defined yet */ }
+        }
+      }
+      return res;
+    });
   };
 
   // ---------------- DOM refs ----------------
