@@ -97,21 +97,29 @@ def parse_variety(value: str) -> VarietyPreset:
 
 _SYSTEM_PROMPT_HEADER = (
     "你是{label}的母语者，从小在当地长大，平时跟家里人和老乡都用这种话聊天。"
-    "现在请把用户给你的中文，重写成你平时讲话的样子，让它读起来像【本地人在你耳边说】，"
-    "而不是新闻稿、教科书或翻译腔。\n\n"
+    "用户会用任何语言（中文、英文、日文、法文、韩文、西班牙文等）给你一段话，"
+    "请你抓住意思，用你平时讲话的样子直接讲出来，"
+    "让它读起来像【本地人在你耳边说】，而不是新闻稿、教科书或翻译腔。\n\n"
 )
 
 _SYSTEM_PROMPT_RULES = (
     "硬性规则：\n"
-    "1. 保留原意、人名、地名、数字、日期、URL、专有名词不变；不要新增主观信息或替换人物。\n"
-    "2. 改写后字符数 <= 原文字符数 + 200，超出请通过删去多余修饰、合并短句来精简。\n"
-    "3. 不要逐字对换。优先调整句式、节奏、语气词，让句子有自然的呼吸。\n"
-    "4. 大量使用目标方言的语气词、俚语、惯用表达、句末助词，但每句最多 1~2 个，避免堆砌。\n"
-    "5. 称呼、敬语、玩笑分寸要符合当地习惯（如东北话直率热络、上海话精致克制）。\n"
-    "6. 不要添加【以下是改写】【翻译为】之类的前导语；不要解释自己做了什么。\n"
-    "7. 严格按以下 JSON 输出，不要 Markdown、不要多余字段：\n"
+    "1. 输出语言锁定：无论用户用什么语言输入，输出必须是中文文字（{label}的本地表达），"
+    "绝对不要返回英文、日文或其它非中文字符（人名、地名、URL、专有名词除外）。\n"
+    "2. 跨语言一致性：同一个意思，无论用户用哪种语言提问，输出都应当高度一致——"
+    "方言版本由【说话的内容和情境】决定，不要被【输入的语言形式】影响；"
+    "不要逐词对译，要先在脑里抓住意思再用方言重说一遍。\n"
+    "3. 保留原意、人名、地名、数字、日期、URL、专有名词不变；不要新增主观信息或替换人物。\n"
+    "4. 输出汉字数 <= 用户输入信息所需的中文长度 + 200；中文输入按原文长度算，"
+    "非中文输入按你脑中等价中文的合理长度算，超出请精简。\n"
+    "5. 不要逐字对换。优先调整句式、节奏、语气词，让句子有自然的呼吸。\n"
+    "6. 大量使用目标方言的语气词、俚语、惯用表达、句末助词，但每句最多 1~2 个，避免堆砌。\n"
+    "7. 称呼、敬语、玩笑分寸要符合当地习惯（如东北话直率热络、上海话精致克制）。\n"
+    "8. 不要添加【以下是改写】【翻译为】【原文/译文对照】之类的前导语或说明；"
+    "不要保留原文、不要给双语对照；只输出最终的方言版本，仿佛本地人原本就是这么说的。\n"
+    "9. 严格按以下 JSON 输出，不要 Markdown、不要多余字段：\n"
     '   {"rewritten_text": "...", "warning": ""}\n'
-    "8. warning 仅在确实无法完全达到方言风味时，用 <=20 个汉字写一句简短说明"
+    "10. warning 仅在确实无法完全达到方言风味时，用 <=20 个汉字写一句简短说明"
     '（如：语料不足，已尽量贴近），否则一律填空字符串 ""。\n\n'
 )
 
@@ -182,15 +190,18 @@ def build_rate_system_prompt(metadata: PresetMetadata) -> str:
 # --- Explain prompt (Cycle 3) ---
 
 _EXPLAIN_SYSTEM_PROMPT = (
-    "你是一位{label}研究者兼语言老师。学生刚把一段普通话改写成了{label}。"
-    "请你帮他对照原文与改写，挑出最有【方言味】的 3-6 处变化，并简明解释为什么这样写更地道。\n\n"
+    "你是一位{label}研究者兼语言老师。学生刚把一段原文（可能是普通话，也可能是英文/日文等其它语言）"
+    "改写成了{label}。请你帮他对照原文与改写，挑出最有【方言味】的 3-6 处变化，"
+    "并简明解释为什么这样写更地道。\n\n"
     "硬性规则：\n"
     "1. 只看原文与改写的【实际差异】，不要编造没出现的词。\n"
-    "2. 每条 ≤ 25 个字，要点出【原文里的词/句式 → 改写里的词/句式 → 为什么】。\n"
+    "2. 每条 ≤ 25 个字，要点出【原文里的词/句式 → 改写里的词/句式 → 为什么】；"
+    "如果原文是非中文，可在 from 字段写原词的中文意译再加注原词，例:'tomorrow（明天）'。\n"
     "3. 优先点出：方言专有词、句末助词、语序变化、语气变化、文化梗。\n"
-    "4. 严格 JSON 输出，不要 markdown，不要前导语：\n"
+    "4. 用中文回答，不要在 summary / why 里夹杂大段英文。\n"
+    "5. 严格 JSON 输出，不要 markdown，不要前导语：\n"
     '   {{"summary": "一句话总评", "points": [{{"from": "...", "to": "...", "why": "..."}}, ...]}}\n'
-    '5. 如果原文与改写【几乎相同】，summary 写"差异很小"，points 用空数组 []。\n'
+    '6. 如果原文与改写【几乎相同】，summary 写"差异很小"，points 用空数组 []。\n'
 )
 
 
@@ -238,7 +249,7 @@ def build_characterize_user_prompt(recipient: str, mood: str) -> str:
 
 def build_user_prompt(text: str, target: VarietyPreset) -> str:
     metadata = PRESET_METADATA[target]
-    return f"请改写为{metadata.label}：\n{text}"
+    return f"用{metadata.label}讲下面这段话（输入语言不限，输出必须是中文{metadata.label}）：\n{text}"
 
 
 # ---------- env / config ----------
@@ -916,14 +927,39 @@ class HeuristicRewriter:
         VarietyPreset.MINNAN_WRITTEN: "帮你顺成带闽南味、读起来较自然个写法：",
     }
 
+    @staticmethod
+    def _looks_chinese(text: str) -> bool:
+        # Cycle 20: heuristic fallback's replacement maps and prefix banners
+        # only make sense for Chinese input. Non-CJK input (English, Japanese
+        # kana, etc.) would otherwise come out as "给你整成东北那股劲儿:very
+        # good", which is worse than admitting we can't translate offline.
+        # >= 30% CJK chars => Chinese.
+        if not text:
+            return False
+        cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+        return cjk / len(text) >= 0.3
+
     def rewrite(self, text: str, target: VarietyPreset, reason: str | None = None) -> RewriteResult:
         metadata = PRESET_METADATA[target]
         rewritten = text
+        warning_reason = reason or "No LLM provider is configured."
+        # Cycle 20: be honest rather than mispronounce. If input isn't Chinese,
+        # the prefix-prepend trick produces "<Chinese banner><English text>"
+        # which is silly. Surface a clear warning and pass text through.
+        if not self._looks_chinese(text):
+            return RewriteResult(
+                rewritten_text=text,
+                target_variety=target,
+                script=metadata.script,
+                warning=(
+                    f"离线兜底模式无法翻译非中文内容。{warning_reason} 请稍后重试,或确认 LLM 服务可用。"
+                ),
+                degraded=True,
+            )
         for source, replacement in self.REPLACEMENTS.get(target, []):
             rewritten = rewritten.replace(source, replacement)
         if rewritten == text and target != VarietyPreset.STANDARD_PUTONGHUA:
             rewritten = f"{self.PREFIXES.get(target, '帮你改写成更自然的说法：')}{text}"
-        warning_reason = reason or "No LLM provider is configured."
         warning = f"Using local heuristic fallback. {warning_reason} {metadata.fallback_warning}"
         return RewriteResult(
             rewritten_text=rewritten,

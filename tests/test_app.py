@@ -221,6 +221,62 @@ class PromptBuildingTests(unittest.TestCase):
         # Workplace should mention work
         self.assertIn("工作", workplace)
 
+    def test_build_system_prompt_declares_multilanguage_input(self) -> None:
+        # Cycle 20: user may type in any language; output must remain native
+        # Chinese in the target variety, with consistency across input languages.
+        meta = PRESET_METADATA[VarietyPreset.BEIJING_MANDARIN]
+        prompt = build_system_prompt(meta)
+        self.assertIn("英文", prompt)
+        self.assertIn("输出语言锁定", prompt)
+        self.assertIn("跨语言一致性", prompt)
+        self.assertIn("双语对照", prompt)
+
+    def test_build_user_prompt_signals_input_language_unrestricted(self) -> None:
+        from native_chinese_assistant.rewrite import build_user_prompt
+
+        out = build_user_prompt("Hello, how are you?", VarietyPreset.SHANGHAI_MANDARIN_STYLE)
+        self.assertIn("输入语言不限", out)
+        self.assertIn("Hello, how are you?", out)
+
+
+class MultiLanguageInputTests(unittest.TestCase):
+    """Cycle 20: non-Chinese input flows through the rewrite path correctly.
+    Transport is mocked; we verify:
+      1. input text reaches the LLM verbatim
+      2. system prompt carries the multi-language rule
+      3. parse + return contract is identical to Chinese-input case
+    """
+
+    def test_english_input_reaches_llm_and_parses(self) -> None:
+        client, transport = _build_client(_llm_json("嗨喽,今儿过得咋样啊?"))
+        result = client.rewrite("Hello, how's your day going?", VarietyPreset.BEIJING_MANDARIN)
+        self.assertEqual(result.rewritten_text, "嗨喽,今儿过得咋样啊?")
+        self.assertFalse(result.degraded)
+        body = json.loads(transport.calls[0]["body"])
+        user_msg = next(m for m in body["messages"] if m["role"] == "user")
+        self.assertIn("Hello, how's your day going?", user_msg["content"])
+        sys_msg = next(m for m in body["messages"] if m["role"] == "system")
+        self.assertIn("输出语言锁定", sys_msg["content"])
+
+    def test_japanese_input_reaches_llm_and_parses(self) -> None:
+        client, transport = _build_client(_llm_json("侬早呀。"))
+        result = client.rewrite("おはようございます", VarietyPreset.SHANGHAI_MANDARIN_STYLE)
+        self.assertEqual(result.rewritten_text, "侬早呀。")
+        body = json.loads(transport.calls[0]["body"])
+        user_msg = next(m for m in body["messages"] if m["role"] == "user")
+        self.assertIn("おはようございます", user_msg["content"])
+
+    def test_heuristic_refuses_non_chinese_input(self) -> None:
+        # Cycle 20: prepending a Chinese banner to English ("给你整成...:very
+        # good") is worse than admitting offline mode can't help.
+        from native_chinese_assistant.rewrite import HeuristicRewriter
+
+        result = HeuristicRewriter().rewrite("This is a very good day.", VarietyPreset.DONGBEI_MANDARIN)
+        self.assertEqual(result.rewritten_text, "This is a very good day.")
+        self.assertTrue(result.degraded)
+        self.assertIn("非中文", result.warning or "")
+        self.assertNotIn("给你", result.rewritten_text)
+
 
 class ScenarioParsingTests(unittest.TestCase):
     def test_parse_scenario_default_for_none(self) -> None:
