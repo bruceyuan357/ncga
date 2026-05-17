@@ -2492,6 +2492,52 @@ class SecurityCycle13Tests(unittest.TestCase):
         )
         self.assertEqual(s, "200 OK")
 
+    def test_logout_revokes_cookie_and_expires_it(self) -> None:
+        # Cycle 21 self-audit #6: SPA can end its session without rotating
+        # NCGA_AUTH_TOKEN. /api/logout adds (ts, nonce) to the revocation set
+        # and ships Max-Age=0 so the browser drops the cookie.
+        os.environ["NCGA_AUTH_TOKEN"] = "logout-secret"
+        client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=client))
+        # Mint a cookie via GET /
+        _, headers, _ = call_app(app, "GET", "/")
+        cookie_pair = headers["Set-Cookie"].split(";", 1)[0].strip()
+        # Confirm it works once
+        s, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "hi", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_COOKIE": cookie_pair},
+        )
+        self.assertEqual(s, "200 OK")
+        # Call /api/logout with the cookie
+        s, headers, body = call_app(app, "POST", "/api/logout", extra_environ={"HTTP_COOKIE": cookie_pair})
+        self.assertEqual(s, "200 OK")
+        payload = json.loads(body)
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["revoked"])
+        # Browser instructed to drop cookie via Max-Age=0
+        self.assertIn("Max-Age=0", headers["Set-Cookie"])
+        # Subsequent request with the (now revoked) cookie → 401
+        s, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "hi", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_COOKIE": cookie_pair},
+        )
+        self.assertEqual(s, "401 Unauthorized")
+
+    def test_logout_without_cookie_is_noop_200(self) -> None:
+        os.environ["NCGA_AUTH_TOKEN"] = "logout-secret"
+        app = App(rewrite_service=RewriteService(config=None))
+        s, _, body = call_app(app, "POST", "/api/logout")
+        self.assertEqual(s, "200 OK")
+        payload = json.loads(body)
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["revoked"])
+
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:
         os.environ.pop("NCGA_TRUST_FORWARDED_FOR", None)

@@ -103,6 +103,37 @@ def _check_auth(environ: dict) -> bool:
 _SESSION_COOKIE_NAME = "ncga_sess"
 _SESSION_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
 
+# Cycle 21 self-audit #6: stateless cookie has no revocation without this.
+# When a user logs out, we add their cookie's (timestamp, nonce) pair to an
+# in-memory set so subsequent requests carrying it 401. Auto-pruned when
+# entries pass the 30-day expiry. A process restart clears it — acceptable
+# since all in-flight cookies are also validated against NCGA_AUTH_TOKEN.
+_REVOKED_COOKIES: set[tuple[str, str]] = set()
+_REVOKED_LOCK = threading.Lock()
+
+
+def _revoke_cookie(value: str) -> bool:
+    """Mark a cookie value as revoked. Returns True if added (incl. duplicate)."""
+    parts = value.split(".")
+    if len(parts) != 3:
+        return False
+    ts_str, nonce, _sig = parts
+    with _REVOKED_LOCK:
+        _REVOKED_COOKIES.add((ts_str, nonce))
+        cutoff = time.time() - _SESSION_COOKIE_MAX_AGE
+        expired = {(t, n) for (t, n) in _REVOKED_COOKIES if t.isdigit() and int(t) < cutoff}
+        _REVOKED_COOKIES.difference_update(expired)
+    return True
+
+
+def _is_cookie_revoked(value: str) -> bool:
+    parts = value.split(".")
+    if len(parts) != 3:
+        return False
+    ts_str, nonce, _sig = parts
+    with _REVOKED_LOCK:
+        return (ts_str, nonce) in _REVOKED_COOKIES
+
 
 def _make_session_cookie() -> str | None:
     """Mint a fresh session cookie value. Returns None if auth is disabled."""
@@ -141,7 +172,11 @@ def _verify_session_cookie(value: str) -> bool:
     if time.time() - ts > _SESSION_COOKIE_MAX_AGE:
         return False
     expected = _hmac.new(secret.encode(), f"{ts_str}.{nonce}".encode(), hashlib.sha256).hexdigest()[:24]
-    return _hmac.compare_digest(sig, expected)
+    if not _hmac.compare_digest(sig, expected):
+        return False
+    # Cycle 21 self-audit #6: signature valid + not expired, but if user
+    # logged out, the (ts, nonce) pair is in the revocation set.
+    return not _is_cookie_revoked(value)
 
 
 def _get_cookie(environ: dict, name: str) -> str | None:
@@ -598,6 +633,7 @@ class App:
             ("POST", "/api/override-activate"): self.handle_override_activate,
             ("POST", "/api/override-reject"): self.handle_override_reject,
             ("POST", "/api/feedback"): self.handle_feedback,
+            ("POST", "/api/logout"): self.handle_logout,
         }
 
     def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -605,9 +641,17 @@ class App:
         path = environ.get("PATH_INFO", "/")
 
         # Cycle 13: bearer-token gate (when NCGA_AUTH_TOKEN is set in env).
-        # Applied to POST /api/* — GET stays open so the SPA can boot. The injected token
-        # in the served index.html lets the SPA add the Authorization header to its POSTs.
-        if method == "POST" and path.startswith("/api/") and not _check_auth(environ):
+        # Applied to POST /api/* — GET stays open so the SPA can boot.
+        # Cycle 21 #6: /api/logout is exempt — calling logout when already
+        # logged-out / stale-cookie should always be a 200 no-op so the SPA
+        # can clean up without first proving auth.
+        _AUTH_EXEMPT_POST_PATHS = {"/api/logout"}
+        if (
+            method == "POST"
+            and path.startswith("/api/")
+            and path not in _AUTH_EXEMPT_POST_PATHS
+            and not _check_auth(environ)
+        ):
             return json_response(
                 start_response,
                 "401 Unauthorized",
@@ -1228,6 +1272,46 @@ class App:
             )
         logger.info("feedback_received id=%s rating=%d ip_hash=%s", record["id"], rating, record["ip_hash"])
         return json_response(start_response, "200 OK", {"ok": True, "id": record["id"]})
+
+    def handle_logout(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Cycle 21 self-audit #6: SPA-side logout.
+
+        The HMAC cookie is stateless and lives 30 days. Without revocation,
+        the only way to kick a session out was to rotate NCGA_AUTH_TOKEN
+        (which kicks EVERYONE). Now:
+          1. Add the current cookie's (timestamp, nonce) to _REVOKED_COOKIES
+             so subsequent requests with it fail _verify_session_cookie.
+          2. Send Set-Cookie with Max-Age=0 so the browser drops the value.
+
+        Idempotent. Always returns 200 — calling logout without a cookie is
+        a no-op (the user is already "logged out" in any meaningful sense).
+        No auth requirement: anyone who CAN reach us with a forged cookie
+        only gets that forged cookie revoked, not anyone else's.
+        """
+        cookie_val = _get_cookie(environ, _SESSION_COOKIE_NAME)
+        revoked = False
+        if cookie_val:
+            revoked = _revoke_cookie(cookie_val)
+        # Build the Set-Cookie that immediately expires the browser's copy.
+        expire_cookie = f"{_SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax"
+        secure_flag = environ.get("wsgi.url_scheme") == "https" or (
+            environ.get("HTTP_X_FORWARDED_PROTO", "").lower() == "https"
+        )
+        if secure_flag:
+            expire_cookie += "; Secure"
+        body = json.dumps({"ok": True, "revoked": revoked}, ensure_ascii=False).encode("utf-8")
+        start_response(
+            "200 OK",
+            _security_headers(
+                [
+                    ("Content-Type", "application/json; charset=utf-8"),
+                    ("Content-Length", str(len(body))),
+                    ("Cache-Control", "no-store"),
+                    ("Set-Cookie", expire_cookie),
+                ]
+            ),
+        )
+        return [body]
 
 
 def _coerce_glossary(raw) -> list[str] | None:
