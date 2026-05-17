@@ -8,6 +8,7 @@ Public surface kept stable for tests:
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -183,8 +184,16 @@ _RATE_SYSTEM_PROMPT = (
 )
 
 
+# Cycle 21 self-audit #9: PRESET_METADATA is module-level + frozen, so for any
+# given metadata.label the .replace() chain produces the same string every
+# call. Cache by label string. ~20µs per call avoided × ~10 calls/min.
+@functools.lru_cache(maxsize=32)
+def _rate_prompt_for_label(label: str) -> str:
+    return _RATE_SYSTEM_PROMPT.replace("{label}", label).replace("{{", "{").replace("}}", "}")
+
+
 def build_rate_system_prompt(metadata: PresetMetadata) -> str:
-    return _RATE_SYSTEM_PROMPT.replace("{label}", metadata.label).replace("{{", "{").replace("}}", "}")
+    return _rate_prompt_for_label(metadata.label)
 
 
 # --- Explain prompt (Cycle 3) ---
@@ -205,8 +214,13 @@ _EXPLAIN_SYSTEM_PROMPT = (
 )
 
 
+@functools.lru_cache(maxsize=32)
+def _explain_prompt_for_label(label: str) -> str:
+    return _EXPLAIN_SYSTEM_PROMPT.replace("{label}", label).replace("{{", "{").replace("}}", "}")
+
+
 def build_explain_system_prompt(metadata: PresetMetadata) -> str:
-    return _EXPLAIN_SYSTEM_PROMPT.replace("{label}", metadata.label).replace("{{", "{").replace("}}", "}")
+    return _explain_prompt_for_label(metadata.label)
 
 
 def build_explain_user_prompt(original: str, rewritten: str) -> str:
@@ -233,12 +247,17 @@ _CHARACTERIZE_SYSTEM_PROMPT = (
 )
 
 
-def build_characterize_system_prompt(scenario_values: list[str]) -> str:
+@functools.lru_cache(maxsize=4)
+def _characterize_prompt_for_joined(joined: str) -> str:
     return (
-        _CHARACTERIZE_SYSTEM_PROMPT.replace("{scenario_values}", " / ".join(scenario_values))
-        .replace("{{", "{")
-        .replace("}}", "}")
+        _CHARACTERIZE_SYSTEM_PROMPT.replace("{scenario_values}", joined).replace("{{", "{").replace("}}", "}")
     )
+
+
+def build_characterize_system_prompt(scenario_values: list[str]) -> str:
+    # list → str so lru_cache key is hashable. The Scenario enum is small;
+    # in practice this cache holds exactly 1 entry (the full enum joined).
+    return _characterize_prompt_for_joined(" / ".join(scenario_values))
 
 
 def build_characterize_user_prompt(recipient: str, mood: str) -> str:
