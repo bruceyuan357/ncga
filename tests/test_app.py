@@ -778,6 +778,122 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(headers["X-Frame-Options"], "DENY")
 
 
+# ---------------- Cycle 20: in-app reflection form (POST /api/feedback) ----------------
+
+
+class FeedbackEndpointTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="ncga-fb-jsonl-"))
+        self.store_path = self.tmpdir / "feedback.jsonl"
+        os.environ["NCGA_FEEDBACK_STORE"] = str(self.store_path)
+
+    def tearDown(self) -> None:
+        import shutil
+
+        os.environ.pop("NCGA_FEEDBACK_STORE", None)
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _make_app(self) -> App:
+        return App(rewrite_service=RewriteService(config=None))
+
+    def _post(self, app: App, body_obj: dict):
+        return call_app(app, "POST", "/api/feedback", body=json.dumps(body_obj).encode("utf-8"))
+
+    def test_happy_path_persists_jsonl_line(self) -> None:
+        app = self._make_app()
+        status, _, body = self._post(
+            app,
+            {
+                "rating": 5,
+                "liked": ["方言味地道", "速度快"],
+                "wishlist": ["UI"],
+                "note": "试用 30 分钟体验很好",
+                "contact": "wechat: alice",
+                "variety": "beijing_mandarin",
+                "scenario": "friends_casual",
+                "input_language": "en",
+            },
+        )
+        self.assertEqual(status, "200 OK")
+        payload = json.loads(body)
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["id"].startswith("fb_"))
+        self.assertTrue(self.store_path.exists())
+        lines = self.store_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 1)
+        record = json.loads(lines[0])
+        self.assertEqual(record["rating"], 5)
+        self.assertEqual(record["liked"], ["方言味地道", "速度快"])
+        self.assertEqual(record["variety"], "beijing_mandarin")
+        self.assertNotIn("127.0.0.1", lines[0])  # ip is hashed
+        self.assertEqual(len(record["ip_hash"]), 12)
+        self.assertTrue(record["ts"].endswith("Z"))
+
+    def test_file_perm_0o600(self) -> None:
+        # Cycle 21 self-audit #1: file must be 0o600 not 0o644.
+        app = self._make_app()
+        self._post(app, {"rating": 3})
+        mode = os.stat(self.store_path).st_mode & 0o777
+        self.assertEqual(mode, 0o600, f"expected 0o600, got {oct(mode)}")
+
+    def test_rating_required(self) -> None:
+        status, _, body = self._post(self._make_app(), {"note": "no rating"})
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("rating", json.loads(body)["error"])
+
+    def test_rating_out_of_range(self) -> None:
+        status, _, body = self._post(self._make_app(), {"rating": 7})
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("1", json.loads(body)["error"])
+        status, _, _ = self._post(self._make_app(), {"rating": 0})
+        self.assertEqual(status, "400 Bad Request")
+
+    def test_rating_must_be_integer(self) -> None:
+        status, _, body = self._post(self._make_app(), {"rating": "five"})
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("integer", json.loads(body)["error"])
+
+    def test_chips_must_be_arrays(self) -> None:
+        status, _, body = self._post(self._make_app(), {"rating": 3, "liked": "not-an-array"})
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("arrays", json.loads(body)["error"])
+
+    def test_note_truncates_at_cap(self) -> None:
+        long_note = "x" * 2000
+        status, _, _ = self._post(self._make_app(), {"rating": 3, "note": long_note})
+        self.assertEqual(status, "200 OK")
+        record = json.loads(self.store_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(len(record["note"]), 800)
+
+    def test_chip_count_and_length_capped(self) -> None:
+        chips = ["a" * 50] * 20
+        status, _, _ = self._post(self._make_app(), {"rating": 4, "liked": chips})
+        self.assertEqual(status, "200 OK")
+        record = json.loads(self.store_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(len(record["liked"]), 10)
+        self.assertEqual(len(record["liked"][0]), 24)
+
+    def test_control_chars_stripped_from_note(self) -> None:
+        # Cycle 20: terminal-injection defense. \r\n + ANSI escape in a note
+        # would otherwise let an attacker mess with the operator's `tail`.
+        status, _, _ = self._post(
+            self._make_app(),
+            {"rating": 4, "note": "hello\n\rworld\x1b[31mRED\x1b[0m\x7f"},
+        )
+        self.assertEqual(status, "200 OK")
+        record = json.loads(self.store_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(record["note"], "helloworld[31mRED[0m")
+
+    def test_rate_limit_blocks_burst(self) -> None:
+        app = self._make_app()
+        for _ in range(5):
+            status, _, _ = self._post(app, {"rating": 3})
+            self.assertEqual(status, "200 OK")
+        status, _, body = self._post(app, {"rating": 3})
+        self.assertEqual(status, "429 Too Many Requests")
+        self.assertIn("反馈", json.loads(body)["error"])
+
+
 # ---------------- Cycle 16: validation diagnostics ----------------
 #
 # Each user-correctable 4xx must carry a precise, actionable string (RFC 7807 spirit).

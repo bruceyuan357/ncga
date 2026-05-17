@@ -7,6 +7,7 @@ import logging
 import logging.config
 import mimetypes
 import os
+import re
 import threading
 import time
 from collections import deque
@@ -41,6 +42,18 @@ DEFAULT_MAX_BODY_BYTES = 64 * 1024  # 64 KB — bumped to fit batch inputs (≤1
 DEFAULT_CHARACTERIZE_MAX_BODY_BYTES = 4 * 1024  # 4 KB
 # Cycle 18 v2 (per A6): bumped 120 → 240 so users can write a real sentence per field.
 CHARACTERIZE_FIELD_MAX_CHARS = 240
+# Cycle 20: in-app reflection form (POST /api/feedback). Append-only JSONL.
+DEFAULT_FEEDBACK_RATE_LIMIT_PER_MIN = 5  # tight: honest users only need a few
+DEFAULT_FEEDBACK_MAX_BODY_BYTES = 8 * 1024  # 8 KB — note ≤800 chars + chips
+FEEDBACK_NOTE_MAX_CHARS = 800
+FEEDBACK_CONTACT_MAX_CHARS = 120
+FEEDBACK_CHIP_MAX = 10
+FEEDBACK_CHIP_LEN = 24
+# Cycle 20: strip C0 + DEL control chars before persisting any user-supplied
+# text to the feedback JSONL. Two reasons: (a) defense against terminal
+# escape-sequence injection when an operator tails the file; (b) consistency
+# so logs from different OSes look the same.
+_CTRL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def _const_eq(a: str, b: str) -> bool:
@@ -268,6 +281,64 @@ class DailyCounter:
             return max(0, self.per_day - self._counts.get((ip, self._today()), 0))
 
 
+class FeedbackStore:
+    """Cycle 20: append-only JSONL for user reflection-form submissions.
+
+    Plain JSONL (one JSON object per line) so the operator can `tail -f`,
+    grep, or pipe through `jq`. No DB, no migrations. Each write is one
+    open-append-close under a lock so concurrent waitress threads don't
+    interleave half-written lines.
+
+    Lives at NCGA_FEEDBACK_STORE if set, else ~/.local/share/ncga/feedback.jsonl
+    (fallback to BASE_DIR/.ncga-feedback.jsonl for read-only home dirs).
+    Records contain salted SHA-256(ip) — never the raw IP — so the file is
+    safe to ship to collaborators.
+
+    Self-audit #1 (Cycle 21): file is created with mode 0o600 so a shared
+    machine doesn't expose users' emails to other local users.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._lock = threading.Lock()
+
+    @classmethod
+    def default_path(cls) -> Path:
+        override = os.environ.get("NCGA_FEEDBACK_STORE", "").strip()
+        if override:
+            return Path(override)
+        xdg = os.environ.get("XDG_DATA_HOME", "").strip()
+        user_dir = Path(xdg) / "ncga" if xdg else Path.home() / ".local" / "share" / "ncga"
+        try:
+            user_dir.mkdir(parents=True, exist_ok=True)
+            return user_dir / "feedback.jsonl"
+        except OSError:
+            return BASE_DIR / ".ncga-feedback.jsonl"
+
+    def append(self, record: dict) -> None:
+        line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            need_chmod = not self.path.exists()
+            with self.path.open("a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+            if need_chmod:
+                try:
+                    os.chmod(self.path, 0o600)
+                except OSError:
+                    logger.warning("could not chmod 0o600 on %s", self.path)
+
+
+def _hash_ip(ip: str) -> str:
+    """Salted SHA-256 prefix so per-IP grouping is possible without storing the raw IP.
+    Salt is derived from NCGA_AUTH_TOKEN when set (rotates with the deploy) so the same
+    user appears stable within one deployment but not linkable across deployments."""
+    import hashlib
+
+    salt = os.environ.get("NCGA_AUTH_TOKEN", "ncga-feedback-default-salt")
+    return hashlib.sha256(f"{salt}:{ip}".encode()).hexdigest()[:12]
+
+
 def _trust_forwarded_for() -> bool:
     """Cycle 13: only trust X-Forwarded-For when explicitly opted in.
     Without this gate, an attacker can rotate the header to bypass per-IP rate limiting."""
@@ -363,6 +434,17 @@ class App:
                 DEFAULT_CHARACTERIZE_MAX_BODY_BYTES,
             )
         )
+        # Cycle 20: feedback form. Tight rate limit (no LLM call, but spam guard).
+        # Storage is plain JSONL the operator can tail / aggregate.
+        self.feedback_limiter = RateLimiter(
+            per_minute=int(
+                os.environ.get("NCGA_FEEDBACK_RATE_LIMIT_PER_MIN", DEFAULT_FEEDBACK_RATE_LIMIT_PER_MIN)
+            )
+        )
+        self.feedback_max_body_bytes = int(
+            os.environ.get("NCGA_FEEDBACK_MAX_BODY_BYTES", DEFAULT_FEEDBACK_MAX_BODY_BYTES)
+        )
+        self.feedback_store = FeedbackStore(FeedbackStore.default_path())
 
     def _check_daily_cap(self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1):
         """Cycle 18 v2: shared per-IP daily ceiling check. Call this in every
@@ -412,6 +494,7 @@ class App:
             ("POST", "/api/quality-stats/clear-override"): self.handle_clear_override,
             ("POST", "/api/override-activate"): self.handle_override_activate,
             ("POST", "/api/override-reject"): self.handle_override_reject,
+            ("POST", "/api/feedback"): self.handle_feedback,
         }
 
     def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -935,6 +1018,113 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         cleared = self.quality_store.clear_override(target.value, scenario.value)
         return json_response(start_response, "200 OK", {"cleared": cleared})
+
+    def handle_feedback(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Cycle 20: accept a reflection-form submission and append to JSONL.
+
+        No LLM call; rate-limited by a dedicated bucket. Body schema:
+          {
+            "rating":  1-5 (required, int),
+            "liked":   [str, ...] optional,
+            "wishlist": [str, ...] optional,
+            "note":    free text, ≤800 chars (optional),
+            "variety": str (optional context — what they last used),
+            "scenario": str (optional context),
+            "input_language": str (optional, user-picked or auto-detected),
+            "contact": str ≤120 chars (optional)
+          }
+        Stored record adds: id, ts (ISO UTC), ip_hash, ua (truncated).
+        Strips C0 control chars from all persisted text — defends both
+        terminal-tail operators and shared `cat`/`grep` viewers.
+        """
+        ip = client_ip(environ)
+        if not self.feedback_limiter.allow(ip):
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "反馈提交太频繁,请等一分钟再试。"},
+            )
+        payload, err = self._read_json_body(environ, start_response, max_bytes=self.feedback_max_body_bytes)
+        if err is not None:
+            return err
+
+        # rating: required int 1..5
+        try:
+            rating_raw = payload["rating"]
+        except KeyError:
+            return json_response(
+                start_response, "400 Bad Request", {"error": "Missing required field: 'rating'."}
+            )
+        try:
+            rating = int(rating_raw)
+        except (TypeError, ValueError):
+            return json_response(
+                start_response, "400 Bad Request", {"error": "`rating` must be an integer 1–5."}
+            )
+        if not 1 <= rating <= 5:
+            return json_response(
+                start_response, "400 Bad Request", {"error": "`rating` must be between 1 and 5."}
+            )
+
+        def _chips(raw):
+            if raw is None:
+                return []
+            if not isinstance(raw, list):
+                return None  # signal validation error to caller
+            out: list[str] = []
+            for item in raw[:FEEDBACK_CHIP_MAX]:
+                s = _CTRL_RE.sub("", str(item)).strip()[:FEEDBACK_CHIP_LEN]
+                if s:
+                    out.append(s)
+            return out
+
+        liked = _chips(payload.get("liked"))
+        wishlist = _chips(payload.get("wishlist"))
+        if liked is None or wishlist is None:
+            return json_response(
+                start_response,
+                "400 Bad Request",
+                {"error": "`liked` and `wishlist` must be arrays of strings."},
+            )
+
+        def _trim(field: str, cap: int) -> str:
+            v = payload.get(field)
+            if v is None:
+                return ""
+            return _CTRL_RE.sub("", str(v)).strip()[:cap]
+
+        note = _trim("note", FEEDBACK_NOTE_MAX_CHARS)
+        contact = _trim("contact", FEEDBACK_CONTACT_MAX_CHARS)
+        variety = _trim("variety", 64)
+        scenario = _trim("scenario", 64)
+        input_language = _trim("input_language", 32)
+
+        from datetime import datetime, timezone
+        from secrets import token_hex
+
+        record = {
+            "id": f"fb_{int(time.time() * 1000)}_{token_hex(4)}",
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ip_hash": _hash_ip(ip),
+            "rating": rating,
+            "liked": liked,
+            "wishlist": wishlist,
+            "note": note,
+            "contact": contact,
+            "variety": variety,
+            "scenario": scenario,
+            "input_language": input_language,
+            "ua": _CTRL_RE.sub("", str(environ.get("HTTP_USER_AGENT", "")))[:200],
+        }
+        try:
+            self.feedback_store.append(record)
+        except OSError as exc:
+            logger.exception("feedback store write failed: %s", exc)
+            return json_response(
+                start_response, "500 Internal Server Error", {"error": "Could not save feedback."}
+            )
+        logger.info("feedback_received id=%s rating=%d ip_hash=%s", record["id"], rating, record["ip_hash"])
+        return json_response(start_response, "200 OK", {"ok": True, "id": record["id"]})
 
 
 def _coerce_glossary(raw) -> list[str] | None:
