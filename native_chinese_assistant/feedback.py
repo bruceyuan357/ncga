@@ -386,11 +386,7 @@ class QualityStore:
                 "delta": None,
                 "legacy": baseline_count == 0,
             }
-        recent = (
-            samples_snapshot[-post_count:]
-            if post_count <= len(samples_snapshot)
-            else samples_snapshot
-        )
+        recent = samples_snapshot[-post_count:] if post_count <= len(samples_snapshot) else samples_snapshot
         post_mean = sum(s.score for s in recent) / len(recent) if recent else 0.0
         return {
             "post_count": len(recent),
