@@ -701,13 +701,16 @@
   // ---------------- atlas ----------------
   function renderAtlas() {
     if (!varietyOrder.length) return;
+    // Cycle 20: HTML emits `data-bg` instead of inline `style=` so we can
+    // drop CSP `style-src 'unsafe-inline'`. Background image is set via
+    // DOM API after insertion — CSP doesn't gate element.style.foo writes.
     atlasGrid.innerHTML = varietyOrder.map((key) => {
       const v = VARIETIES[key];
       const list = v.landmarks || [];
       const cover = (SETTINGS.pinnedLandmark[key] && list.find((l) => l.url === SETTINGS.pinnedLandmark[key])) || list[0] || {};
       return `
         <article class="variety-tile" data-variety="${escapeHtml(key)}">
-          <div class="variety-thumb" style="background-image:url('${escapeHtml(cover.url || "")}')">
+          <div class="variety-thumb" data-bg="${escapeHtml(cover.url || "")}">
             <span class="variety-letter">${escapeHtml(v.letter || "")}</span>
             <span class="variety-landmark-name">${escapeHtml(cover.name || "")}</span>
             ${v.trial ? '<span class="trial-flag"><i class="fas fa-flask" aria-hidden="true"></i> 试用版</span>' : ""}
@@ -727,6 +730,10 @@
         </article>
       `;
     }).join("");
+    $$(".variety-thumb[data-bg]", atlasGrid).forEach((el) => {
+      const url = el.dataset.bg;
+      if (url) el.style.backgroundImage = `url('${url}')`;
+    });
 
     $$(".variety-tile", atlasGrid).forEach((tile) => {
       const v = tile.dataset.variety;
@@ -773,16 +780,17 @@
     const list = (v && v.landmarks) || [];
     modalCurrentPick = SETTINGS.pinnedLandmark[varietyKey] || (list[0] && list[0].url);
     landmarkModalTitle.textContent = `${(v && v.label) || varietyKey} · 地标选择`;
+    // Cycle 20: no inline style= on the HTML → CSP-clean; set via DOM API.
     landmarkModalGrid.innerHTML = list.map((l) => `
       <button type="button"
               class="landmark-pick ${l.url === modalCurrentPick ? "is-selected" : ""}"
               data-url="${escapeHtml(l.url)}"
-              style="background-image:url('${escapeHtml(l.url)}')"
               aria-pressed="${l.url === modalCurrentPick ? "true" : "false"}">
         <span class="pick-name">${escapeHtml(l.name)}</span>
       </button>
     `).join("");
     $$(".landmark-pick", landmarkModalGrid).forEach((p) => {
+      if (p.dataset.url) p.style.backgroundImage = `url('${p.dataset.url}')`;
       p.addEventListener("click", () => {
         modalCurrentPick = p.dataset.url;
         $$(".landmark-pick", landmarkModalGrid).forEach((x) => {
@@ -2316,6 +2324,12 @@
       // Sort by mean ascending — worst first (most likely to need attention)
       buckets.sort((a, b) => (a.stats?.mean ?? 5) - (b.stats?.mean ?? 5));
       panel.innerHTML = buckets.map(renderQualityBucket).join("");
+      // Cycle 20: bar width is dynamic per bucket; setting via DOM API after
+      // insertion keeps the HTML CSP-clean (no inline style=).
+      $$(".quality-bucket-distribution .fill[data-width]", panel).forEach((el) => {
+        const pct = Math.max(0, Math.min(100, parseFloat(el.dataset.width || "0")));
+        el.style.width = pct + "%";
+      });
       $$(".quality-bucket [data-act='refine']", panel).forEach((btn) => {
         btn.addEventListener("click", () => triggerMetaRefine(btn.dataset.variety, btn.dataset.scenario, btn));
       });
@@ -2385,8 +2399,8 @@
           <span class="stat"><span class="lbl">min/max</span><span class="num">${stats.min ?? "—"}/${stats.max ?? "—"}</span></span>
         </div>
         <div class="quality-bucket-distribution" title="平均分 ${(stats.mean ?? 0).toFixed(2)}/5">
-          <div class="fill" style="width: ${meanPct}%"></div>
-          <div class="marker" style="left: 70%" title="阈值 3.5"></div>
+          <div class="fill" data-width="${meanPct}"></div>
+          <div class="marker" title="阈值 3.5"></div>
         </div>
         ${abBlock}
         ${draftBlock}
@@ -2585,7 +2599,7 @@
                   td.title = out.reason || "";
                   td.innerHTML = `<span class="score-num">${out.score.toFixed(1)}</span><span class="score-out">/5</span>`;
                 } else {
-                  td.innerHTML = '<span class="skeleton-row" style="width:60%"></span>';
+                  td.innerHTML = '<span class="skeleton-row skeleton-row--short"></span>';
                   maybeScore(idx, v, out.rewritten_text);
                 }
               }

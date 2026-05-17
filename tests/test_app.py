@@ -2538,6 +2538,17 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertFalse(payload["revoked"])
 
+    def test_csp_no_unsafe_inline_anywhere(self) -> None:
+        # Cycle 20 C5: CSP must not contain 'unsafe-inline' on either
+        # style-src or script-src. The 6 inline `style=` sites in app.js
+        # have been moved to DOM-API style sets / CSS classes. Lock the
+        # no-unsafe-inline guarantee so a future regression fails CI.
+        app = App(rewrite_service=RewriteService(config=None))
+        _, headers, _ = call_app(app, "GET", "/api/healthz")
+        csp = headers["Content-Security-Policy"]
+        self.assertNotIn("'unsafe-inline'", csp)
+        self.assertNotIn("'unsafe-eval'", csp)
+
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:
         os.environ.pop("NCGA_TRUST_FORWARDED_FOR", None)

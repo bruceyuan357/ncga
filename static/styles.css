@@ -2305,7 +2305,12 @@ mark.kw-hl {
   width: 2px;
   background: var(--ink);
   opacity: 0.6;
+  /* Cycle 20: was inline style="left:70%". The 3.5/5 threshold position is
+     fixed → move to CSS so we can drop CSP unsafe-inline on style-src. */
+  left: 70%;
 }
+/* Cycle 20: short skeleton (replaces inline style="width:60%"). */
+.skeleton-row--short { width: 60% !important; }
 .quality-bucket-actions {
   display: flex; gap: 0.4rem; flex-wrap: wrap;
 }

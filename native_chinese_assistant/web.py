@@ -215,8 +215,12 @@ _STATIC_SECURITY_HEADERS: list[tuple[str, str]] = [
 
 
 def _build_csp(nonce: str | None = None) -> str:
-    """Cycle 13: tighter CSP. script-src no longer permits 'unsafe-inline'; the small
-    boot-screen FOUC inline script gets a nonce instead."""
+    """Cycle 13: script-src has no 'unsafe-inline'; boot-screen FOUC script gets a nonce.
+    Cycle 20: style-src ALSO drops 'unsafe-inline' now. All previously-inline
+    `style="..."` sites in app.js have been refactored to DOM-API style sets
+    (which CSP doesn't gate) or fixed CSS rules. External stylesheets remain
+    allowed via the explicit https://* allowlist.
+    """
     script_src = "'self'"
     if nonce:
         script_src += f" 'nonce-{nonce}'"
@@ -225,7 +229,7 @@ def _build_csp(nonce: str | None = None) -> str:
         "img-src 'self' data: "
         "https://upload.wikimedia.org https://commons.wikimedia.org "
         "https://images.unsplash.com; "
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+        "style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
         f"script-src {script_src}; "
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
         "connect-src 'self'; "
