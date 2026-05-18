@@ -21,57 +21,72 @@
   /* CN content (中文内容主体,用于 hero verse / output card): Noto Serif SC */
   --font-cn: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
 
-  /* ============ v3「随四时」 默认调色板 (春天) ============
+  /* ============ v3「随四时」 默认调色板 (春天,R-A2 提亮版) ============
      四季调色板由下面 [data-season] 属性切换。默认 :root 等同于春。
-     v3 是渐进迁移:旧的 --bg / --accent 等保留给 v1/v2,
-     v3 自己用带 -s3- 前缀的变量避免污染老主题。
+     v3 用带 -s3- 前缀,与 v1/v2 老变量正交。
+     R-A2 增 --s3-bg-soft (卡片底) / --s3-accent-2 (次 accent) / --s3-accent-deep (强调)
      ============================================================ */
-  --s3-bg: #FAFAF6;
+  --s3-bg: #FFF8F4;
+  --s3-bg-soft: #FCEEE8;
   --s3-text: #1A1A1A;
-  --s3-text-soft: #4F4F4D;
-  --s3-rule: #E6E6DF;
-  --s3-accent: #C04A6C;     /* 樱花深粉 cherry-deep */
-  --s3-hero-tint: rgba(192, 74, 108, 0.08);
+  --s3-text-soft: #5A4844;
+  --s3-rule: #F0D9CF;
+  --s3-accent: #E89BB0;
+  --s3-accent-deep: #C95F7D;
+  --s3-accent-2: #8FB99B;
+  --s3-hero-tint: rgba(232, 155, 176, 0.06);
 }
 
-/* 春 — Spring (3-5月) */
+/* 春 — Spring (3-5月) — R-A2 提亮 + 加嫩柳绿次 accent */
 [data-season="spring"] {
-  --s3-bg: #FAFAF6;
+  --s3-bg: #FFF8F4;
+  --s3-bg-soft: #FCEEE8;
   --s3-text: #1A1A1A;
-  --s3-text-soft: #4F4F4D;
-  --s3-rule: #E6E6DF;
-  --s3-accent: #C04A6C;     /* 樱花深粉 */
-  --s3-hero-tint: rgba(192, 74, 108, 0.08);
+  --s3-text-soft: #5A4844;
+  --s3-rule: #F0D9CF;
+  --s3-accent: #E89BB0;        /* 樱花粉(原 #C04A6C 太暗) */
+  --s3-accent-deep: #C95F7D;   /* 强调态 */
+  --s3-accent-2: #8FB99B;      /* 嫩柳绿,作次 accent */
+  --s3-hero-tint: rgba(232, 155, 176, 0.06);
 }
 
 /* 夏 — Summer (6-8月) */
 [data-season="summer"] {
-  --s3-bg: #F7F9F4;
+  --s3-bg: #F4F8F1;
+  --s3-bg-soft: #E6F0E0;
   --s3-text: #161818;
   --s3-text-soft: #4A504A;
-  --s3-rule: #DCE3D7;
-  --s3-accent: #2F6B3E;     /* 林深绿 */
-  --s3-hero-tint: rgba(47, 107, 62, 0.10);
+  --s3-rule: #D2DCC9;
+  --s3-accent: #4A8A5A;        /* 提亮林绿 */
+  --s3-accent-deep: #2F6B3E;
+  --s3-accent-2: #D9C77B;      /* 蝉鸣金 */
+  --s3-hero-tint: rgba(74, 138, 90, 0.08);
 }
 
 /* 秋 — Autumn (9-11月) */
 [data-season="autumn"] {
-  --s3-bg: #FAF6F0;
+  --s3-bg: #FBF5ED;
+  --s3-bg-soft: #F4E6D2;
   --s3-text: #1C1715;
-  --s3-text-soft: #524740;
-  --s3-rule: #E8DFD3;
-  --s3-accent: #B5491D;     /* 枫红铁锈 */
-  --s3-hero-tint: rgba(181, 73, 29, 0.10);
+  --s3-text-soft: #6B5840;
+  --s3-rule: #E8D4B5;
+  --s3-accent: #D26A2F;        /* 提亮枫橙 */
+  --s3-accent-deep: #A8451A;
+  --s3-accent-2: #C9A85E;      /* 麦穗金 */
+  --s3-hero-tint: rgba(210, 106, 47, 0.08);
 }
 
 /* 冬 — Winter (12-2月) */
 [data-season="winter"] {
-  --s3-bg: #F4F6F8;
+  --s3-bg: #F3F6F9;
+  --s3-bg-soft: #E2EAF1;
   --s3-text: #14181B;
-  --s3-text-soft: #485058;
-  --s3-rule: #D9DEE3;
-  --s3-accent: #2C5C7A;     /* 雪松青蓝 */
-  --s3-hero-tint: rgba(44, 92, 122, 0.08);
+  --s3-text-soft: #54606C;
+  --s3-rule: #C8D2DC;
+  --s3-accent: #4A7B98;        /* 提亮松青 */
+  --s3-accent-deep: #2C5C7A;
+  --s3-accent-2: #A8B8C3;      /* 雪灰 */
+  --s3-hero-tint: rgba(74, 123, 152, 0.07);
 }
 
 /* 关掉以下这条假 :root 关闭,继续后面的真 :root 内容 */
@@ -3412,4 +3427,76 @@ body[data-v3="on"] .v3-hero-photo::after {
   body[data-v3="on"] .v3-hero-caption {
     left: 18px; right: 18px; bottom: 24px;
   }
+}
+
+/* ============================================================
+   v3 R-A2: 输出卡 + page 整体宽松化(让排版"舒展")
+   ============================================================ */
+
+/* page 整体加宽,顶部 padding 加大,让 hero 与内容呼吸 */
+body[data-v3="on"] .page {
+  max-width: 820px;             /* 760 -> 820 */
+  padding-top: 3.6rem;          /* 2.8 -> 3.6rem */
+  padding-bottom: 5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* 整页底色用 s3-bg(暖白偏粉),让 v3 视觉成片 */
+body[data-v3="on"] {
+  background: var(--s3-bg);
+}
+
+/* 输出卡留白进一步加宽 + 用次 accent 嫩绿做 hover 提示 */
+body[data-v3="on"] .result,
+body[data-v3="on"] .result-compare-orig {
+  background: var(--s3-bg-soft, var(--s3-bg));
+  padding: 2.2rem 2rem 2.4rem 2.4rem;       /* 上下 +20%、左 +20% */
+  line-height: 2.0;                          /* 1.85 -> 2.0,真正舒展 */
+  font-size: calc(1.22rem * var(--font-scale));
+}
+
+/* focus 用 accent-deep,hover 用 accent-2 嫩柳绿,层次感 */
+body[data-v3="on"] .result:focus {
+  border-left-color: var(--s3-accent-deep);
+}
+body[data-v3="on"] .result:hover {
+  background: var(--s3-bg-soft);
+  transition: background 0.3s ease;
+}
+
+/* cmdbar 在 v3 模式更克制:小高度、轻分隔 */
+body[data-v3="on"] .cmdbar {
+  background: transparent;
+  border-bottom: 1px solid var(--s3-rule);
+  padding-top: 1.4rem;
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.2rem;
+}
+
+/* 切方言的 chips / 输入区也加间距 */
+body[data-v3="on"] .workbench {
+  gap: 1.6rem;
+}
+body[data-v3="on"] textarea {
+  font-family: var(--font-cn);
+  font-size: calc(1.08rem * var(--font-scale));
+  line-height: 1.8;
+  padding: 1.4rem 1.4rem;
+}
+
+/* 按钮 v3 风:更圆,accent 色 */
+body[data-v3="on"] .cmd-btn.primary {
+  background: var(--s3-accent);
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 0.7rem 1.5rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: background 0.2s, transform 0.15s;
+}
+body[data-v3="on"] .cmd-btn.primary:hover {
+  background: var(--s3-accent-deep);
+  transform: translateY(-1px);
 }
