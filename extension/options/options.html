@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>地道中文 · 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>地道中文 · 扩展设置</h1>
+
+    <section class="grp">
+      <h2>服务器</h2>
+      <label for="server-url">NCGA 服务器 URL</label>
+      <input id="server-url" type="text" placeholder="http://localhost:8000" value="http://localhost:8000">
+      <p class="hint">默认假设本机 8000 端口在跑 <code>python3 app.py</code>。要换地址需要同时改 <code>manifest.json</code> 里的 <code>host_permissions</code>。</p>
+    </section>
+
+    <section class="grp">
+      <h2>身份 · Bearer Token</h2>
+      <label for="token">Token(<code>NCGA_AUTH_TOKEN</code>)</label>
+      <input id="token" type="password" placeholder="从服务器 .env 复制" autocomplete="off">
+      <label for="passphrase">加密密码 passphrase</label>
+      <input id="passphrase" type="password" placeholder="一段你能记住的话(不存,只用来派生密钥)" autocomplete="off">
+      <label for="passphrase2">再输一次</label>
+      <input id="passphrase2" type="password" autocomplete="off">
+      <p class="hint">Token 用你这段 passphrase 派生 AES-GCM 256-bit key 加密后存进 <code>chrome.storage.local</code>。passphrase 本身永远不存盘。</p>
+      <button id="save-btn" class="primary">加密并保存</button>
+      <p id="save-msg" class="msg"></p>
+    </section>
+
+    <section class="grp">
+      <h2>当前状态</h2>
+      <pre id="status-out" class="status"></pre>
+      <button id="clear-btn" class="danger">清空所有保存的配置</button>
+    </section>
+  </main>
+  <script src="options.js" type="module"></script>
+</body>
+</html>

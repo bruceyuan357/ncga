@@ -1,0 +1,58 @@
+/* extension/options/options.css */
+:root {
+  --bg: #FFF8F4;
+  --text: #1A1A1A;
+  --text-soft: #5A4844;
+  --accent: #E89BB0;
+  --accent-deep: #C95F7D;
+  --rule: #F0D9CF;
+  --err: #C0392B;
+  --ok: #2F6B3E;
+  --font: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.55; }
+.wrap { max-width: 560px; padding: 1.5rem 1.5rem 3rem; margin: 0 auto; }
+
+h1 { font-size: 18px; margin: 0 0 1.5rem; font-weight: 700; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-soft); margin: 0 0 0.6rem; font-weight: 600; }
+
+.grp { margin: 0 0 2.2rem; padding: 1rem 1.1rem 1.3rem; background: #FFFFFF; border: 1px solid var(--rule); border-radius: 8px; }
+
+label { display: block; font-size: 11px; color: var(--text-soft); margin: 0.8rem 0 0.3rem; }
+input[type=text], input[type=password] {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 13px;
+  background: #FFFEFD;
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
+.hint { font-size: 11px; color: var(--text-soft); opacity: 0.85; margin: 0.5rem 0 0; }
+.hint code { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; background: rgba(232,155,176,0.18); padding: 0.05em 0.4em; border-radius: 4px; font-size: 11px; }
+
+button {
+  margin-top: 0.9rem;
+  padding: 0.55rem 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+button.primary { background: var(--accent); color: #FFFFFF; }
+button.primary:hover { background: var(--accent-deep); transform: translateY(-1px); }
+button.primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+button.danger { background: transparent; color: var(--err); border: 1px solid var(--err); }
+button.danger:hover { background: var(--err); color: #FFFFFF; }
+
+.msg { margin: 0.6rem 0 0; font-size: 12px; min-height: 1em; }
+.msg.ok { color: var(--ok); }
+.msg.err { color: var(--err); }
+
+.status { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11.5px; background: #FFFFFF; border: 1px solid var(--rule); border-radius: 6px; padding: 0.8rem 1rem; white-space: pre-wrap; word-break: break-all; margin: 0 0 0.5rem; min-height: 4em; color: var(--text-soft); }

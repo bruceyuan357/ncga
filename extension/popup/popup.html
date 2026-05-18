@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>地道中文 · NCGA</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="hdr">
+    <h1>地道中文</h1>
+    <span class="ver">v0.1.0</span>
+  </header>
+
+  <section id="status" class="status">
+    <div id="status-line">检查中…</div>
+  </section>
+
+  <!-- Unlock panel: shown when token is locked (passphrase needed) -->
+  <section id="unlock-panel" class="panel hidden">
+    <label for="passphrase">解锁 passphrase</label>
+    <input id="passphrase" type="password" autocomplete="off" placeholder="…" autofocus>
+    <button id="unlock-btn" class="primary">解锁</button>
+    <p id="unlock-err" class="err"></p>
+  </section>
+
+  <!-- Quick-rewrite panel: shown when ready -->
+  <section id="rewrite-panel" class="panel hidden">
+    <label for="text">要改写的文字</label>
+    <textarea id="text" rows="3" placeholder="贴一段话…"></textarea>
+    <div class="row">
+      <label for="variety" class="small">改写为</label>
+      <select id="variety">
+        <option value="standard_putonghua">标准普通话</option>
+        <option value="beijing_mandarin">北京话</option>
+        <option value="dongbei_mandarin">东北话</option>
+        <option value="sichuan_chongqing_mandarin">川渝话</option>
+        <option value="jianghuai_or_lower_yangtze_mandarin">江淮话</option>
+        <option value="guangdong_mandarin">广东普通话</option>
+        <option value="shanghai_mandarin_style" selected>上海话风格</option>
+        <option value="cantonese_written">粤语书面语</option>
+        <option value="hokkien_written">台湾闽南语</option>
+        <option value="minnan_written">福建闽南语</option>
+      </select>
+    </div>
+    <button id="rewrite-btn" class="primary">改写</button>
+    <pre id="result" class="result"></pre>
+  </section>
+
+  <footer class="ftr">
+    <a id="open-options" href="#">设置</a>
+    <span class="dot">·</span>
+    <a id="lock-btn" href="#" class="hidden">锁回去</a>
+  </footer>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
