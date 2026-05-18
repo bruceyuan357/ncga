@@ -503,6 +503,29 @@
   }
 
   // ---------------- settings ----------------
+  // v3「随四时」: detect season from current month (北半球节气近似).
+  // 3-5 = 春 spring · 6-8 = 夏 summer · 9-11 = 秋 autumn · 12,1,2 = 冬 winter.
+  // Override via localStorage `ncga.seasonOverride` ∈ {spring,summer,autumn,winter}
+  // for demo / screenshot purposes.
+  function currentSeason() {
+    try {
+      var override = localStorage.getItem("ncga.seasonOverride");
+      if (override && /^(spring|summer|autumn|winter)$/.test(override)) {
+        return override;
+      }
+    } catch (e) { /* localStorage may be blocked — fall through */ }
+    var m = new Date().getMonth() + 1;  // 1..12
+    if (m >= 3 && m <= 5) return "spring";
+    if (m >= 6 && m <= 8) return "summer";
+    if (m >= 9 && m <= 11) return "autumn";
+    return "winter";
+  }
+
+  function applySeason(season) {
+    document.documentElement.setAttribute("data-season", season);
+    document.body.setAttribute("data-season", season);
+  }
+
   function applyVersion(v) {
     document.documentElement.setAttribute("data-version", v);
     document.body.setAttribute("data-version", v);
@@ -3088,6 +3111,7 @@
   // ---------------- init ----------------
   syncSettingsUI();
   applyVersion(SETTINGS.version);
+  applySeason(currentSeason());  // v3「随四时」: set [data-season] from month
   applyFontScale(SETTINGS.fontScale);
   updateBgModePill();
 

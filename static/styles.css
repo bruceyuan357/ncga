@@ -21,6 +21,62 @@
   /* CN content (中文内容主体,用于 hero verse / output card): Noto Serif SC */
   --font-cn: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
 
+  /* ============ v3「随四时」 默认调色板 (春天) ============
+     四季调色板由下面 [data-season] 属性切换。默认 :root 等同于春。
+     v3 是渐进迁移:旧的 --bg / --accent 等保留给 v1/v2,
+     v3 自己用带 -s3- 前缀的变量避免污染老主题。
+     ============================================================ */
+  --s3-bg: #FAFAF6;
+  --s3-text: #1A1A1A;
+  --s3-text-soft: #4F4F4D;
+  --s3-rule: #E6E6DF;
+  --s3-accent: #C04A6C;     /* 樱花深粉 cherry-deep */
+  --s3-hero-tint: rgba(192, 74, 108, 0.08);
+}
+
+/* 春 — Spring (3-5月) */
+[data-season="spring"] {
+  --s3-bg: #FAFAF6;
+  --s3-text: #1A1A1A;
+  --s3-text-soft: #4F4F4D;
+  --s3-rule: #E6E6DF;
+  --s3-accent: #C04A6C;     /* 樱花深粉 */
+  --s3-hero-tint: rgba(192, 74, 108, 0.08);
+}
+
+/* 夏 — Summer (6-8月) */
+[data-season="summer"] {
+  --s3-bg: #F7F9F4;
+  --s3-text: #161818;
+  --s3-text-soft: #4A504A;
+  --s3-rule: #DCE3D7;
+  --s3-accent: #2F6B3E;     /* 林深绿 */
+  --s3-hero-tint: rgba(47, 107, 62, 0.10);
+}
+
+/* 秋 — Autumn (9-11月) */
+[data-season="autumn"] {
+  --s3-bg: #FAF6F0;
+  --s3-text: #1C1715;
+  --s3-text-soft: #524740;
+  --s3-rule: #E8DFD3;
+  --s3-accent: #B5491D;     /* 枫红铁锈 */
+  --s3-hero-tint: rgba(181, 73, 29, 0.10);
+}
+
+/* 冬 — Winter (12-2月) */
+[data-season="winter"] {
+  --s3-bg: #F4F6F8;
+  --s3-text: #14181B;
+  --s3-text-soft: #485058;
+  --s3-rule: #D9DEE3;
+  --s3-accent: #2C5C7A;     /* 雪松青蓝 */
+  --s3-hero-tint: rgba(44, 92, 122, 0.08);
+}
+
+/* 关掉以下这条假 :root 关闭,继续后面的真 :root 内容 */
+:root {
+
   /* ============ 形 ============ */
   --radius-xs: 6px;
   --radius-sm: 10px;

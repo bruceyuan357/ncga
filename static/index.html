@@ -8,8 +8,9 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="color-scheme" content="dark light">
 
-    <!-- FOUC 防抖：在样式 / JS 加载前先把 v1/v2 主题与字号写入根元素，
-         避免上一次保存的「古朴」版闪一下「墨韵」黑底再切回。 -->
+    <!-- FOUC 防抖：在样式 / JS 加载前先把 v1/v2 主题与字号、v3 季节写入根元素，
+         避免上一次保存的「古朴」版闪一下「墨韵」黑底再切回，
+         或秋色页面闪一下春樱色。 -->
     <script>
       (function () {
         try {
@@ -20,6 +21,21 @@
           document.documentElement.setAttribute("data-version", v);
           document.documentElement.style.setProperty("--font-scale", fs);
         } catch (e) { /* ignore — fall back to defaults */ }
+        // v3「随四时」: 按月份给 <html> 写 data-season,与 app.js currentSeason() 同算法。
+        try {
+          var override = localStorage.getItem("ncga.seasonOverride");
+          var season;
+          if (override && /^(spring|summer|autumn|winter)$/.test(override)) {
+            season = override;
+          } else {
+            var m = new Date().getMonth() + 1;
+            season = (m >= 3 && m <= 5) ? "spring"
+                  : (m >= 6 && m <= 8) ? "summer"
+                  : (m >= 9 && m <= 11) ? "autumn"
+                  : "winter";
+          }
+          document.documentElement.setAttribute("data-season", season);
+        } catch (e) { /* ignore */ }
       })();
     </script>
 
