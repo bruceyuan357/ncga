@@ -436,6 +436,42 @@
     if (SETTINGS.bgMode === "rotate") startBgRotate(varietyKey);
   }
 
+  // v3「随四时」 Stage A7 — 16 首古诗,4 季 × 4 首。
+  // 选诗策略:按"年内第几天 + 季节槽数"日级稳定,每天午夜换一句不闪。
+  const SEASONAL_VERSES = {
+    spring: [
+      { verse: "二月春风似剪刀", source: "贺知章 · 咏柳" },
+      { verse: "春眠不觉晓,处处闻啼鸟", source: "孟浩然 · 春晓" },
+      { verse: "等闲识得东风面,万紫千红总是春", source: "朱熹 · 春日" },
+      { verse: "沾衣欲湿杏花雨,吹面不寒杨柳风", source: "志南 · 绝句" },
+    ],
+    summer: [
+      { verse: "接天莲叶无穷碧,映日荷花别样红", source: "杨万里 · 晓出净慈寺送林子方" },
+      { verse: "黄梅时节家家雨,青草池塘处处蛙", source: "赵师秀 · 约客" },
+      { verse: "小荷才露尖尖角,早有蜻蜓立上头", source: "杨万里 · 小池" },
+      { verse: "卷地风来忽吹散,望湖楼下水如天", source: "苏轼 · 六月二十七日望湖楼醉书" },
+    ],
+    autumn: [
+      { verse: "停车坐爱枫林晚,霜叶红于二月花", source: "杜牧 · 山行" },
+      { verse: "自古逢秋悲寂寥,我言秋日胜春朝", source: "刘禹锡 · 秋词" },
+      { verse: "月落乌啼霜满天,江枫渔火对愁眠", source: "张继 · 枫桥夜泊" },
+      { verse: "空山新雨后,天气晚来秋", source: "王维 · 山居秋暝" },
+    ],
+    winter: [
+      { verse: "千山鸟飞绝,万径人踪灭", source: "柳宗元 · 江雪" },
+      { verse: "忽如一夜春风来,千树万树梨花开", source: "岑参 · 白雪歌送武判官归京" },
+      { verse: "墙角数枝梅,凌寒独自开", source: "王安石 · 梅花" },
+      { verse: "晚来天欲雪,能饮一杯无", source: "白居易 · 问刘十九" },
+    ],
+  };
+
+  function pickVerseForSeason(season) {
+    const list = SEASONAL_VERSES[season] || [];
+    if (!list.length) return null;
+    const dayIdx = Math.floor(Date.now() / (24 * 3600 * 1000)) % list.length;
+    return list[dayIdx];
+  }
+
   // v3「随四时」: render hero photo + caption based on current variety + season.
   function updateV3Hero(varietyKey, landmark) {
     if (!varietyKey || !landmark) return;
@@ -456,6 +492,28 @@
     if (metaSeason) metaSeason.textContent = seasonZh;
     if (metaYear) metaYear.textContent = String(year);
     if (headline) headline.textContent = landmark.name || "—";
+    // Stage A7: render today's verse for the active season.
+    const verseEl = $("#v3-hero-verse");
+    if (verseEl) {
+      const picked = pickVerseForSeason(season);
+      if (picked) {
+        // Use DOM-API style sets (Cycle 20 CSP: no inline styles or innerHTML).
+        verseEl.textContent = "";
+        const q = document.createElement("span");
+        q.textContent = "「" + picked.verse + "」";
+        const dash = document.createElement("span");
+        dash.className = "v3-hero-verse-sep";
+        dash.textContent = "  — ";
+        const src = document.createElement("span");
+        src.className = "v3-hero-verse-source";
+        src.textContent = picked.source;
+        verseEl.appendChild(q);
+        verseEl.appendChild(dash);
+        verseEl.appendChild(src);
+      } else {
+        verseEl.textContent = "「随四时,听乡音」";
+      }
+    }
   }
 
   // v3 mode opt-in: URL ?v3=1 (one-time toggle, persists to localStorage),

@@ -3321,3 +3321,17 @@ body[data-v3="on"] .cmdbar-subtitle {
   color: var(--s3-text-soft);
   opacity: 0.85;
 }
+
+/* Stage A7: verse source separator styling */
+body[data-v3="on"] .v3-hero-verse-sep {
+  font-family: var(--font-body);
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+body[data-v3="on"] .v3-hero-verse-source {
+  font-family: var(--font-body);
+  font-size: 0.78em;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+  font-style: normal;
+}

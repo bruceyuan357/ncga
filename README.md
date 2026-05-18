@@ -8,6 +8,11 @@
 > - **双轨认证** — SPA 走 HMAC cookie,扩展/脚本走 Bearer header
 > - **`/api/logout`** — cookie 撤销,无需轮转 token
 > - **CSP 锁紧** — `style-src` 不再有 `unsafe-inline`
+>
+> **Cycle 22 Stage A (preview):**
+> - **v3「随四时」** Cinematic Editorial 视觉:40vh hero 大图 + 杂志式 caption + 季节调色板(春樱粉/夏林绿/秋枫橙/冬青蓝)+ 16 首古诗每日轮换 + sidebar 右抽屉
+> - **启用**:打开 `http://127.0.0.1:8000/?v3=1`(写 localStorage 持久,`?v3=0` 关)
+> - 当前预览态,v1/v2 用户零影响;A1 季节地标数据集齐后翻默认
 
 - 后端：Python 3.10+，零运行时依赖（除 `certifi`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
