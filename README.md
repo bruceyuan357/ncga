@@ -9,10 +9,12 @@
 > - **`/api/logout`** — cookie 撤销,无需轮转 token
 > - **CSP 锁紧** — `style-src` 不再有 `unsafe-inline`
 >
-> **Cycle 22 Stage A (preview):**
-> - **v3「随四时」** Cinematic Editorial 视觉:40vh hero 大图 + 杂志式 caption + 季节调色板(春樱粉/夏林绿/秋枫橙/冬青蓝)+ 16 首古诗每日轮换 + sidebar 右抽屉
-> - **启用**:打开 `http://127.0.0.1:8000/?v3=1`(写 localStorage 持久,`?v3=0` 关)
-> - 当前预览态,v1/v2 用户零影响;A1 季节地标数据集齐后翻默认
+> **Cycle 22 Stage A + R-A 重做 (preview):**
+> - **v3「随四时」** Cinematic Editorial 视觉:48vh hero + 节气小章 caption + 4 季调色板(春樱粉+嫩绿次 accent / 夏林绿+蝉鸣金 / 秋枫橙+麦穗金 / 冬松青+雪灰)+ 16 首古诗每日轮换 + sidebar 右抽屉 + **春日樱花瓣 SVG 飘落装饰**
+> - 排版舒展(820px max-width, line-height 2.0, padding 2.2rem, 字号 1.22rem)
+> - 启用:打开 `http://127.0.0.1:8000/?v3=1`(`?v3=0` 关)
+> - 24 节气自动:5 月当前 = 立夏/小满,顶上小章标显
+> - 预览态,v1/v2 零影响
 
 - 后端：Python 3.10+，零运行时依赖（除 `certifi`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
