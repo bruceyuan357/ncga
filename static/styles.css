@@ -13,6 +13,14 @@
   --calligraphy: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
+  /* ============ v3「随四时」 Cinematic Editorial 字体 ============ */
+  /* Display (页面大标题 / hero 标语): Manrope 700  */
+  --font-display: 'Manrope', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Body (英文短语 / UI 控件): Inter */
+  --font-body: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* CN content (中文内容主体,用于 hero verse / output card): Noto Serif SC */
+  --font-cn: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+
   /* ============ 形 ============ */
   --radius-xs: 6px;
   --radius-sm: 10px;
