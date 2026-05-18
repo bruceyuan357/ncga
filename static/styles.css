@@ -3335,3 +3335,81 @@ body[data-v3="on"] .v3-hero-verse-source {
   opacity: 0.75;
   font-style: normal;
 }
+
+/* ============================================================
+   v3 R-A1 重做:hero 排版宽松化 + caption 去英文大写小字
+   保留 Direction B 大结构,只调间距/字号/对齐
+   ============================================================ */
+
+body[data-v3="on"] .v3-hero {
+  height: 48vh;             /* 40vh -> 48vh,更舒展 */
+  min-height: 340px;
+}
+
+body[data-v3="on"] .v3-hero-caption {
+  left: clamp(24px, 6vw, 72px);          /* 内缩更大 */
+  right: clamp(24px, 6vw, 72px);
+  bottom: clamp(28px, 5vh, 52px);
+  gap: 0.8rem;                            /* 各行间距加大 */
+  max-width: 80ch;
+}
+
+body[data-v3="on"] .v3-hero-meta {
+  font-family: var(--font-cn);            /* 中文衬线,不再 uppercase Inter */
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.05em;                 /* 字距收紧到正常 */
+  text-transform: none;                   /* 取消全大写 */
+  opacity: 0.92;
+}
+
+body[data-v3="on"] .v3-hero-meta-solar {
+  /* 节气小标:更柔的金色描边感 */
+  padding: 0.18em 0.6em;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 999px;
+  font-size: 11.5px;
+  margin-right: 0.25em;
+}
+
+body[data-v3="on"] .v3-hero-meta .sep {
+  margin: 0 0.6em;
+  opacity: 0.55;
+}
+
+body[data-v3="on"] .v3-hero-place {
+  font-size: clamp(34px, 6vw, 64px);      /* 大标题更大,主次更分明 */
+  line-height: 1.0;
+  margin: 0.2rem 0 0.3rem;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.35);  /* 深阴影,确保白字在亮图上仍清晰 */
+}
+
+body[data-v3="on"] .v3-hero-verse {
+  font-family: var(--font-cn);
+  font-style: normal;                     /* 取消斜体,Noto Serif SC 不该斜 */
+  font-weight: 400;
+  font-size: clamp(16px, 2.2vw, 21px);
+  line-height: 1.75;
+  margin-top: 0.5rem;
+  opacity: 0.95;
+  letter-spacing: 0.02em;
+}
+
+/* 隐掉旧的 hero credit 行(R-A1 简化后不需要署名) */
+body[data-v3="on"] .v3-hero-credit { display: none; }
+
+/* photo 渐黑加深,弱化原图杂色,突出文字 */
+body[data-v3="on"] .v3-hero-photo::after {
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.65) 0%,
+    rgba(0,0,0,0.28) 38%,
+    rgba(0,0,0,0.10) 72%,
+    rgba(0,0,0,0.04) 100%);
+}
+
+@media (max-width: 720px) {
+  body[data-v3="on"] .v3-hero { height: 42vh; min-height: 280px; }
+  body[data-v3="on"] .v3-hero-caption {
+    left: 18px; right: 18px; bottom: 24px;
+  }
+}

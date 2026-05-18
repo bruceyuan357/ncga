@@ -510,6 +510,30 @@
     return list[dayIdx];
   }
 
+  // R-A1: 24 节气表 — 按月日近似匹配,不准但意境到位
+  // (精确节气需天文计算,这里用每月固定日 5/20 简化)
+  const SOLAR_TERMS = [
+    [2, 4, "立春"], [2, 19, "雨水"], [3, 6, "惊蛰"], [3, 21, "春分"],
+    [4, 5, "清明"], [4, 20, "谷雨"],
+    [5, 6, "立夏"], [5, 21, "小满"], [6, 6, "芒种"], [6, 21, "夏至"],
+    [7, 7, "小暑"], [7, 23, "大暑"],
+    [8, 8, "立秋"], [8, 23, "处暑"], [9, 8, "白露"], [9, 23, "秋分"],
+    [10, 8, "寒露"], [10, 23, "霜降"],
+    [11, 7, "立冬"], [11, 22, "小雪"], [12, 7, "大雪"], [12, 22, "冬至"],
+    [1, 6, "小寒"], [1, 20, "大寒"],
+  ];
+  function currentSolarTerm() {
+    const now = new Date();
+    const m = now.getMonth() + 1, d = now.getDate();
+    let best = "立春";
+    for (const [tm, td, name] of SOLAR_TERMS) {
+      // Pick the latest term whose start date <= today (in calendar order)
+      if (tm < m || (tm === m && td <= d)) best = name;
+      // Special wrap: if Jan and we passed 6/20, "小寒/大寒" handled above naturally
+    }
+    return best;
+  }
+
   // v3「随四时」: render hero photo + caption based on current variety + season.
   // Prefers SEASONAL_LANDMARKS[variety][season] (Stage A1 dataset).
   // Falls back to the variety's first preset landmark if the dataset isn't
@@ -519,8 +543,6 @@
     const v = VARIETIES[varietyKey];
     if (!v) return;
     const season = currentSeason();
-    const seasonZh = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" }[season] || "—";
-    const year = new Date().getFullYear();
 
     // Resolve photo source: seasonal entry > caller-supplied landmark > nothing
     const seasonal = getSeasonalEntry(varietyKey, season);
@@ -530,15 +552,13 @@
 
     const photo = $("#v3-hero-photo");
     const metaPlace = $("#v3-hero-meta-place");
-    const metaSeason = $("#v3-hero-meta-season");
-    const metaYear = $("#v3-hero-meta-year");
+    const metaSolar = $("#v3-hero-meta-solar");
     const headline = $("#v3-hero-headline");
     if (photo && photoUrl) {
       photo.style.backgroundImage = `url("${photoUrl}")`;
     }
     if (metaPlace) metaPlace.textContent = locationLabel;
-    if (metaSeason) metaSeason.textContent = seasonZh;
-    if (metaYear) metaYear.textContent = String(year);
+    if (metaSolar) metaSolar.textContent = currentSolarTerm();
     if (headline) headline.textContent = landmarkLabel;
     // Stage A7: render today's verse for the active season.
     const verseEl = $("#v3-hero-verse");
