@@ -3149,3 +3149,100 @@ body[data-v3="on"] .bg-stage { display: none; }
 @media (max-width: 720px) {
   body[data-v3="on"] .v3-hero { height: 36vh; min-height: 240px; }
 }
+
+/* ============================================================
+   v3「随四时」 Stage A5 — Sidebar-as-drawer (slides from right)
+   ============================================================ */
+
+/* v3 trigger button (top-right fixed, only in v3 mode) */
+.v3-menu-btn {
+  display: none;
+}
+body[data-v3="on"] .v3-menu-btn {
+  display: inline-flex;
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  color: #222;
+  cursor: pointer;
+  z-index: 60;
+  font-size: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s, background 0.15s;
+}
+body[data-v3="on"] .v3-menu-btn:hover {
+  background: #ffffff;
+  transform: scale(1.05);
+}
+body[data-v3="on"].sidebar-open .v3-menu-btn {
+  /* hide trigger when drawer is open (close from inside the drawer or backdrop) */
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* In v3 mode: hide the always-visible left sidebar by default, hide cmdbar
+   mobile menu button. The sidebar is reused as a slide-from-right drawer. */
+body[data-v3="on"] #mobile-menu-btn { display: none !important; }
+
+body[data-v3="on"] body, body[data-v3="on"] {
+  /* keep the grid layout intact below desktop breakpoint, but treat sidebar as fixed overlay */
+}
+
+body[data-v3="on"] .sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: auto;
+  width: 360px;
+  max-width: 100vw;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 70;
+  background: var(--s3-bg, #FAFAF6);
+  border-left: 1px solid var(--s3-rule, rgba(0,0,0,0.08));
+  border-right: none;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+  /* Reset old desktop grid behaviour */
+  display: flex;
+  flex-direction: column;
+  padding-top: 64px;
+  overflow-y: auto;
+}
+
+body[data-v3="on"].sidebar-open .sidebar {
+  transform: translateX(0);
+}
+
+/* In v3 mode, the main column takes full width — no sidebar gutter. */
+body[data-v3="on"] body {
+  grid-template-columns: 1fr !important;
+}
+body[data-v3="on"] .app-main {
+  grid-column: 1 / -1 !important;
+}
+
+/* v3 backdrop: stronger blur + softer dim per Direction B */
+body[data-v3="on"] .sidebar-backdrop {
+  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 65;
+}
+
+/* In v3 mode, hide the sidebar-toggle (collapse arrow inside sidebar header)
+   because there's no "collapsed" state in drawer mode. */
+body[data-v3="on"] .sidebar-toggle { display: none; }
+
+/* On mobile in v3, drawer is full width */
+@media (max-width: 720px) {
+  body[data-v3="on"] .sidebar { width: 100vw; }
+  body[data-v3="on"] .v3-menu-btn { top: 14px; right: 14px; }
+}

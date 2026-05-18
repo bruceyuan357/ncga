@@ -3101,6 +3101,19 @@
     sidebarBackdrop.addEventListener("click", () => {
       document.body.classList.remove("sidebar-open");
     });
+    // Stage A5: v3 trigger opens sidebar as right-drawer (same .sidebar-open class).
+    const v3MenuBtn = $("#v3-menu-btn");
+    if (v3MenuBtn) {
+      v3MenuBtn.addEventListener("click", () => {
+        document.body.classList.add("sidebar-open");
+      });
+    }
+    // Esc closes the drawer (also useful for the mobile drawer).
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("sidebar-open")) {
+        document.body.classList.remove("sidebar-open");
+      }
+    });
   }
 
   function bindWorkbench() {

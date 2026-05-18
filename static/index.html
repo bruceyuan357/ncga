@@ -129,6 +129,12 @@
 
     <main class="app-main">
 
+      <!-- v3 fixed menu trigger (Stage A5). Sits top-right outside layout flow,
+           only displays when body[data-v3="on"]. Opens the sidebar-as-drawer. -->
+      <button type="button" class="v3-menu-btn" id="v3-menu-btn" aria-label="打开菜单" aria-controls="sidebar-as-drawer">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+
       <!-- v3「随四时」 hero (Stage A4). Only renders when body[data-v3="on"].
            Activate via URL ?v3=1 or localStorage.setItem("ncga.v3","1").
            Photo + caption populated by app.js updateV3Hero() on variety change. -->
