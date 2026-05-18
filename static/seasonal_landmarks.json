@@ -1,0 +1,268 @@
+{
+  "_meta": {
+    "generated": "2026-05-18",
+    "count": 40,
+    "schema": "variety_key -> { spring|summer|autumn|winter: { url, landmark, location, caption } }",
+    "notes": "Stage A1 first pass — landmark URLs are reused from native_chinese_assistant/presets.py (all verified Wikimedia Commons). Season-specific photo sourcing via Wikimedia Commons category search is a follow-up enhancement (separate commit). The current dataset gives v3 a working seasonal hero for all 40 (variety x season) combinations; the palette tint + caption do the seasonal heavy-lifting."
+  },
+  "standard_putonghua": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Hall_of_Supreme_Harmony_%2820241127120000%29.jpg?width=2400",
+      "landmark": "故宫 · 太和殿",
+      "location": "北京",
+      "caption": "春日的紫禁城,檐角飞燕"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Longevity_Hill_of_the_Summer_Palace.jpg?width=2400",
+      "landmark": "颐和园 · 万寿山",
+      "location": "北京",
+      "caption": "盛夏昆明湖,荷风送香"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Huangshan_fengjing.jpg?width=2400",
+      "landmark": "黄山 · 群峰",
+      "location": "安徽",
+      "caption": "秋色染峰,云海初凝"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/The_Great_Wall_of_China_at_Jinshanling-edit.jpg?width=2400",
+      "landmark": "万里长城 · 金山岭",
+      "location": "河北",
+      "caption": "冬日长城,雪覆烽烟"
+    }
+  },
+  "beijing_mandarin": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Beihai_Park_2.jpg?width=2400",
+      "landmark": "北海公园",
+      "location": "北京",
+      "caption": "春风拂柳,白塔映水"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/IMG_3084_Hutong_seen_from_Drum_Tower_Beijing_august_2007.JPG?width=2400",
+      "landmark": "胡同 · 鼓楼俯瞰",
+      "location": "北京",
+      "caption": "夏夜胡同,蝉鸣声起"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Temple_of_Heaven_20160323_01.jpg?width=2400",
+      "landmark": "天坛 · 祈年殿",
+      "location": "北京",
+      "caption": "秋阳金顶,古柏苍苍"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Beijing_Drum_Tower_viewed_from_Beijing_Bell_Tower.jpg?width=2400",
+      "landmark": "钟鼓楼",
+      "location": "北京",
+      "caption": "冬至钟声,城角薄霜"
+    }
+  },
+  "dongbei_mandarin": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Songhua_River_1.JPG?width=2400",
+      "landmark": "松花江畔",
+      "location": "哈尔滨",
+      "caption": "春融化冰,江水初开"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Baitou_Mountain_Tianchi.jpg?width=2400",
+      "landmark": "长白山 · 天池",
+      "location": "吉林",
+      "caption": "盛夏天池,云水一色"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Paektu-san.jpg?width=2400",
+      "landmark": "长白山 · 秋林",
+      "location": "吉林",
+      "caption": "山林尽染,白桦凝金"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Harbin_Ice_Festival.jpg?width=2400",
+      "landmark": "哈尔滨冰雪节",
+      "location": "哈尔滨",
+      "caption": "冰城灯火,雪夜流光"
+    }
+  },
+  "sichuan_chongqing_mandarin": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Giant_Panda_2004-03-2.jpg?width=2400",
+      "landmark": "卧龙 · 大熊猫",
+      "location": "四川",
+      "caption": "春竹新发,憨态可掬"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/%E5%B3%A8%E7%9C%89%E5%B1%B1%E9%A3%8E%E6%99%AF%E5%8C%BA_Mount_Emei_Scenic_Area_07.jpg?width=2400",
+      "landmark": "峨眉山",
+      "location": "四川",
+      "caption": "夏云出岫,翠峰染雾"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/1_nuorilang_jiuzhaigou_2023.jpg?width=2400",
+      "landmark": "九寨沟 · 诺日朗",
+      "location": "四川",
+      "caption": "九寨秋色,五彩共一池"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Hongya_Cave_20180520.jpg?width=2400",
+      "landmark": "洪崖洞",
+      "location": "重庆",
+      "caption": "冬夜山城,千灯映江"
+    }
+  },
+  "jianghuai_or_lower_yangtze_mandarin": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Hall_of_Sun_Yat-sen_Mausoleum.jpg?width=2400",
+      "landmark": "中山陵 · 梅花山",
+      "location": "南京",
+      "caption": "春樱漫山,陵阙肃穆"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Thin_West_Lake_south_entrance.JPG?width=2400",
+      "landmark": "瘦西湖",
+      "location": "扬州",
+      "caption": "夏荷盈池,画舫轻摇"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/South_Lake_of_Hongcun_20141110.JPG?width=2400",
+      "landmark": "宏村 · 南湖",
+      "location": "安徽 · 黟县",
+      "caption": "秋村粉墙,水镜映瓦"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/2024Apr_-_Nanjing_City_Wall_--_south_section_-_img_04.jpg?width=2400",
+      "landmark": "南京城墙",
+      "location": "南京",
+      "caption": "冬阳照壁,古砖凝霜"
+    }
+  },
+  "guangdong_mandarin": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/%E5%B9%BF%E5%B7%9E%E5%A1%94Scenery_in_Guangzhou%2C_China_-_panoramio_%289%29.jpg?width=2400",
+      "landmark": "广州塔",
+      "location": "广州",
+      "caption": "春雨新霁,小蛮腰映珠江"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/ShamianIsland.JPG?width=2400",
+      "landmark": "沙面岛",
+      "location": "广州",
+      "caption": "夏树成荫,百年洋楼"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Chen_Clan_Ancestral_Hall_2025.06_03.jpg?width=2400",
+      "landmark": "陈家祠",
+      "location": "广州",
+      "caption": "秋瓦灰檐,木雕静默"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Pearl_river%2C_Guangzhou.JPG?width=2400",
+      "landmark": "珠江夜景",
+      "location": "广州",
+      "caption": "冬夜珠江,灯影摇红"
+    }
+  },
+  "shanghai_mandarin_style": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/2024-Apr_Shanghai_Yu_Yuan_Garden_%E8%B1%AB%E5%9B%AD_-_img_20.jpg?width=2400",
+      "landmark": "豫园 · 春景",
+      "location": "上海",
+      "caption": "春至豫园,粉墙映嫩绿"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Promenade_du_Bund.jpg?width=2400",
+      "landmark": "外滩",
+      "location": "上海",
+      "caption": "夏夜外滩,黄浦灯火"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/East_Nanjing_Road_2020_%2850361842166%29.jpg?width=2400",
+      "landmark": "南京东路",
+      "location": "上海",
+      "caption": "秋日街市,梧桐金黄"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Shanghai_Tower_in_2015_%282%29.jpg?width=2400",
+      "landmark": "陆家嘴 · 上海中心",
+      "location": "上海",
+      "caption": "冬夜陆家嘴,云顶可览"
+    }
+  },
+  "cantonese_written": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Tsim_Sha_Tsui_Overview_2018.jpg?width=2400",
+      "landmark": "尖沙咀",
+      "location": "香港",
+      "caption": "春暖海湾,船笛悠悠"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/HK_YTM_%E8%A5%BF%E4%B9%9D%E9%BE%8D%E6%96%87%E5%8C%96%E5%8D%80_West_Kowloon_Cultural_District_M%2B_Plus_Museum_%E5%A4%A9%E5%8F%B0%E8%8A%B1%E5%9C%92_roof_garden_view_Victoria_Harbour_July_2022_Px3_13.jpg?width=2400",
+      "landmark": "维多利亚港",
+      "location": "香港",
+      "caption": "盛夏维港,云涌天际"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Lionrock.jpg?width=2400",
+      "landmark": "狮子山",
+      "location": "香港",
+      "caption": "秋天狮山,城外远眺"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Tian_Tan_Buddha_by_Beria.jpg?width=2400",
+      "landmark": "天坛大佛",
+      "location": "香港 · 大屿山",
+      "caption": "冬雾大屿,佛影禅心"
+    }
+  },
+  "hokkien_written": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Alishan_National_Scenic_Area_sign_20160208b.jpg?width=2400",
+      "landmark": "阿里山",
+      "location": "台湾 · 嘉义",
+      "caption": "春樱漫山,神木迎风"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Sun_Moon_Lake_Sentinel-2B_MSI_2024-04-04.jpg?width=2400",
+      "landmark": "日月潭",
+      "location": "台湾 · 南投",
+      "caption": "夏潭澄碧,云山倒影"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Eternal_Spring_Shrine_in_Taroko.JPG?width=2400",
+      "landmark": "太鲁阁 · 长春祠",
+      "location": "台湾 · 花莲",
+      "caption": "秋峡飞瀑,赤崖凝霞"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/180124_Jiufen%2C_Taiwan_%E4%B9%9D%E4%BB%BD.jpg?width=2400",
+      "landmark": "九份山城",
+      "location": "台湾 · 新北",
+      "caption": "冬夜九份,红灯逐巷"
+    }
+  },
+  "minnan_written": {
+    "spring": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/%E9%BC%93%E6%B5%AA%E5%B1%BF_-_panoramio.jpg?width=2400",
+      "landmark": "鼓浪屿",
+      "location": "厦门",
+      "caption": "春风琴岛,老洋房静默"
+    },
+    "summer": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Wuyi_Mountains_Sea_of_clouds_4.jpg?width=2400",
+      "landmark": "武夷山 · 云海",
+      "location": "福建 · 南平",
+      "caption": "夏雨过后,峰浮云上"
+    },
+    "autumn": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Hakka_china.jpg?width=2400",
+      "landmark": "永定土楼",
+      "location": "福建 · 龙岩",
+      "caption": "秋阳土楼,夯墙凝光"
+    },
+    "winter": {
+      "url": "https://commons.wikimedia.org/wiki/Special:FilePath/Xiamen_night_cityscape_2018_-_Flickr_-_Jaykhuang.jpg?width=2400",
+      "landmark": "厦门 · 鹭岛夜景",
+      "location": "厦门",
+      "caption": "冬夜鹭岛,海风带温"
+    }
+  }
+}

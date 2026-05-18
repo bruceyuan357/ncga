@@ -436,6 +436,44 @@
     if (SETTINGS.bgMode === "rotate") startBgRotate(varietyKey);
   }
 
+  // v3「随四时」 Stage A1 — seasonal landmark dataset (40 entries, lazy-loaded).
+  // Schema: SEASONAL_LANDMARKS[variety_key][season] = { url, landmark, location, caption }
+  let SEASONAL_LANDMARKS = null;
+  let SEASONAL_LANDMARKS_LOADING = false;
+
+  async function loadSeasonalLandmarks() {
+    if (SEASONAL_LANDMARKS || SEASONAL_LANDMARKS_LOADING) return SEASONAL_LANDMARKS;
+    SEASONAL_LANDMARKS_LOADING = true;
+    try {
+      const res = await fetch("/static/seasonal_landmarks.json", { credentials: "same-origin" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      // Strip _meta envelope
+      delete data._meta;
+      SEASONAL_LANDMARKS = data;
+      // Re-render hero if v3 is active and a variety is selected,
+      // so the upgraded seasonal entry takes effect immediately.
+      if (document.body.getAttribute("data-v3") === "on") {
+        const sel = $("#variety");
+        if (sel && sel.value) applyBackgroundFor(sel.value);
+      }
+    } catch (e) {
+      // Silent — v3 hero falls back to presets.py first landmark.
+      console.warn("seasonal_landmarks load failed", e);
+      SEASONAL_LANDMARKS = {};  // empty cache, stop retrying
+    } finally {
+      SEASONAL_LANDMARKS_LOADING = false;
+    }
+    return SEASONAL_LANDMARKS;
+  }
+
+  function getSeasonalEntry(varietyKey, season) {
+    if (!SEASONAL_LANDMARKS) return null;
+    const byVariety = SEASONAL_LANDMARKS[varietyKey];
+    if (!byVariety) return null;
+    return byVariety[season] || null;
+  }
+
   // v3「随四时」 Stage A7 — 16 首古诗,4 季 × 4 首。
   // 选诗策略:按"年内第几天 + 季节槽数"日级稳定,每天午夜换一句不闪。
   const SEASONAL_VERSES = {
@@ -473,25 +511,35 @@
   }
 
   // v3「随四时」: render hero photo + caption based on current variety + season.
+  // Prefers SEASONAL_LANDMARKS[variety][season] (Stage A1 dataset).
+  // Falls back to the variety's first preset landmark if the dataset isn't
+  // loaded yet or doesn't cover the variety.
   function updateV3Hero(varietyKey, landmark) {
-    if (!varietyKey || !landmark) return;
+    if (!varietyKey) return;
     const v = VARIETIES[varietyKey];
     if (!v) return;
     const season = currentSeason();
     const seasonZh = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" }[season] || "—";
     const year = new Date().getFullYear();
+
+    // Resolve photo source: seasonal entry > caller-supplied landmark > nothing
+    const seasonal = getSeasonalEntry(varietyKey, season);
+    const photoUrl = (seasonal && seasonal.url) || (landmark && landmark.url) || null;
+    const landmarkLabel = (seasonal && seasonal.landmark) || (landmark && landmark.name) || "—";
+    const locationLabel = (seasonal && seasonal.location) || v.label || "";
+
     const photo = $("#v3-hero-photo");
     const metaPlace = $("#v3-hero-meta-place");
     const metaSeason = $("#v3-hero-meta-season");
     const metaYear = $("#v3-hero-meta-year");
     const headline = $("#v3-hero-headline");
-    if (photo && landmark.url) {
-      photo.style.backgroundImage = `url("${landmark.url}")`;
+    if (photo && photoUrl) {
+      photo.style.backgroundImage = `url("${photoUrl}")`;
     }
-    if (metaPlace) metaPlace.textContent = v.label || "";
+    if (metaPlace) metaPlace.textContent = locationLabel;
     if (metaSeason) metaSeason.textContent = seasonZh;
     if (metaYear) metaYear.textContent = String(year);
-    if (headline) headline.textContent = landmark.name || "—";
+    if (headline) headline.textContent = landmarkLabel;
     // Stage A7: render today's verse for the active season.
     const verseEl = $("#v3-hero-verse");
     if (verseEl) {
@@ -3227,6 +3275,8 @@
   applyVersion(SETTINGS.version);
   applySeason(currentSeason());  // v3「随四时」: set [data-season] from month
   detectV3Mode();                 // v3 preview flag from URL / localStorage
+  // Stage A1: kick off lazy load (non-blocking — falls back to preset landmarks).
+  if (document.body.getAttribute("data-v3") === "on") loadSeasonalLandmarks();
   applyFontScale(SETTINGS.fontScale);
   updateBgModePill();
 
