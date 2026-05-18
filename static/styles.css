@@ -3246,3 +3246,78 @@ body[data-v3="on"] .sidebar-toggle { display: none; }
   body[data-v3="on"] .sidebar { width: 100vw; }
   body[data-v3="on"] .v3-menu-btn { top: 14px; right: 14px; }
 }
+
+/* ============================================================
+   v3「随四时」 Stage A6 — Output card editorial styling
+   3px left accent bar (season color) · Noto Serif SC · generous whitespace
+   ============================================================ */
+
+body[data-v3="on"] .result,
+body[data-v3="on"] .result-compare-orig {
+  background: var(--s3-bg, #FAFAF6);
+  border: none;
+  border-left: 3px solid var(--s3-accent, #C04A6C);
+  border-radius: 0;
+  padding: 1.8rem 1.6rem 2rem 2rem;
+  font-family: var(--font-cn);
+  font-size: calc(1.18rem * var(--font-scale));
+  line-height: 1.85;
+  letter-spacing: 0.01em;
+  color: var(--s3-text, #1A1A1A);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+body[data-v3="on"] .result:focus {
+  outline: none;
+  border-left-width: 4px;
+  box-shadow: none;
+}
+
+body[data-v3="on"] .result:empty::before {
+  color: var(--s3-text-soft, #4F4F4D);
+  font-family: var(--font-body);
+  font-style: normal;
+  opacity: 0.55;
+}
+
+body[data-v3="on"] .result-compare-orig {
+  border-left-color: var(--s3-rule, #E6E6DF);
+}
+
+body[data-v3="on"] .result-compare-orig::before {
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  color: var(--s3-text-soft);
+}
+
+/* Page padding more generous in v3 (editorial breathing room) */
+body[data-v3="on"] .page {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 2.8rem;
+  padding-bottom: 4rem;
+}
+
+/* Hide watermark in v3 mode (the accent bar replaces the visual identity) */
+body[data-v3="on"] .result-watermark { display: none; }
+
+/* Section labels (v2 has `.cmdbar-title` etc) — give v3 a magazine-style subhead */
+body[data-v3="on"] .cmdbar-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+body[data-v3="on"] .cmdbar-subtitle {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--s3-text-soft);
+  opacity: 0.85;
+}
