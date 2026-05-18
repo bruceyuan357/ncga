@@ -3500,3 +3500,121 @@ body[data-v3="on"] .cmd-btn.primary:hover {
   background: var(--s3-accent-deep);
   transform: translateY(-1px);
 }
+
+/* ============================================================
+   v3 R-A3:春日装饰层 — 樱花瓣 SVG 飘落 (四季粒子总入口)
+   - .v3-season-deco 是 hero 内一个绝对定位的全覆盖层
+   - 内部装 .v3-petal × N,CSS @keyframes 缓慢飘落 + 旋转
+   - 仅在 [data-season="spring"] 时显示樱花瓣;夏/秋/冬下个 Cycle 加
+   - prefers-reduced-motion:respects user accessibility preference
+   ============================================================ */
+
+body[data-v3="on"] .v3-season-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;                 /* on top of photo, under caption */
+}
+
+/* 樱花瓣:用 SVG data-URI 内嵌,避免外部请求,CSP friendly */
+body[data-v3="on"][data-season="spring"] .v3-petal {
+  position: absolute;
+  top: -8%;
+  width: 18px;
+  height: 18px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2 C 14 6 18 8 22 8 C 18 10 16 14 16 18 C 14 14 10 14 8 18 C 8 14 6 10 2 8 C 6 8 10 6 12 2 Z' fill='%23F4B3C6' opacity='0.85'/></svg>");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.78;
+  animation-name: v3-petal-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* 8 朵樱花,错开位置 + 时长 + 延迟,看上去自然飘 */
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(1) {
+  left: 6%;  animation-duration: 16s; animation-delay: 0s;
+  --x-drift: 30px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(2) {
+  left: 18%; animation-duration: 22s; animation-delay: 3s;
+  width: 14px; height: 14px; --x-drift: -25px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(3) {
+  left: 33%; animation-duration: 19s; animation-delay: 1.5s;
+  --x-drift: 40px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(4) {
+  left: 47%; animation-duration: 24s; animation-delay: 6s;
+  width: 20px; height: 20px; --x-drift: -30px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(5) {
+  left: 62%; animation-duration: 17s; animation-delay: 2s;
+  --x-drift: 35px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(6) {
+  left: 75%; animation-duration: 21s; animation-delay: 4.5s;
+  width: 16px; height: 16px; --x-drift: -40px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(7) {
+  left: 86%; animation-duration: 18s; animation-delay: 0.8s;
+  --x-drift: 28px;
+}
+body[data-v3="on"][data-season="spring"] .v3-petal:nth-child(8) {
+  left: 94%; animation-duration: 23s; animation-delay: 5s;
+  width: 14px; height: 14px; --x-drift: -22px;
+}
+
+@keyframes v3-petal-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% { opacity: 0.78; }
+  100% {
+    transform: translate3d(var(--x-drift, 30px), 110vh, 0) rotate(540deg);
+    opacity: 0.6;
+  }
+}
+
+/* 尊重无障碍偏好:停止飘落 */
+@media (prefers-reduced-motion: reduce) {
+  body[data-v3="on"] .v3-petal {
+    animation: none;
+    display: none;
+  }
+}
+
+/* 春日嫩柳绿装饰条:输出卡左下角加细绿线 */
+body[data-v3="on"][data-season="spring"] .result::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 80px;
+  height: 2px;
+  background: var(--s3-accent-2, #8FB99B);
+  opacity: 0.7;
+  transition: width 0.3s ease;
+}
+body[data-v3="on"][data-season="spring"] .result:hover::after {
+  width: 140px;
+}
+
+/* hero 顶部加一行节令的副 banner(更显春日仪式感) */
+body[data-v3="on"] .v3-hero-caption {
+  position: relative;
+}
+body[data-v3="on"][data-season="spring"] .v3-hero-meta-solar {
+  /* 春节气小章用嫩绿底,跟瓣的粉对比清新 */
+  border-color: rgba(143, 185, 155, 0.7);
+  background: rgba(143, 185, 155, 0.15);
+}
+
+/* 给 cmd-btn primary 加春日嫩绿光晕(focus 态),春天才有 */
+body[data-v3="on"][data-season="spring"] .cmd-btn.primary:focus-visible {
+  outline: 2px solid var(--s3-accent-2);
+  outline-offset: 3px;
+}

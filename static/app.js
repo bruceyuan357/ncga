@@ -596,8 +596,27 @@
         document.body.setAttribute("data-v3", "on");
         const hero = $("#v3-hero");
         if (hero) hero.setAttribute("aria-hidden", "false");
+        // R-A3: inject 8 petal divs into deco layer (CSS handles animation per :nth-child)
+        injectSeasonDeco();
       }
     } catch (e) { /* ignore — preview flag silently disabled */ }
+  }
+
+  // R-A3: 春日装饰 — 在 .v3-season-deco 里注入 8 个 .v3-petal,CSS 飘落动画。
+  // 夏/秋/冬下个 cycle 加(同一容器换 class:.v3-firefly / .v3-mapleleaf / .v3-snowflake)
+  function injectSeasonDeco() {
+    const deco = $("#v3-season-deco");
+    if (!deco) return;
+    deco.textContent = "";          // 清旧
+    const season = currentSeason();
+    if (season === "spring") {
+      for (let i = 0; i < 8; i++) {
+        const p = document.createElement("div");
+        p.className = "v3-petal";
+        deco.appendChild(p);
+      }
+    }
+    // 夏/秋/冬留待下次 cycle:占位结构已就绪
   }
 
   function updateBgModePill() {
