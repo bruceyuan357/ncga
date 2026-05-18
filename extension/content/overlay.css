@@ -1,0 +1,8 @@
+/* extension/content/overlay.css
+ * Fallback styles — primary styling lives inside content.js's shadow root.
+ * This file is declared in manifest content_scripts so Chrome injects it,
+ * but our overlay is in a Shadow DOM and doesn't read from it. Kept as a
+ * documented hook in case a future iteration moves out of shadow.
+ *
+ * Intentionally empty (no host-page selectors).
+ */
