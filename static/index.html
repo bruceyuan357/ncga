@@ -129,6 +129,26 @@
 
     <main class="app-main">
 
+      <!-- v3「随四时」 hero (Stage A4). Only renders when body[data-v3="on"].
+           Activate via URL ?v3=1 or localStorage.setItem("ncga.v3","1").
+           Photo + caption populated by app.js updateV3Hero() on variety change. -->
+      <header class="v3-hero" id="v3-hero" aria-hidden="true">
+        <div class="v3-hero-photo" id="v3-hero-photo"></div>
+        <div class="v3-hero-tint"></div>
+        <div class="v3-hero-caption">
+          <p class="v3-hero-meta">
+            <span id="v3-hero-meta-place">上海</span>
+            <span class="sep">·</span>
+            <span id="v3-hero-meta-season">春</span>
+            <span class="sep">·</span>
+            <span id="v3-hero-meta-year">二〇二六</span>
+          </p>
+          <h2 class="v3-hero-place" id="v3-hero-headline">外滩</h2>
+          <p class="v3-hero-verse" id="v3-hero-verse">「随四时,听乡音」</p>
+          <p class="v3-hero-credit" id="v3-hero-credit">photo · Wikimedia Commons</p>
+        </div>
+      </header>
+
       <header class="cmdbar">
         <div class="cmdbar-left">
           <button type="button" class="cmd-btn ghost" id="mobile-menu-btn" aria-label="打开菜单">

@@ -407,6 +407,11 @@
   function applyBackgroundFor(varietyKey) {
     bgVersion++;  // cycle 9: invalidate any in-flight preload from previous variety
     stopBgRotate();
+
+    // v3「随四时」: hero always updates (independent of bgMode), pick the first landmark.
+    const allLandmarks = (VARIETIES[varietyKey] && VARIETIES[varietyKey].landmarks) || [];
+    if (allLandmarks.length) updateV3Hero(varietyKey, allLandmarks[0]);
+
     if (SETTINGS.bgMode === "off") {
       document.body.setAttribute("data-bg-mode", "off");
       updateLandmarkTag(null);
@@ -429,6 +434,44 @@
     updateLandmarkTag(first.name);
 
     if (SETTINGS.bgMode === "rotate") startBgRotate(varietyKey);
+  }
+
+  // v3「随四时」: render hero photo + caption based on current variety + season.
+  function updateV3Hero(varietyKey, landmark) {
+    if (!varietyKey || !landmark) return;
+    const v = VARIETIES[varietyKey];
+    if (!v) return;
+    const season = currentSeason();
+    const seasonZh = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" }[season] || "—";
+    const year = new Date().getFullYear();
+    const photo = $("#v3-hero-photo");
+    const metaPlace = $("#v3-hero-meta-place");
+    const metaSeason = $("#v3-hero-meta-season");
+    const metaYear = $("#v3-hero-meta-year");
+    const headline = $("#v3-hero-headline");
+    if (photo && landmark.url) {
+      photo.style.backgroundImage = `url("${landmark.url}")`;
+    }
+    if (metaPlace) metaPlace.textContent = v.label || "";
+    if (metaSeason) metaSeason.textContent = seasonZh;
+    if (metaYear) metaYear.textContent = String(year);
+    if (headline) headline.textContent = landmark.name || "—";
+  }
+
+  // v3 mode opt-in: URL ?v3=1 (one-time toggle, persists to localStorage),
+  // ?v3=0 to opt out, otherwise read localStorage flag. Stage A7 will flip
+  // this to default-on; for now Stage A4-A6 are preview-only.
+  function detectV3Mode() {
+    try {
+      const q = (location.search || "") + (location.hash || "");
+      if (q.indexOf("v3=1") !== -1) localStorage.setItem("ncga.v3", "1");
+      if (q.indexOf("v3=0") !== -1) localStorage.removeItem("ncga.v3");
+      if (localStorage.getItem("ncga.v3") === "1") {
+        document.body.setAttribute("data-v3", "on");
+        const hero = $("#v3-hero");
+        if (hero) hero.setAttribute("aria-hidden", "false");
+      }
+    } catch (e) { /* ignore — preview flag silently disabled */ }
   }
 
   function updateBgModePill() {
@@ -3112,6 +3155,7 @@
   syncSettingsUI();
   applyVersion(SETTINGS.version);
   applySeason(currentSeason());  // v3「随四时」: set [data-season] from month
+  detectV3Mode();                 // v3 preview flag from URL / localStorage
   applyFontScale(SETTINGS.fontScale);
   updateBgModePill();
 

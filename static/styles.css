@@ -3031,3 +3031,121 @@ body[data-version="v1"] .scenario-chip.is-active {
   font-size: 0.9rem;
 }
 .saved-phrases-empty i { color: var(--gold); margin: 0 0.25rem; }
+
+/* ============================================================
+   v3「随四时」 Cinematic Editorial — Stage A4: Hero + caption
+   Activated by body[data-v3="on"]; else hidden so v1/v2 untouched.
+   Toggle via URL ?v3=1 or localStorage.setItem("ncga.v3","1").
+   ============================================================ */
+
+.v3-hero { display: none; }
+
+body[data-v3="on"] .v3-hero {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 40vh;
+  min-height: 280px;
+  overflow: hidden;
+  background-color: var(--s3-bg);
+  z-index: 5;
+}
+
+body[data-v3="on"] .v3-hero-photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  /* season tint overlay sits inside ::after */
+}
+
+body[data-v3="on"] .v3-hero-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.55) 0%,
+    rgba(0,0,0,0.20) 35%,
+    rgba(0,0,0,0.05) 70%,
+    rgba(0,0,0,0.00) 100%);
+  pointer-events: none;
+}
+
+body[data-v3="on"] .v3-hero-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--s3-hero-tint);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+body[data-v3="on"] .v3-hero-caption {
+  position: absolute;
+  left: clamp(20px, 5vw, 48px);
+  bottom: clamp(20px, 4vh, 40px);
+  right: clamp(20px, 5vw, 48px);
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 70ch;
+}
+
+body[data-v3="on"] .v3-hero-meta {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+body[data-v3="on"] .v3-hero-meta .sep {
+  margin: 0 0.6em;
+  opacity: 0.6;
+}
+
+body[data-v3="on"] .v3-hero-place {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 5vw, 56px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+body[data-v3="on"] .v3-hero-verse {
+  font-family: var(--font-cn);
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(15px, 2vw, 19px);
+  line-height: 1.6;
+  opacity: 0.92;
+  margin-top: 0.4rem;
+}
+
+body[data-v3="on"] .v3-hero-credit {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  align-self: flex-end;
+}
+
+/* Push the existing layout below the hero in v3 mode. The hero is now part
+   of the document flow (not fixed), so app-main just continues underneath. */
+body[data-v3="on"] .app-main {
+  /* No extra padding needed — hero is in normal flow. */
+}
+
+/* Hide background-stage in v3 mode — hero serves as the visual anchor. */
+body[data-v3="on"] .bg-stage { display: none; }
+
+/* Reduce desktop hero on small screens (vertical balance) */
+@media (max-width: 720px) {
+  body[data-v3="on"] .v3-hero { height: 36vh; min-height: 240px; }
+}
