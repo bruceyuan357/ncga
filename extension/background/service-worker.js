@@ -159,7 +159,11 @@ async function callRewriteAPI(serverUrl, token, varietyKey, text) {
     throw new Error("HTTP " + res.status + (detail ? " · " + detail : ""));
   }
   const data = await res.json();
-  return data.text || data.result || "";
+  // /api/rewrite returns {"rewritten_text": "...", "target_variety": "...",
+  // "script": "...", "degraded": bool, "effective_scenario": "..."}.
+  // Bug 修正:之前硬编 data.text / data.result 都不对,导致永远返回空字符串
+  // → popup 和 overlay 都显空白("无输出"报告)。
+  return data.rewritten_text || data.text || data.result || "";
 }
 
 async function sendToTab(tabId, msg) {
