@@ -3203,9 +3203,27 @@ body[data-v3="on"].sidebar-open .v3-menu-btn {
   pointer-events: none;
 }
 
-/* In v3 mode: hide the always-visible left sidebar by default, hide cmdbar
-   mobile menu button. The sidebar is reused as a slide-from-right drawer. */
-body[data-v3="on"] #mobile-menu-btn { display: none !important; }
+/* In v3 mode: the sidebar is a slide-from-right drawer.
+   M8 fix (重叠 bug):原本隐 #mobile-menu-btn 改用 fixed 浮动 .v3-menu-btn,
+   但浮动按钮 z-index 60 覆在 cmdbar(z 20) 上跟「立即重写」视觉重叠。
+   现在反过来:cmdbar 内置 ☰ 始终显示,浮动按钮一律隐藏。 */
+body[data-v3="on"] #mobile-menu-btn {
+  display: inline-flex !important;
+  background: transparent;
+  border: 1px solid var(--s3-rule);
+  color: var(--s3-text-soft);
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+body[data-v3="on"] #mobile-menu-btn:hover {
+  background: var(--s3-bg-soft);
+  color: var(--s3-accent-deep);
+}
+body[data-v3="on"] .v3-menu-btn { display: none !important; }
 
 body[data-v3="on"] body, body[data-v3="on"] {
   /* keep the grid layout intact below desktop breakpoint, but treat sidebar as fixed overlay */
