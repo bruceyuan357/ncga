@@ -137,6 +137,7 @@ def build_system_prompt(
     strict_json: bool = False,
     addendum_override: str | None = None,
     glossary_lines: list[str] | None = None,
+    example_lines: list[str] | None = None,
 ) -> str:
     """Compose the system prompt.
 
@@ -145,6 +146,11 @@ def build_system_prompt(
       (used by the self-improving prompt system)
     - glossary_lines: brand-voice term substitutions, one per line as
       "中文 → 方言写法"; injected as an extra rule
+
+    Cycle 22 Stage C addition:
+    - example_lines: few-shot retrieved corpus pairs, one per line. Injected as
+      【本地人示例】 block — they show the model concrete (原文 → 本地说法) so
+      it doesn't have to guess what "上海话风格" feels like.
     """
     # f-string: no .format() ⇒ literal `{` / `}` in metadata strings can never break templating.
     header = _SYSTEM_PROMPT_HEADER.replace("{label}", metadata.label)
@@ -156,6 +162,16 @@ def build_system_prompt(
         f"【风格指引】{metadata.style_notes}\n\n"
         f"{addendum}\n\n"
     )
+    if example_lines:
+        # Filter empty/whitespace lines; injected RIGHT BEFORE glossary so the
+        # model has concrete examples to absorb before any explicit rules.
+        filtered = [ln for ln in example_lines if ln and ln.strip()]
+        if filtered:
+            joined = "\n".join(filtered)
+            body += (
+                "【本地人示例】（参考这些真实的本地说法,不要逐字复制,要学语气和句式）\n"
+                f"{joined}\n\n"
+            )
     if glossary_lines:
         joined = "\n".join(f"  · {ln}" for ln in glossary_lines if ln.strip())
         if joined:
@@ -541,6 +557,23 @@ class ChatCompletionsClient:
         glossary_lines: list[str] | None = None,
     ) -> dict[str, Any]:
         metadata = PRESET_METADATA[target]
+        # Cycle 22 Stage C: retrieve few-shot examples from corpus (zero-dep BM25).
+        # Disabled when NCGA_CORPUS_DISABLE=1 or corpus file missing/empty.
+        example_lines: list[str] | None = None
+        try:
+            from native_chinese_assistant.corpus import (
+                format_examples_for_prompt,
+                get_default_retriever,
+            )
+
+            retriever = get_default_retriever()
+            if retriever is not None:
+                hits = retriever.retrieve(text, target.value, top_k=3)
+                if hits:
+                    example_lines = format_examples_for_prompt(hits)
+        except Exception:
+            # Corpus is an enhancement; never fail rewrite because retrieval broke.
+            example_lines = None
         return {
             "model": self.config.model,
             "messages": [
@@ -552,6 +585,7 @@ class ChatCompletionsClient:
                         strict_json=strict_json,
                         addendum_override=addendum_override,
                         glossary_lines=glossary_lines,
+                        example_lines=example_lines,
                     ),
                 },
                 {"role": "user", "content": build_user_prompt(text, target)},
