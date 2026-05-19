@@ -209,8 +209,16 @@ async function sendToTab(tabId, msg) {
     });
     await chrome.tabs.sendMessage(tabId, msg);
   } catch (e2) {
-    // Can't inject on chrome:// / Chrome Web Store / pdf viewer / etc.
-    console.warn("ncga: could not inject content script into tab", tabId, e2 && e2.message);
+    // Most likely: host_permissions doesn't cover this domain AND activeTab
+    // wasn't triggered (e.g. message came from non-user-gesture path).
+    // Or: page is chrome:// / Chrome Web Store / pdf viewer (un-injectable).
+    console.error(
+      "ncga: failed to inject content script into tab",
+      tabId,
+      "— err:",
+      e2 && e2.message,
+      "(若是普通网页,请确认 manifest 已含 activeTab + 是从右键/popup 触发)"
+    );
   }
 }
 
