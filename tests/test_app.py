@@ -2752,5 +2752,130 @@ class SSLSkipWarningTests(unittest.TestCase):
             self.assertTrue(any("SKIP_SSL_VERIFY" in msg for msg in cm.output))
 
 
+class CorpusAndRetrievalTests(unittest.TestCase):
+    """Cycle 22 Stage C: corpus + BM25 + system-prompt injection."""
+
+    def setUp(self) -> None:
+        from native_chinese_assistant.corpus import _reset_default_retriever_for_tests
+        _reset_default_retriever_for_tests()
+
+    def tearDown(self) -> None:
+        os.environ.pop("NCGA_CORPUS_DISABLE", None)
+        os.environ.pop("NCGA_CORPUS_PATH", None)
+        from native_chinese_assistant.corpus import _reset_default_retriever_for_tests
+        _reset_default_retriever_for_tests()
+
+    def test_corpus_jsonl_loads_and_has_100_entries(self) -> None:
+        from native_chinese_assistant.corpus import load_corpus
+        entries = load_corpus()
+        self.assertEqual(len(entries), 100, "data/corpus.jsonl should have exactly 100 entries")
+        varieties = {e.variety for e in entries}
+        self.assertEqual(len(varieties), 10, f"expected 10 varieties, got {varieties}")
+        for e in entries:
+            self.assertIn(e.quality_tier, ("verified", "needs_review"))
+
+    def test_bm25_returns_most_similar_entry_first(self) -> None:
+        from native_chinese_assistant.corpus import BM25Retriever, load_corpus
+        r = BM25Retriever(load_corpus())
+        hits = r.retrieve("能不能借你的东西用一下", "shanghai_mandarin_style", top_k=3)
+        self.assertGreaterEqual(len(hits), 1)
+        self.assertEqual(hits[0].scenario, "request")
+
+    def test_bm25_isolates_by_variety(self) -> None:
+        from native_chinese_assistant.corpus import BM25Retriever, load_corpus
+        r = BM25Retriever(load_corpus())
+        hits_sh = r.retrieve("今天天气真好", "shanghai_mandarin_style", top_k=3)
+        hits_bj = r.retrieve("今天天气真好", "beijing_mandarin", top_k=3)
+        for h in hits_sh:
+            self.assertEqual(h.variety, "shanghai_mandarin_style")
+        for h in hits_bj:
+            self.assertEqual(h.variety, "beijing_mandarin")
+        self.assertNotEqual(hits_sh[0].rewrite, hits_bj[0].rewrite)
+
+    def test_bm25_empty_query_falls_back_to_first_entries(self) -> None:
+        from native_chinese_assistant.corpus import BM25Retriever, load_corpus
+        r = BM25Retriever(load_corpus())
+        hits = r.retrieve("", "beijing_mandarin", top_k=3)
+        self.assertEqual(len(hits), 3)
+
+    def test_bm25_unknown_variety_returns_empty(self) -> None:
+        from native_chinese_assistant.corpus import BM25Retriever, load_corpus
+        r = BM25Retriever(load_corpus())
+        hits = r.retrieve("anything", "not_a_real_variety", top_k=3)
+        self.assertEqual(hits, [])
+
+    def test_system_prompt_includes_examples_when_provided(self) -> None:
+        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.rewrite import build_system_prompt
+        prompt = build_system_prompt(
+            PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
+            scenario=Scenario.FRIENDS_CASUAL,
+            example_lines=[
+                "  · 原文「测试」 → 本地人会说「特斯特」",
+                "  · 原文「再来一个」 → 本地人会说「再来个」",
+            ],
+        )
+        self.assertIn("【本地人示例】", prompt)
+        self.assertIn("特斯特", prompt)
+        self.assertIn("再来个", prompt)
+
+    def test_system_prompt_omits_examples_block_when_none(self) -> None:
+        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.rewrite import build_system_prompt
+        prompt = build_system_prompt(
+            PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
+            scenario=Scenario.FRIENDS_CASUAL,
+            example_lines=None,
+        )
+        self.assertNotIn("【本地人示例】", prompt)
+
+    def test_system_prompt_filters_blank_example_lines(self) -> None:
+        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.rewrite import build_system_prompt
+        prompt = build_system_prompt(
+            PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
+            scenario=Scenario.FRIENDS_CASUAL,
+            example_lines=["", "   "],
+        )
+        self.assertNotIn("【本地人示例】", prompt)
+
+    def test_corpus_disable_env_returns_none_retriever(self) -> None:
+        from native_chinese_assistant.corpus import get_default_retriever
+        os.environ["NCGA_CORPUS_DISABLE"] = "1"
+        r = get_default_retriever()
+        self.assertIsNone(r)
+
+    def test_corpus_custom_path_via_env(self) -> None:
+        from native_chinese_assistant.corpus import get_default_retriever
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
+            f.write('{"variety":"beijing_mandarin","scenario":"x","original":"orig","rewrite":"rew","quality_tier":"verified"}\n')
+            tmp_path = f.name
+        try:
+            os.environ["NCGA_CORPUS_PATH"] = tmp_path
+            r = get_default_retriever()
+            self.assertIsNotNone(r)
+            assert r is not None
+            self.assertEqual(r.variety_size("beijing_mandarin"), 1)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_tokenizer_emits_cjk_chars_and_bigrams(self) -> None:
+        from native_chinese_assistant.corpus import _tokenize
+        toks = _tokenize("今天好")
+        self.assertIn("今", toks)
+        self.assertIn("天", toks)
+        self.assertIn("好", toks)
+        self.assertIn("今天", toks)
+        self.assertIn("天好", toks)
+
+    def test_tokenizer_handles_mixed_cjk_ascii(self) -> None:
+        from native_chinese_assistant.corpus import _tokenize
+        toks = _tokenize("用 Python 跑")
+        self.assertIn("python", toks)
+        self.assertIn("用", toks)
+        self.assertIn("跑", toks)
+
+
 if __name__ == "__main__":
     unittest.main()

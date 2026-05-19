@@ -57,6 +57,28 @@ python app.py                          # http://127.0.0.1:8000
 | `NCGA_HOST` | `127.0.0.1` | 监听地址 |
 | `NCGA_PORT` | `8000` | 监听端口 |
 | `NCGA_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
+| `NCGA_CORPUS_PATH` | `data/corpus.jsonl` | Cycle 22 Stage C: 语料库 JSONL 路径(覆盖默认) |
+| `NCGA_CORPUS_DISABLE` | — | Cycle 22 Stage C: 设 `1` 关掉 few-shot 注入(回到无示例 prompt) |
+
+## 语料库与少样本注入 (Cycle 22 Stage C)
+
+`data/corpus.jsonl` 是手写的方言语料(100 条:10 方言 × 10 场景),每条:
+```json
+{"variety":"shanghai_mandarin_style","scenario":"request","original":"我能借一下你的笔吗","rewrite":"支笔借拨我用一道好伐","quality_tier":"verified","notes":"拨+用一道+伐"}
+```
+
+每次 `/api/rewrite` 调用时,后端用纯 stdlib BM25(`native_chinese_assistant/corpus.py`)从目标方言池里检索 top-3 最像的示例,以「【本地人示例】参考这些真实的本地说法,不要逐字复制」块注入 system prompt。LLM 因此能看到具体的「原文 → 本地说法」对子,而非仅靠风格描述脑补。
+
+**当前状态**:70 条 verified(普通话/京/东北/川渝/江淮/广普/上海)+ 30 条 needs_review(粤书/台闽南/福建闽南 — 母语者欢迎 PR)。
+
+**扩到 30 条/方言**(需 `DEEPSEEK_API_KEY`):
+```bash
+python3 tools/build_corpus.py --target 30
+python3 tools/review_corpus.py        # 交互 y/n/e/s/q 审批
+```
+审批通过的进 `data/corpus.jsonl`,拒绝的进 `data/corpus_rejected.jsonl` 留作审计。
+
+**临时关掉**:`NCGA_CORPUS_DISABLE=1 python3 app.py`。
 
 ## 测试
 

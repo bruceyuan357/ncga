@@ -88,32 +88,42 @@ _NON_TOKEN_RE = re.compile(r"[\s,，。！？!?;；:：、（）()\[\]【】《�
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize for BM25: ASCII words + CJK chars + CJK char-bigrams."""
+    """Tokenize for BM25: ASCII words (lowercased) + CJK chars + CJK char-bigrams.
+
+    Walks the string accumulating either a CJK run or an ASCII run; flushes
+    whichever just ended when the char type flips. ASCII flush emits the whole
+    word as one token (lowercased). CJK flush emits each char + each adjacent
+    bigram so short Chinese inputs have enough surface overlap.
+    """
     if not text:
         return []
     tokens: list[str] = []
-    # ASCII / non-CJK words by splitting on punct
     for chunk in _NON_TOKEN_RE.split(text):
         if not chunk:
             continue
-        # CJK chars: emit each + each bigram; non-CJK: emit lowercased whole word
-        cjk_run = []
+        cjk_run: list[str] = []
+        ascii_run: list[str] = []
         for ch in chunk:
             cp = ord(ch)
             is_cjk = (
-                0x4E00 <= cp <= 0x9FFF       # CJK Unified
-                or 0x3400 <= cp <= 0x4DBF    # Extension A
-                or 0xF900 <= cp <= 0xFAFF    # Compatibility
+                0x4E00 <= cp <= 0x9FFF
+                or 0x3400 <= cp <= 0x4DBF
+                or 0xF900 <= cp <= 0xFAFF
             )
             if is_cjk:
+                if ascii_run:
+                    tokens.append("".join(ascii_run).lower())
+                    ascii_run = []
                 cjk_run.append(ch)
             else:
                 if cjk_run:
                     _emit_cjk(cjk_run, tokens)
                     cjk_run = []
-                tokens.append(ch.lower())
+                ascii_run.append(ch)
         if cjk_run:
             _emit_cjk(cjk_run, tokens)
+        if ascii_run:
+            tokens.append("".join(ascii_run).lower())
     return tokens
 
 
