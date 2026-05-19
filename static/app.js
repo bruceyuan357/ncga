@@ -195,7 +195,17 @@
       const raw = localStorage.getItem("ncga.settings.v2");
       if (!raw) return { ...DEFAULT_SETTINGS };
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...parsed, pinnedLandmark: parsed.pinnedLandmark || {} };
+      const merged = { ...DEFAULT_SETTINGS, ...parsed, pinnedLandmark: parsed.pinnedLandmark || {} };
+      // M5 follow-up: 一次性迁移老 v2 用户到 v3 默认。
+      // 仅当用户没显式选过 version(localStorage migration flag 没记)就强升。
+      try {
+        const migrated = localStorage.getItem("ncga.v3-migrated");
+        if (!migrated && merged.version === "v2") {
+          merged.version = "v3";
+          localStorage.setItem("ncga.v3-migrated", "1");
+        }
+      } catch (_) { /* ignore */ }
+      return merged;
     } catch (_) { return { ...DEFAULT_SETTINGS }; }
   }
   function saveSettings() {
