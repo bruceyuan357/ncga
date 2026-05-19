@@ -80,6 +80,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     );
     return true; // async response
   }
+  // Selection-initiated rewrite (E7: content.js auto-trigger on selection).
+  // We do NOT route through handleRewriteRequest because that path also pushes
+  // overlay-loading/overlay-result messages to the tab; the content script in
+  // selection mode handles its own overlay locally with anchor positioning.
+  // So this handler just does API call + returns text.
+  if (msg && msg.type === "ncga:rewrite-from-selection") {
+    (async () => {
+      try {
+        const cfg = await getConfig();
+        if (!cfg.serverUrl) throw new Error("请先在 Options 填服务器 URL");
+        const token = await getCachedToken();
+        if (!token) throw new Error("Token 未解锁,点扩展图标输 passphrase");
+        const result = await callRewriteAPI(cfg.serverUrl, token, msg.varietyKey, msg.text);
+        sendResponse({ ok: true, result });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e && e.message || e) });
+      }
+    })();
+    return true;
+  }
   // Options-initiated config save (after encrypting token there)
   if (msg && msg.type === "ncga:config-saved") {
     sendResponse({ ok: true });

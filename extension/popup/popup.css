@@ -102,3 +102,19 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .ftr a { color: var(--text-soft); text-decoration: none; }
 .ftr a:hover { color: var(--accent-deep); text-decoration: underline; }
 .ftr .dot { opacity: 0.4; }
+
+.toggle-row {
+  display: flex; align-items: center; gap: 0.5em;
+  padding: 0.5rem 0.6rem;
+  margin: 0 0 0.8rem;
+  background: #FCEEE8;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.toggle-row input[type=checkbox] { width: auto; margin: 0; cursor: pointer; }
+.toggle-row span { flex: 1; }

@@ -28,23 +28,22 @@
   let shadowRoot = null;
   let panelEl = null;
 
-  function ensureHost() {
-    if (hostEl) return shadowRoot;
+  /**
+   * ensureHost(anchorRect): create or reuse the overlay host.
+   * - anchorRect=null: corner mode (right-bottom of viewport, big window).
+   * - anchorRect={top,left,bottom,right,width,height}: selection mode,
+   *   absolute-positioned just BELOW the selection bbox, narrower window.
+   */
+  function ensureHost(anchorRect = null) {
+    if (hostEl) {
+      // Already exists: only re-position if anchor changed mode
+      applyHostPosition(anchorRect);
+      return shadowRoot;
+    }
     hostEl = document.createElement("div");
     hostEl.id = HOST_ID;
-    // Inline styles only on the host (Shadow won't isolate position itself).
-    hostEl.style.cssText = [
-      "all: initial",
-      "position: fixed",
-      "right: 16px",
-      "bottom: 16px",
-      "z-index: 2147483647",          // top of every page
-      "width: 380px",
-      "max-width: calc(100vw - 32px)",
-      "max-height: calc(100vh - 32px)",
-      "pointer-events: none",         // shadow content re-enables
-      "font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif",
-    ].join(";");
+    shadowRoot = hostEl.attachShadow({ mode: "open" });
+    applyHostPosition(anchorRect);
     shadowRoot = hostEl.attachShadow({ mode: "open" });
     // Internal CSS — pinned here to avoid host-page interference.
     const style = document.createElement("style");
@@ -187,8 +186,8 @@
     return shadowRoot;
   }
 
-  function renderLoading(varietyKey, sourceText) {
-    ensureHost();
+  function renderLoading(varietyKey, sourceText, anchorRect = null) {
+    ensureHost(anchorRect);
     panelEl.textContent = "";
     panelEl.appendChild(buildHeader(varietyKey, true));
     const body = document.createElement("div");
@@ -204,8 +203,8 @@
     panelEl.appendChild(body);
   }
 
-  function renderResult(varietyKey, sourceText, result) {
-    ensureHost();
+  function renderResult(varietyKey, sourceText, result, anchorRect = null) {
+    ensureHost(anchorRect);
     panelEl.textContent = "";
     panelEl.appendChild(buildHeader(varietyKey, true));
     const body = document.createElement("div");
@@ -248,8 +247,8 @@
     panelEl.appendChild(ftr);
   }
 
-  function renderError(message) {
-    ensureHost();
+  function renderError(message, anchorRect = null) {
+    ensureHost(anchorRect);
     panelEl.textContent = "";
     panelEl.appendChild(buildHeader("—", true));
     const body = document.createElement("div");
@@ -305,10 +304,115 @@
     panelEl = null;
   }
 
+  /**
+   * Position the overlay host. If anchorRect supplied, attach absolutely
+   * below the selection; otherwise float at bottom-right of viewport.
+   */
+  function applyHostPosition(anchorRect) {
+    if (!hostEl) return;
+    if (anchorRect) {
+      // Below-selection anchor; account for page scroll because we use
+      // absolute (not fixed) so the popover scrolls with the text.
+      const scrollX = window.pageXOffset || 0;
+      const scrollY = window.pageYOffset || 0;
+      const top = scrollY + anchorRect.bottom + 6;       // 6px gap
+      let left = scrollX + anchorRect.left;
+      const popWidth = Math.min(420, Math.max(280, anchorRect.width + 80));
+      // Keep popover within viewport horizontally
+      const maxLeft = scrollX + window.innerWidth - popWidth - 16;
+      if (left > maxLeft) left = Math.max(scrollX + 12, maxLeft);
+      hostEl.style.cssText = [
+        "all: initial",
+        "position: absolute",
+        `top: ${top}px`,
+        `left: ${left}px`,
+        `width: ${popWidth}px`,
+        "max-width: calc(100vw - 24px)",
+        "max-height: 60vh",
+        "z-index: 2147483647",
+        "pointer-events: none",
+        "font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif",
+      ].join(";");
+    } else {
+      hostEl.style.cssText = [
+        "all: initial",
+        "position: fixed",
+        "right: 16px",
+        "bottom: 16px",
+        "z-index: 2147483647",
+        "width: 380px",
+        "max-width: calc(100vw - 32px)",
+        "max-height: calc(100vh - 32px)",
+        "pointer-events: none",
+        "font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif",
+      ].join(";");
+    }
+  }
+
   // Esc → close overlay
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && hostEl) destroy();
   });
+
+  // Click outside the panel → close (selection-mode UX expectation)
+  document.addEventListener("mousedown", (e) => {
+    if (!hostEl) return;
+    // hostEl uses shadow DOM; e.target stays the shadow host from outside
+    if (e.target === hostEl || hostEl.contains(e.target)) return;
+    destroy();
+  });
+
+  // ============ selection-anchored auto-rewrite (E7) ============
+  // selectionchange + 300ms debounce; if user setting allows + selection ≥3 chars,
+  // ask SW to rewrite using the default variety, anchor popover under selection.
+  let selectionDebounceTimer = null;
+  let lastTriggeredText = "";
+
+  function onSelectionChange() {
+    if (selectionDebounceTimer) clearTimeout(selectionDebounceTimer);
+    selectionDebounceTimer = setTimeout(handleSelectionMaybeRewrite, 300);
+  }
+
+  async function handleSelectionMaybeRewrite() {
+    let cfg;
+    try {
+      cfg = (await chrome.storage.local.get("ncga.config.v1"))["ncga.config.v1"] || {};
+    } catch (_e) { return; }
+    if (!cfg.autoRewriteOnSelection) return;     // feature is off
+
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (text.length < 3) return;
+    // Avoid re-firing on same selection (selectionchange fires per micro-movement)
+    if (text === lastTriggeredText && hostEl) return;
+    lastTriggeredText = text;
+
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) return;
+
+    const variety = cfg.defaultVariety || "shanghai_mandarin_style";
+    // Render loading immediately at anchor
+    renderLoading(variety, text, rect);
+
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: "ncga:rewrite-from-selection",
+        varietyKey: variety,
+        text,
+      });
+      if (res && res.ok) {
+        renderResult(variety, text, res.result || "", rect);
+      } else {
+        renderError((res && res.error) || "未知错误", rect);
+      }
+    } catch (e) {
+      renderError(String(e && e.message || e), rect);
+    }
+  }
+
+  document.addEventListener("selectionchange", onSelectionChange);
 
   // ============ message bridge with background SW ============
   chrome.runtime.onMessage.addListener((msg) => {

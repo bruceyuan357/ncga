@@ -16,6 +16,34 @@ const rewriteBtn = $("#rewrite-btn");
 const resultEl = $("#result");
 const openOptions = $("#open-options");
 const lockBtn = $("#lock-btn");
+const autoToggle = $("#auto-rewrite-toggle");
+
+const CONFIG_KEY = "ncga.config.v1";
+
+async function loadAutoToggle() {
+  try {
+    const s = await chrome.storage.local.get(CONFIG_KEY);
+    const cfg = s[CONFIG_KEY] || {};
+    autoToggle.checked = !!cfg.autoRewriteOnSelection;
+    if (cfg.defaultVariety) varietySel.value = cfg.defaultVariety;
+  } catch (_e) { /* keep defaults */ }
+}
+
+autoToggle.addEventListener("change", async () => {
+  const s = await chrome.storage.local.get(CONFIG_KEY);
+  const cfg = s[CONFIG_KEY] || {};
+  cfg.autoRewriteOnSelection = autoToggle.checked;
+  await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+});
+
+varietySel.addEventListener("change", async () => {
+  // When user changes variety in popup, persist as defaultVariety for
+  // selection auto-rewrite path. No-op if config not yet saved (just stores it).
+  const s = await chrome.storage.local.get(CONFIG_KEY);
+  const cfg = s[CONFIG_KEY] || {};
+  cfg.defaultVariety = varietySel.value;
+  await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+});
 
 function showStatus(text, kind) {
   statusEl.textContent = text;
@@ -105,3 +133,4 @@ lockBtn.addEventListener("click", async (e) => {
 });
 
 refresh();
+loadAutoToggle();
