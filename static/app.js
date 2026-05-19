@@ -606,17 +606,33 @@
   // 夏/秋/冬下个 cycle 加(同一容器换 class:.v3-firefly / .v3-mapleleaf / .v3-snowflake)
   function injectSeasonDeco() {
     const deco = $("#v3-season-deco");
-    if (!deco) return;
-    deco.textContent = "";          // 清旧
-    const season = currentSeason();
-    if (season === "spring") {
-      for (let i = 0; i < 8; i++) {
-        const p = document.createElement("div");
-        p.className = "v3-petal";
-        deco.appendChild(p);
+    if (deco) {
+      deco.textContent = "";
+      const season = currentSeason();
+      if (season === "spring") {
+        for (let i = 0; i < 8; i++) {
+          const p = document.createElement("div");
+          p.className = "v3-petal";
+          deco.appendChild(p);
+        }
       }
     }
-    // 夏/秋/冬留待下次 cycle:占位结构已就绪
+    // M4: 全站樱花瓣层(独立于 hero,fixed 全 viewport,所有页面都飘)
+    injectGlobalSeasonDeco();
+  }
+
+  function injectGlobalSeasonDeco() {
+    const g = $("#v3-global-deco");
+    if (!g) return;
+    g.textContent = "";
+    const season = currentSeason();
+    if (season === "spring") {
+      for (let i = 0; i < 18; i++) {
+        const p = document.createElement("div");
+        p.className = "v3-gpetal";
+        g.appendChild(p);
+      }
+    }
   }
 
   function updateBgModePill() {

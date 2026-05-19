@@ -3886,3 +3886,98 @@ body[data-v3="on"][data-route="batch"] .batch-table th {
   background: var(--s3-bg-soft);
   color: var(--s3-text);
 }
+
+/* ============================================================
+   v3 M4:全站樱花瓣装饰(fixed 全 viewport)
+   不再受 hero 元素限制,所有页面都能看到春日装饰
+   ============================================================ */
+
+.v3-global-deco {
+  display: none;                /* 默认 hide,v3 启用才显 */
+}
+
+body[data-v3="on"] .v3-global-deco {
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 3;                   /* hero(z:5)之下,内容之上 */
+}
+
+/* 18 朵全站樱花瓣,数量增多,覆盖整个 viewport */
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal {
+  position: absolute;
+  top: -10%;
+  width: 22px;
+  height: 22px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2 C 14 6 18 8 22 8 C 18 10 16 14 16 18 C 14 14 10 14 8 18 C 8 14 6 10 2 8 C 6 8 10 6 12 2 Z' fill='%23F4B3C6' opacity='0.9'/></svg>");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.82;
+  animation-name: v3-gpetal-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* 18 朵错开:每朵不同 left% / duration / delay / 大小 / 漂移方向 */
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(1)  { left:  3%; animation-duration: 18s; animation-delay:  0s; width: 18px; height: 18px; --x-drift:  40px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(2)  { left:  9%; animation-duration: 24s; animation-delay:  3s; width: 14px; height: 14px; --x-drift: -30px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(3)  { left: 15%; animation-duration: 21s; animation-delay:  7s; width: 22px; height: 22px; --x-drift:  50px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(4)  { left: 22%; animation-duration: 19s; animation-delay:  1s; width: 16px; height: 16px; --x-drift: -45px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(5)  { left: 29%; animation-duration: 26s; animation-delay:  5s; width: 20px; height: 20px; --x-drift:  35px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(6)  { left: 35%; animation-duration: 17s; animation-delay:  9s; width: 14px; height: 14px; --x-drift: -28px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(7)  { left: 42%; animation-duration: 23s; animation-delay:  2s; width: 24px; height: 24px; --x-drift:  42px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(8)  { left: 48%; animation-duration: 20s; animation-delay:  6s; width: 18px; height: 18px; --x-drift: -38px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(9)  { left: 55%; animation-duration: 25s; animation-delay: 11s; width: 16px; height: 16px; --x-drift:  48px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(10) { left: 61%; animation-duration: 18s; animation-delay:  4s; width: 20px; height: 20px; --x-drift: -32px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(11) { left: 68%; animation-duration: 22s; animation-delay:  8s; width: 14px; height: 14px; --x-drift:  36px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(12) { left: 74%; animation-duration: 19s; animation-delay: 13s; width: 22px; height: 22px; --x-drift: -42px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(13) { left: 80%; animation-duration: 27s; animation-delay:  1s; width: 16px; height: 16px; --x-drift:  44px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(14) { left: 86%; animation-duration: 16s; animation-delay: 10s; width: 18px; height: 18px; --x-drift: -34px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(15) { left: 91%; animation-duration: 24s; animation-delay:  3s; width: 20px; height: 20px; --x-drift:  30px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(16) { left: 96%; animation-duration: 21s; animation-delay: 12s; width: 14px; height: 14px; --x-drift: -26px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(17) { left: 12%; animation-duration: 28s; animation-delay: 14s; width: 24px; height: 24px; --x-drift:  46px; }
+body[data-v3="on"][data-season="spring"] .v3-global-deco .v3-gpetal:nth-child(18) { left: 78%; animation-duration: 26s; animation-delay: 15s; width: 16px; height: 16px; --x-drift: -40px; }
+
+@keyframes v3-gpetal-fall {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+  8%   { opacity: 0.82; }
+  100% { transform: translate3d(var(--x-drift, 30px), 115vh, 0) rotate(720deg); opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-v3="on"] .v3-global-deco { display: none; }
+}
+
+/* M4 bonus: hero 顶部加春日花边淡光 — 模糊的樱粉渐变,更春日仪式感 */
+body[data-v3="on"][data-season="spring"] .v3-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(232, 155, 176, 0.4) 20%,
+    rgba(143, 185, 155, 0.35) 50%,
+    rgba(232, 155, 176, 0.4) 80%,
+    transparent 100%);
+  z-index: 4;
+}
+
+/* daily 页面顶部也加这条花边(让 daily 第一眼有春日识别) */
+body[data-v3="on"][data-season="spring"][data-route="daily"] .daily-page-wrap::before {
+  content: "";
+  display: block;
+  height: 4px;
+  margin: 0 -1.5rem 1.5rem;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--s3-accent) 30%,
+    var(--s3-accent-2) 70%,
+    transparent 100%);
+  border-radius: 999px;
+}
