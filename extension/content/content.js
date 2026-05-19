@@ -310,6 +310,7 @@
    */
   function applyHostPosition(anchorRect) {
     if (!hostEl) return;
+    overlayMode = anchorRect ? "anchor" : "corner";
     if (anchorRect) {
       // Below-selection anchor; account for page scroll because we use
       // absolute (not fixed) so the popover scrolls with the text.
@@ -349,17 +350,28 @@
     }
   }
 
-  // Esc → close overlay
+  // Mode flag: "corner" (right-click + popup paths) vs "anchor" (selection popover).
+  // Mousedown-outside auto-close only applies in anchor mode.
+  let overlayMode = "corner";
+
+  // Esc → close overlay (always)
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && hostEl) destroy();
   });
 
-  // Click outside the panel → close (selection-mode UX expectation)
+  // Outside click → only auto-close in anchor (selection) mode.
+  // In corner mode the user must click × to dismiss — otherwise the popover
+  // closes the instant they click anywhere on the page to interact with content.
+  // Also delay attaching until next tick so the SAME mousedown that produced
+  // the selection (and thus the popover) doesn't immediately trigger close.
   document.addEventListener("mousedown", (e) => {
     if (!hostEl) return;
-    // hostEl uses shadow DOM; e.target stays the shadow host from outside
+    if (overlayMode !== "anchor") return;
     if (e.target === hostEl || hostEl.contains(e.target)) return;
-    destroy();
+    // Defer to next tick so a fresh selection click doesn't kill its own popover
+    setTimeout(() => {
+      if (hostEl && overlayMode === "anchor") destroy();
+    }, 0);
   });
 
   // ============ selection-anchored auto-rewrite (E7) ============
