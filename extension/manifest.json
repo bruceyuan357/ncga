@@ -3,7 +3,6 @@
   "name": "地道中文 · NCGA",
   "version": "0.1.0",
   "description": "Rewrite selected text into 10 Chinese regional varieties via your local NCGA server. Right-click any selection → 改写为... Token stored encrypted via Web Crypto.",
-  "default_locale": "zh_CN",
 
   "icons": {
     "16": "icons/icon-16.png",
