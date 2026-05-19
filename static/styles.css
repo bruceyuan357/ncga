@@ -4127,3 +4127,129 @@ body[data-v3="on"][data-route="batch"] .page-batch {
     max-width: 1440px;
   }
 }
+
+/* ============================================================
+   v3 C1:美感微调 — 柔化硬边 / 调和 cmdbar / hero 收
+   - accent 竖条改渐变收末端
+   - cmdbar 上 primary 按钮(粉胶囊)在 v3 模式去掉粉,改 ghost outline
+   - hero 与内容衔接加一道细分隔线呼吸
+   - 卡片加 hover lift,细微但 精致
+   ============================================================ */
+
+/* 1) 输出卡竖条:hard 3px → 渐变,顶部不实底部隐 */
+body[data-v3="on"] .result,
+body[data-v3="on"] .result-compare-orig {
+  border-left: none;            /* 关掉旧的 hard 边 */
+  position: relative;
+}
+body[data-v3="on"] .result::before,
+body[data-v3="on"] .result-compare-orig::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.5rem;
+  bottom: 1.5rem;
+  width: 3px;
+  background: linear-gradient(180deg,
+    var(--s3-accent) 0%,
+    var(--s3-accent-deep) 40%,
+    var(--s3-accent-2, var(--s3-accent)) 100%);
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+/* 2) cmdbar 顶上"立即重写"在 v3 黑/亮底都太刺,改 ghost outline */
+body[data-v3="on"] .cmdbar .cmd-btn.primary {
+  background: transparent;
+  color: var(--s3-accent-deep);
+  border: 1.5px solid var(--s3-accent);
+  box-shadow: none;
+}
+body[data-v3="on"] .cmdbar .cmd-btn.primary:hover {
+  background: var(--s3-accent);
+  color: #FFFFFF;
+}
+/* 但 workbench 内的提交按钮仍保留实粉胶囊(主行为) */
+body[data-v3="on"] .workbench .cmd-btn.primary,
+body[data-v3="on"] form .cmd-btn.primary {
+  background: var(--s3-accent);
+  color: #FFFFFF;
+  border: 0;
+}
+
+/* 3) hero 与下方内容之间加一道细分隔(留白做不来的精致) */
+body[data-v3="on"] .v3-hero::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 2px;
+  background: var(--s3-accent);
+  border-radius: 999px;
+  opacity: 0.8;
+}
+
+/* 4) 卡片 hover lift(细微):整张卡上抬 2px + 阴影加深 */
+body[data-v3="on"] .settings-card,
+body[data-v3="on"] .card-daily-hero {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+body[data-v3="on"] .settings-card:hover,
+body[data-v3="on"] .card-daily-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.06);
+}
+
+/* 5) cmdbar 整体在 v3 高度收一收,文字加重 */
+body[data-v3="on"] .cmdbar {
+  padding-top: 1.1rem;
+  padding-bottom: 1.1rem;
+  margin-bottom: 0.4rem;
+}
+body[data-v3="on"] .cmdbar h1,
+body[data-v3="on"] .cmdbar .cmdbar-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* 6) 输入区 textarea 边框过亮,改更细更软 */
+body[data-v3="on"] textarea {
+  border: 1px solid var(--s3-rule);
+  background: #FFFFFF;
+  border-radius: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+body[data-v3="on"] textarea:focus {
+  outline: none;
+  border-color: var(--s3-accent);
+  box-shadow: 0 0 0 3px rgba(232, 155, 176, 0.18);
+}
+
+/* 7) sidebar 底 version-switch 三个按钮做胶囊组(原本太散) */
+body[data-v3="on"] .version-switch {
+  display: inline-flex;
+  background: var(--s3-bg-soft);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 0;
+}
+body[data-v3="on"] .version-switch .version-btn {
+  background: transparent;
+  border: 0;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  color: var(--s3-text-soft);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+body[data-v3="on"] .version-switch .version-btn.is-active {
+  background: var(--s3-accent);
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(232, 155, 176, 0.35);
+}
