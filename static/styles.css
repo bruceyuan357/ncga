@@ -3618,3 +3618,168 @@ body[data-v3="on"][data-season="spring"] .cmd-btn.primary:focus-visible {
   outline: 2px solid var(--s3-accent-2);
   outline-offset: 3px;
 }
+
+/* ============================================================
+   v3 M2:daily 首页 v3 化(摆脱 v2 黑底 + 让季节图片成主视觉)
+   关键决策:v3 hero 在 daily 路由上 HIDE(daily 自带 slideshow,
+            重复 hero 反而把图压成天花板)— 改造 daily 自己的 hero card
+   ============================================================ */
+
+/* daily 路由上不显 v3-hero,让 daily 自己的 slideshow 当主视觉 */
+body[data-v3="on"][data-route="daily"] .v3-hero {
+  display: none;
+}
+
+/* daily 页面整页改 v3 浅色 */
+body[data-v3="on"][data-route="daily"] {
+  background: var(--s3-bg);
+  color: var(--s3-text);
+}
+body[data-v3="on"][data-route="daily"] .daily-page-wrap {
+  max-width: 1180px;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* daily 主卡:从黑玻璃改成白底卡片,粉色细边,大圆角 */
+body[data-v3="on"][data-route="daily"] .card-daily-hero {
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(232, 155, 176, 0.12), 0 4px 12px rgba(0,0,0,0.04);
+  padding: 2rem 2.4rem 2.4rem;
+}
+
+/* 标题:Manrope 大字 + 樱粉小章风日期 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-title h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--s3-text);
+  letter-spacing: -0.01em;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-title i {
+  color: var(--s3-accent);
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-date {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--s3-text-soft);
+  background: var(--s3-bg-soft);
+  padding: 0.2em 0.7em;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  opacity: 1;
+}
+
+/* figure 改白底 + 季节色细边,让季节图片真正发光 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-figure {
+  border-radius: 16px;
+  background: var(--s3-bg-soft);
+  border: 2px solid var(--s3-accent);
+  box-shadow: 0 16px 40px rgba(232, 155, 176, 0.18);
+  overflow: hidden;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-slides {
+  height: 380px;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-figure figcaption {
+  background: rgba(255, 248, 244, 0.95);
+  color: var(--s3-text-soft);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 0.5rem 0.9rem;
+  border-top: 1px solid var(--s3-rule);
+}
+
+/* 谚语正文:Noto Serif SC 大号克制 + 粉色左竖条 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-original {
+  font-family: var(--font-cn);
+  font-size: 1.55rem;
+  line-height: 1.7;
+  color: var(--s3-text);
+  border-left: 4px solid var(--s3-accent);
+  padding-left: 1.2rem;
+  background: none;
+}
+
+/* 解释 / 翻译列表 / chips 全部统一浅色卡 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-meaning {
+  color: var(--s3-text-soft);
+  font-family: var(--font-cn);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+/* 翻译列表的方言卡:白底浅边,hover 渡粉 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations,
+body[data-v3="on"][data-route="daily"] .saved-phrases-card {
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+  padding: 1.4rem 1.6rem;
+}
+
+body[data-v3="on"][data-route="daily"] .daily-phrase-translation-item {
+  background: var(--s3-bg-soft);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  transition: border-color 0.2s, transform 0.15s;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-translation-item:hover {
+  border-color: var(--s3-accent);
+  transform: translateY(-1px);
+}
+
+/* daily 页面 cmdbar 在 v3:透明 + 细分隔(其他页 v3 已经这样了,这里复用) */
+body[data-v3="on"][data-route="daily"] .cmdbar {
+  background: transparent;
+  border-bottom: 1px solid var(--s3-rule);
+  padding-top: 1.4rem;
+  padding-bottom: 1.4rem;
+}
+body[data-v3="on"][data-route="daily"] .bg-mode-pill {
+  background: var(--s3-bg-soft);
+  color: var(--s3-text-soft);
+  border: 1px solid var(--s3-rule);
+}
+
+/* 保存的方言句 row 也 v3 化 */
+body[data-v3="on"][data-route="daily"] .saved-phrases-row {
+  background: var(--s3-bg-soft);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  transition: border-color 0.2s;
+}
+body[data-v3="on"][data-route="daily"] .saved-phrases-row:hover { border-color: var(--s3-accent); }
+body[data-v3="on"][data-route="daily"] .saved-phrases-quote {
+  border-left-color: var(--s3-accent);
+  color: var(--s3-text);
+  font-family: var(--font-cn);
+}
+body[data-v3="on"][data-route="daily"] .saved-phrases-meaning,
+body[data-v3="on"][data-route="daily"] .saved-phrases-row .date {
+  color: var(--s3-text-soft);
+  opacity: 0.85;
+}
+
+/* nav-item 在 v3 sidebar drawer 里也要浅色友好 */
+body[data-v3="on"] .nav-item { color: var(--s3-text); }
+body[data-v3="on"] .nav-item.is-active { background: var(--s3-bg-soft); color: var(--s3-accent-deep); }
+body[data-v3="on"] .nav-item:hover { background: var(--s3-bg-soft); }
+body[data-v3="on"] .brand,
+body[data-v3="on"] .brand-text,
+body[data-v3="on"] .sidebar-meta { color: var(--s3-text); }
+body[data-v3="on"] .brand-seal { background: var(--s3-accent); color: #fff; }
+body[data-v3="on"] .version-switch .version-btn {
+  background: var(--s3-bg-soft);
+  color: var(--s3-text-soft);
+  border: 1px solid transparent;
+}
+body[data-v3="on"] .version-switch .version-btn.is-active {
+  background: var(--s3-accent);
+  color: #fff;
+  border-color: var(--s3-accent-deep);
+}
