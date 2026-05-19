@@ -183,7 +183,7 @@
     bgMode: "rotate",
     fontScale: "1",
     highlight: "on",
-    version: "v2",
+    version: "v3",     // M1: v3「随四时」 is now the default (was v2 墨韵)
     pinnedLandmark: {},
     scenario: DEFAULT_SCENARIO,
   };
@@ -719,6 +719,24 @@
     document.body.setAttribute("data-version", v);
     SETTINGS.version = v;
     $$(".version-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.version === v));
+    // M1: v3 is the new "version" — toggle data-v3 to match.
+    // This unifies the version switcher with the previous URL-only ?v3=1 flag.
+    if (v === "v3") {
+      document.body.setAttribute("data-v3", "on");
+      try { localStorage.setItem("ncga.v3", "1"); } catch (_) {}
+      const hero = $("#v3-hero");
+      if (hero) hero.setAttribute("aria-hidden", "false");
+      injectSeasonDeco();
+      loadSeasonalLandmarks();
+      // Re-render hero for current variety if any selected
+      const sel = $("#variety");
+      if (sel && sel.value) applyBackgroundFor(sel.value);
+    } else {
+      document.body.removeAttribute("data-v3");
+      try { localStorage.removeItem("ncga.v3"); } catch (_) {}
+      const hero = $("#v3-hero");
+      if (hero) hero.setAttribute("aria-hidden", "true");
+    }
   }
   function applyFontScale(scale) {
     document.documentElement.style.setProperty("--font-scale", scale);
