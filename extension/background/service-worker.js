@@ -163,10 +163,30 @@ async function callRewriteAPI(serverUrl, token, varietyKey, text) {
 }
 
 async function sendToTab(tabId, msg) {
+  // Try sendMessage first; if no receiver (content script was never injected
+  // because the tab was opened before the extension was installed/reloaded),
+  // fall back to chrome.scripting.executeScript to inject on demand, then retry.
   try {
     await chrome.tabs.sendMessage(tabId, msg);
-  } catch (e) {
-    // tab may have navigated; swallow
+    return;
+  } catch (_e) {
+    // First send failed — likely no receiver yet. Try injecting then resending.
+  }
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content/content.js"],
+    });
+    // Inject the shadow-DOM overlay CSS too (declared in manifest but only
+    // attached to newly-loaded tabs; harmless to re-add).
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ["content/overlay.css"],
+    });
+    await chrome.tabs.sendMessage(tabId, msg);
+  } catch (e2) {
+    // Can't inject on chrome:// / Chrome Web Store / pdf viewer / etc.
+    console.warn("ncga: could not inject content script into tab", tabId, e2 && e2.message);
   }
 }
 

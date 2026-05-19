@@ -11,6 +11,18 @@
 (function () {
   "use strict";
 
+  // Re-injection guard: chrome.scripting.executeScript may run this file again
+  // on tabs that already have it from content_scripts. Without this guard,
+  // every reinject would add a duplicate chrome.runtime.onMessage listener.
+  if (window.__ncga_content_loaded__) {
+    return;
+  }
+  Object.defineProperty(window, "__ncga_content_loaded__", {
+    value: true,
+    writable: false,
+    configurable: false,
+  });
+
   const HOST_ID = "ncga-overlay-host";
   let hostEl = null;
   let shadowRoot = null;
