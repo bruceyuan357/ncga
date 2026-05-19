@@ -3783,3 +3783,106 @@ body[data-v3="on"] .version-switch .version-btn.is-active {
   color: #fff;
   border-color: var(--s3-accent-deep);
 }
+
+/* ============================================================
+   v3 M3:全局 v3 底色 + 非 daily 页 hero 重调
+   - body 在 v3 mode 总体浅暖底,告别 v2::before 那层水墨晕染
+   - bg-stage 早就 hide,这里强化:整页都浅色
+   - hero 在非 daily 页:让图片真正撑满 viewport 顶 60vh,
+     而不是被 cmdbar 推下去几屏后才能看到
+   ============================================================ */
+
+/* v3 mode 全局浅色,把 v2 body::before 那层墨色全干掉 */
+body[data-v3="on"] {
+  background: var(--s3-bg);
+  color: var(--s3-text);
+}
+body[data-v3="on"]::before { display: none; }  /* kill v2 ink wash */
+
+/* 所有页面 .page 容器在 v3 下也用 s3-bg 不要透出墨色 */
+body[data-v3="on"] .page { background: transparent; }
+
+/* hero 在 workbench / atlas / history / batch / settings 全部 60vh,
+   daily 仍 hide(M2 已处理) */
+body[data-v3="on"] .v3-hero {
+  height: 60vh;
+  min-height: 380px;
+}
+body[data-v3="on"][data-route="daily"] .v3-hero { display: none; }
+
+/* hero 与下方内容之间留一段呼吸,然后 cmdbar 浮在 hero 下方 */
+body[data-v3="on"] .v3-hero + .cmdbar {
+  margin-top: -3rem;
+  position: relative;
+  z-index: 6;
+  background: var(--s3-bg);
+  border-radius: 24px 24px 0 0;
+  padding-top: 2rem;
+}
+
+/* cmdbar 的 title 放大,跟 v3 视觉对齐 */
+body[data-v3="on"] .cmdbar-title {
+  font-size: 1.6rem;
+}
+
+/* 移动端:hero 高度让出更多给内容 */
+@media (max-width: 720px) {
+  body[data-v3="on"] .v3-hero {
+    height: 48vh;
+    min-height: 280px;
+  }
+}
+
+/* settings 页面 v3 化 — 你说「settings 里面也是」,得让 settings 也漂亮 */
+body[data-v3="on"][data-route="settings"] .page-settings {
+  padding: 2rem 1.5rem 4rem;
+  max-width: 880px;
+  margin: 0 auto;
+}
+body[data-v3="on"][data-route="settings"] .settings-card,
+body[data-v3="on"][data-route="settings"] .setting-group,
+body[data-v3="on"][data-route="settings"] .glossary-card {
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+  border-radius: 16px;
+  padding: 1.4rem 1.6rem;
+  margin-bottom: 1.4rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+}
+body[data-v3="on"][data-route="settings"] h2,
+body[data-v3="on"][data-route="settings"] h3 {
+  font-family: var(--font-display);
+  color: var(--s3-text);
+}
+body[data-v3="on"][data-route="settings"] input[type="text"],
+body[data-v3="on"][data-route="settings"] input[type="password"],
+body[data-v3="on"][data-route="settings"] textarea,
+body[data-v3="on"][data-route="settings"] select {
+  background: var(--s3-bg-soft);
+  color: var(--s3-text);
+  border: 1px solid var(--s3-rule);
+  border-radius: 8px;
+}
+
+/* atlas 页面 v3 化 — 卡片白底 */
+body[data-v3="on"][data-route="atlas"] .atlas-card,
+body[data-v3="on"][data-route="atlas"] .variety-card {
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+}
+
+/* history 页面同理 */
+body[data-v3="on"][data-route="history"] .history-item,
+body[data-v3="on"][data-route="history"] .history-card {
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+}
+
+/* batch 表格 v3 化 */
+body[data-v3="on"][data-route="batch"] .batch-table {
+  background: #FFFFFF;
+}
+body[data-v3="on"][data-route="batch"] .batch-table th {
+  background: var(--s3-bg-soft);
+  color: var(--s3-text);
+}
