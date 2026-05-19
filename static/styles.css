@@ -3846,14 +3846,24 @@ body[data-v3="on"] .v3-hero {
 }
 body[data-v3="on"][data-route="daily"] .v3-hero { display: none; }
 
-/* hero 与下方内容之间留一段呼吸,然后 cmdbar 浮在 hero 下方 */
+/* M9 修字遮挡 bug:
+   之前 margin-top:-3rem 让 cmdbar 上吃 hero 48px,白底盖住 hero 底部
+   caption (诗句行) → 用户报告"还有部分字母看不见"。
+   现在:cmdbar 紧贴 hero 下方 (margin-top:0),不再吃字。上圆角 + 细阴影
+   保留过渡感。 */
 body[data-v3="on"] .v3-hero + .cmdbar {
-  margin-top: -3rem;
+  margin-top: 0;
   position: relative;
   z-index: 6;
   background: var(--s3-bg);
   border-radius: 24px 24px 0 0;
-  padding-top: 2rem;
+  padding-top: 1.5rem;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* caption 同时往上提一点,确保即便有小高度差异时也不贴底 */
+body[data-v3="on"] .v3-hero-caption {
+  bottom: clamp(40px, 6vh, 72px);
 }
 
 /* cmdbar 的 title 放大,跟 v3 视觉对齐 */
