@@ -3433,13 +3433,31 @@ body[data-v3="on"] .v3-hero-photo::after {
    v3 R-A2: 输出卡 + page 整体宽松化(让排版"舒展")
    ============================================================ */
 
-/* page 整体加宽,顶部 padding 加大,让 hero 与内容呼吸 */
+/* page 整体加宽,顶部 padding 加大,让 hero 与内容呼吸
+   M5: 820 -> 1100,告别"窄不拉几" */
 body[data-v3="on"] .page {
-  max-width: 820px;             /* 760 -> 820 */
-  padding-top: 3.6rem;          /* 2.8 -> 3.6rem */
+  max-width: 1100px;
+  padding-top: 3.6rem;
   padding-bottom: 5rem;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+/* workbench 双栏:M5 拉宽 — 输入/输出并排时更大 */
+body[data-v3="on"] .workbench {
+  gap: 2.2rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 920px) {
+  body[data-v3="on"] .workbench {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    align-items: start;
+  }
+}
+
+/* textarea 在 v3 拉高,容纳更长输入 */
+body[data-v3="on"] textarea {
+  min-height: 12rem;
 }
 
 /* 整页底色用 s3-bg(暖白偏粉),让 v3 视觉成片 */
