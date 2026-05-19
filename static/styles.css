@@ -3434,13 +3434,13 @@ body[data-v3="on"] .v3-hero-photo::after {
    ============================================================ */
 
 /* page 整体加宽,顶部 padding 加大,让 hero 与内容呼吸
-   M5: 820 -> 1100,告别"窄不拉几" */
+   M5: 820 -> 1100 · M7: 1100 -> 1280,真正宽到不挤 */
 body[data-v3="on"] .page {
-  max-width: 1100px;
+  max-width: 1280px;
   padding-top: 3.6rem;
   padding-bottom: 5rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
+  padding-left: 2.4rem;
+  padding-right: 2.4rem;
 }
 
 /* workbench 双栏:M5 拉宽 — 输入/输出并排时更大 */
@@ -3998,4 +3998,132 @@ body[data-v3="on"][data-season="spring"][data-route="daily"] .daily-page-wrap::b
     var(--s3-accent-2) 70%,
     transparent 100%);
   border-radius: 999px;
+}
+
+/* ============================================================
+   v3 M7:settings 卡片网格拉宽 + 卡片更大 + 字号涨 + 输出区拉宽
+   解决"v3 还是挤"反馈
+   ============================================================ */
+
+/* settings 页:max-width 880 -> 1280 跟主页一致,grid 卡片更大 */
+body[data-v3="on"][data-route="settings"] .page-settings {
+  max-width: 1280px;
+  padding: 2.4rem 2.4rem 5rem;
+}
+body[data-v3="on"][data-route="settings"] .settings-grid {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1.8rem;
+}
+body[data-v3="on"][data-route="settings"] .settings-card {
+  padding: 1.8rem 2rem;
+  background: #FFFFFF;
+  border: 1px solid var(--s3-rule);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+  backdrop-filter: none;       /* 关 v2 玻璃模糊 */
+}
+body[data-v3="on"][data-route="settings"] .settings-card header {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--s3-text);
+  margin-bottom: 0.8rem;
+}
+body[data-v3="on"][data-route="settings"] .settings-card header i {
+  color: var(--s3-accent);
+}
+body[data-v3="on"][data-route="settings"] .settings-card p {
+  color: var(--s3-text-soft);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin-bottom: 1rem;
+}
+
+/* seg-control(主题/字号/高亮/背景模式)按钮 v3 配色 */
+body[data-v3="on"][data-route="settings"] .seg-control {
+  background: var(--s3-bg-soft);
+  border-radius: 999px;
+  padding: 4px;
+  display: inline-flex;
+  gap: 2px;
+}
+body[data-v3="on"][data-route="settings"] .seg-control button {
+  background: transparent;
+  color: var(--s3-text-soft);
+  border: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+body[data-v3="on"][data-route="settings"] .seg-control button.is-active {
+  background: var(--s3-accent);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(232, 155, 176, 0.4);
+}
+body[data-v3="on"][data-route="settings"] .seg-control button:hover:not(.is-active) {
+  color: var(--s3-accent-deep);
+}
+
+/* workbench 输出区拉宽 + 输入区拉宽,字号涨一点 */
+body[data-v3="on"] .workbench {
+  gap: 2.4rem;
+}
+@media (min-width: 1000px) {
+  body[data-v3="on"] .workbench {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+}
+body[data-v3="on"] textarea {
+  font-size: calc(1.12rem * var(--font-scale));
+  line-height: 1.85;
+  padding: 1.6rem 1.6rem;
+  min-height: 14rem;
+}
+
+/* 输出卡 padding 再加,字号更大,真正杂志级留白 */
+body[data-v3="on"] .result,
+body[data-v3="on"] .result-compare-orig {
+  padding: 2.6rem 2.4rem 2.8rem 2.8rem;
+  font-size: calc(1.3rem * var(--font-scale));
+  line-height: 2.05;
+}
+
+/* daily 页拉宽 — 1180 -> 1280,跟主页统一 */
+body[data-v3="on"][data-route="daily"] .daily-page-wrap {
+  max-width: 1280px;
+  padding: 2.4rem 2.4rem 5rem;
+}
+body[data-v3="on"][data-route="daily"] .card-daily-hero {
+  padding: 2.4rem 2.8rem 2.8rem;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-slides {
+  height: 440px;            /* 380 -> 440,季节图片真大 */
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-original {
+  font-size: 1.75rem;       /* 1.55 -> 1.75 */
+}
+
+/* atlas / batch / history 也拉宽 */
+body[data-v3="on"][data-route="atlas"] .page-atlas,
+body[data-v3="on"][data-route="history"] .page-history,
+body[data-v3="on"][data-route="batch"] .page-batch {
+  max-width: 1280px;
+  padding: 2.4rem 2.4rem 5rem;
+  margin: 0 auto;
+}
+
+/* 大屏(1600+)再放更大上限,避免内容只占中间一条 */
+@media (min-width: 1600px) {
+  body[data-v3="on"] .page,
+  body[data-v3="on"][data-route="settings"] .page-settings,
+  body[data-v3="on"][data-route="daily"] .daily-page-wrap,
+  body[data-v3="on"][data-route="atlas"] .page-atlas,
+  body[data-v3="on"][data-route="history"] .page-history,
+  body[data-v3="on"][data-route="batch"] .page-batch {
+    max-width: 1440px;
+  }
 }
