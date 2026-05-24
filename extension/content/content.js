@@ -44,7 +44,8 @@
     hostEl.id = HOST_ID;
     shadowRoot = hostEl.attachShadow({ mode: "open" });
     applyHostPosition(anchorRect);
-    shadowRoot = hostEl.attachShadow({ mode: "open" });
+    // ⬆ 之前这里有重复的 attachShadow,会 throw DOMException 让 panelEl 留 null,
+    //   导致后续 renderResult / renderError 报 "Cannot set properties of null"。
     // Internal CSS — pinned here to avoid host-page interference.
     const style = document.createElement("style");
     style.textContent = `
