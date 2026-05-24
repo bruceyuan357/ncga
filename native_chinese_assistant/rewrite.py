@@ -138,6 +138,7 @@ def build_system_prompt(
     addendum_override: str | None = None,
     glossary_lines: list[str] | None = None,
     example_lines: list[str] | None = None,
+    lexicon_lines: list[str] | None = None,
 ) -> str:
     """Compose the system prompt.
 
@@ -170,6 +171,18 @@ def build_system_prompt(
             joined = "\n".join(filtered)
             body += (
                 "【本地人示例】（参考这些真实的本地说法,不要逐字复制,要学语气和句式）\n"
+                f"{joined}\n\n"
+            )
+    if lexicon_lines:
+        # Cycle 22 Stage D: dictionary-level word mappings retrieved from
+        # data/lexicon.jsonl. Distinct from glossary (user-defined brand voice):
+        # this is authoritative reference data sourced via deep research, used
+        # as soft hints rather than hard substitutions.
+        filtered = [ln for ln in lexicon_lines if ln and ln.strip()]
+        if filtered:
+            joined = "\n".join(filtered)
+            body += (
+                "【词音参考】（这些是该方言里常见的本地表达,如果你的改写里能自然用上几个就用,不要强塞）\n"
                 f"{joined}\n\n"
             )
     if glossary_lines:
@@ -574,6 +587,22 @@ class ChatCompletionsClient:
         except Exception:
             # Corpus is an enhancement; never fail rewrite because retrieval broke.
             example_lines = None
+        # Cycle 22 Stage D: same defensive pattern for lexicon.
+        # Disabled when NCGA_LEXICON_DISABLE=1 or lexicon file missing/empty.
+        lexicon_lines: list[str] | None = None
+        try:
+            from native_chinese_assistant.lexicon import (
+                format_lexicon_for_prompt,
+                get_default_lexicon_retriever,
+            )
+
+            lex_retriever = get_default_lexicon_retriever()
+            if lex_retriever is not None:
+                lex_hits = lex_retriever.retrieve(text, target.value, top_k=5)
+                if lex_hits:
+                    lexicon_lines = format_lexicon_for_prompt(lex_hits)
+        except Exception:
+            lexicon_lines = None
         return {
             "model": self.config.model,
             "messages": [
@@ -586,6 +615,7 @@ class ChatCompletionsClient:
                         addendum_override=addendum_override,
                         glossary_lines=glossary_lines,
                         example_lines=example_lines,
+                        lexicon_lines=lexicon_lines,
                     ),
                 },
                 {"role": "user", "content": build_user_prompt(text, target)},

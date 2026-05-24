@@ -2805,7 +2805,7 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_system_prompt_includes_examples_when_provided(self) -> None:
-        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.presets import PRESET_METADATA, Scenario, VarietyPreset
         from native_chinese_assistant.rewrite import build_system_prompt
         prompt = build_system_prompt(
             PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
@@ -2820,7 +2820,7 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         self.assertIn("再来个", prompt)
 
     def test_system_prompt_omits_examples_block_when_none(self) -> None:
-        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.presets import PRESET_METADATA, Scenario, VarietyPreset
         from native_chinese_assistant.rewrite import build_system_prompt
         prompt = build_system_prompt(
             PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
@@ -2830,7 +2830,7 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         self.assertNotIn("【本地人示例】", prompt)
 
     def test_system_prompt_filters_blank_example_lines(self) -> None:
-        from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset, Scenario
+        from native_chinese_assistant.presets import PRESET_METADATA, Scenario, VarietyPreset
         from native_chinese_assistant.rewrite import build_system_prompt
         prompt = build_system_prompt(
             PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE],
@@ -2846,8 +2846,9 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         self.assertIsNone(r)
 
     def test_corpus_custom_path_via_env(self) -> None:
-        from native_chinese_assistant.corpus import get_default_retriever
         import tempfile
+
+        from native_chinese_assistant.corpus import get_default_retriever
         with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
             f.write('{"variety":"beijing_mandarin","scenario":"x","original":"orig","rewrite":"rew","quality_tier":"verified"}\n')
             tmp_path = f.name
@@ -2875,6 +2876,184 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         self.assertIn("python", toks)
         self.assertIn("用", toks)
         self.assertIn("跑", toks)
+
+
+# ============================================================
+# Cycle 22 Stage D: lexicon module tests
+# ============================================================
+class LexiconTests(unittest.TestCase):
+    """Tests for native_chinese_assistant.lexicon."""
+
+    def setUp(self) -> None:
+        # noqa: SIM115 — lifecycle paired with tearDown, not a leak
+        self._tmpfile = tempfile.NamedTemporaryFile(  # noqa: SIM115
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        )
+        self._tmpfile.write(
+            '{"variety":"shanghai_mandarin_style","mandarin":"漂亮","local":"嗲","category":"idiom","ipa":"tia44","example_sentence":"侬嗲伐","source":"https://wiktionary.org/wiki/嗲"}\n'
+            '{"variety":"shanghai_mandarin_style","mandarin":"你","local":"侬","category":"pronoun"}\n'
+            '{"variety":"shanghai_mandarin_style","mandarin":"今天","local":"今朝","category":"noun"}\n'
+            '{"variety":"beijing_mandarin","mandarin":"靠谱","local":"靠谱","category":"idiom"}\n'
+            '{"variety":"beijing_mandarin","mandarin":"你","local":"您","category":"pronoun"}\n'
+        )
+        self._tmpfile.close()
+        os.environ["NCGA_LEXICON_PATH"] = self._tmpfile.name
+        from native_chinese_assistant import lexicon as lex
+        lex._reset_default_lexicon_retriever_for_tests()
+
+    def tearDown(self) -> None:
+        os.environ.pop("NCGA_LEXICON_PATH", None)
+        os.environ.pop("NCGA_LEXICON_DISABLE", None)
+        Path(self._tmpfile.name).unlink(missing_ok=True)
+        from native_chinese_assistant import lexicon as lex
+        lex._reset_default_lexicon_retriever_for_tests()
+
+    def test_lexicon_loads_entries_from_jsonl(self) -> None:
+        from native_chinese_assistant.lexicon import load_lexicon
+        entries = load_lexicon(self._tmpfile.name)
+        self.assertEqual(len(entries), 5)
+        self.assertEqual(entries[0].mandarin, "漂亮")
+        self.assertEqual(entries[0].local, "嗲")
+        self.assertEqual(entries[0].ipa, "tia44")
+
+    def test_lexicon_skips_malformed_lines(self) -> None:
+        from native_chinese_assistant.lexicon import load_lexicon
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write('not json\n')
+            f.write('{"variety":"shanghai_mandarin_style","mandarin":"x","local":"y"}\n')
+            f.write('{"variety":"shanghai_mandarin_style"}\n')
+            path = f.name
+        try:
+            entries = load_lexicon(path)
+            self.assertEqual(len(entries), 1)
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_lexicon_retriever_returns_matching_variety_only(self) -> None:
+        from native_chinese_assistant.lexicon import get_default_lexicon_retriever
+        r = get_default_lexicon_retriever()
+        self.assertIsNotNone(r)
+        hits = r.retrieve("漂亮", "shanghai_mandarin_style", top_k=5)
+        self.assertTrue(any(h.mandarin == "漂亮" for h in hits))
+        for h in hits:
+            self.assertEqual(h.variety, "shanghai_mandarin_style")
+
+    def test_lexicon_retriever_returns_empty_for_unknown_variety(self) -> None:
+        from native_chinese_assistant.lexicon import get_default_lexicon_retriever
+        r = get_default_lexicon_retriever()
+        hits = r.retrieve("漂亮", "fake_variety", top_k=5)
+        self.assertEqual(hits, [])
+
+    def test_format_lexicon_renders_with_optional_fields(self) -> None:
+        from native_chinese_assistant.lexicon import (
+            LexiconEntry,
+            format_lexicon_for_prompt,
+        )
+        lines = format_lexicon_for_prompt([
+            LexiconEntry(
+                variety="shanghai_mandarin_style",
+                mandarin="漂亮", local="嗲", category="idiom",
+                ipa="tia44", example_sentence="侬嗲伐",
+            ),
+            LexiconEntry(
+                variety="shanghai_mandarin_style",
+                mandarin="你", local="侬", category="pronoun",
+            ),
+        ])
+        self.assertEqual(len(lines), 2)
+        self.assertIn("「漂亮」", lines[0])
+        self.assertIn("「嗲」", lines[0])
+        self.assertIn("IPA: tia44", lines[0])
+        self.assertIn("「侬」", lines[1])
+
+    def test_lexicon_disable_env_returns_none(self) -> None:
+        from native_chinese_assistant import lexicon as lex
+        os.environ["NCGA_LEXICON_DISABLE"] = "1"
+        lex._reset_default_lexicon_retriever_for_tests()
+        self.assertIsNone(lex.get_default_lexicon_retriever())
+
+    def test_build_system_prompt_includes_lexicon_block(self) -> None:
+        from native_chinese_assistant.rewrite import build_system_prompt
+        md = PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE]
+        prompt = build_system_prompt(
+            md,
+            lexicon_lines=["  · 普通话「漂亮」→ 本地说「嗲」"],
+        )
+        self.assertIn("【词音参考】", prompt)
+        self.assertIn("「嗲」", prompt)
+
+    def test_build_system_prompt_no_lexicon_block_when_empty(self) -> None:
+        from native_chinese_assistant.rewrite import build_system_prompt
+        md = PRESET_METADATA[VarietyPreset.SHANGHAI_MANDARIN_STYLE]
+        for arg in (None, [], ["", "   "]):
+            prompt = build_system_prompt(md, lexicon_lines=arg)
+            self.assertNotIn("【词音参考】", prompt)
+
+
+# ============================================================
+# Cycle 22 Stage D: corpus / lexicon importer tests
+# ============================================================
+class ImporterValidationTests(unittest.TestCase):
+    """Tests for tools/import_corpus.py + tools/import_lexicon.py validate logic."""
+
+    def _load_tool(self, name: str):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            name, Path(__file__).resolve().parent.parent / f"tools/{name}.py"
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_import_corpus_validates_required_fields(self) -> None:
+        mod = self._load_tool("import_corpus")
+        ok, n, _ = mod.validate_entry({
+            "variety": "shanghai_mandarin_style",
+            "scenario": "greeting",
+            "original": "早上好",
+            "rewrite": "侬早",
+            "quality_tier": "verified",
+        }, 1)
+        self.assertTrue(ok)
+        self.assertEqual(n["variety"], "shanghai_mandarin_style")
+        ok, _, reason = mod.validate_entry({"variety": "shanghai_mandarin_style"}, 2)
+        self.assertFalse(ok)
+        self.assertIn("missing", reason)
+        ok, _, reason = mod.validate_entry({
+            "variety": "fake", "scenario": "greeting",
+            "original": "x", "rewrite": "y", "quality_tier": "verified",
+        }, 3)
+        self.assertFalse(ok)
+        self.assertIn("unknown variety", reason)
+        ok, _, reason = mod.validate_entry({
+            "variety": "shanghai_mandarin_style", "scenario": "xx",
+            "original": "x", "rewrite": "y", "quality_tier": "verified",
+        }, 4)
+        self.assertFalse(ok)
+        self.assertIn("unknown scenario", reason)
+
+    def test_import_lexicon_validates_required_fields(self) -> None:
+        mod = self._load_tool("import_lexicon")
+        ok, n, _ = mod.validate_entry({
+            "variety": "shanghai_mandarin_style",
+            "mandarin": "漂亮", "local": "嗲", "category": "idiom",
+        }, 1)
+        self.assertTrue(ok)
+        self.assertEqual(n["category"], "idiom")
+        # bogus category falls back to "other"
+        ok, n, _ = mod.validate_entry({
+            "variety": "shanghai_mandarin_style",
+            "mandarin": "漂亮", "local": "嗲", "category": "bogus_category",
+        }, 2)
+        self.assertTrue(ok)
+        self.assertEqual(n["category"], "other")
+        ok, _, reason = mod.validate_entry({
+            "variety": "fake", "mandarin": "x", "local": "y",
+        }, 3)
+        self.assertFalse(ok)
+        self.assertIn("unknown variety", reason)
 
 
 if __name__ == "__main__":

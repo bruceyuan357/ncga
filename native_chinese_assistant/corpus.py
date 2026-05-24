@@ -29,9 +29,9 @@ import math
 import os
 import re
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 # Path to the corpus JSONL. Override via NCGA_CORPUS_PATH for tests.
 _DEFAULT_CORPUS_PATH = Path(__file__).parent.parent / "data" / "corpus.jsonl"

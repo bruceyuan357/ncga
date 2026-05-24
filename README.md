@@ -80,6 +80,41 @@ python3 tools/review_corpus.py        # 交互 y/n/e/s/q 审批
 
 **临时关掉**:`NCGA_CORPUS_DISABLE=1 python3 app.py`。
 
+### 从外部 deep research 增量导入 (Stage D)
+
+Cowork / Perplexity Deep Research / Gemini Deep Research 拉回来的 `corpus.jsonl`:
+```bash
+python3 tools/import_corpus.py /path/to/incoming.jsonl --dry-run    # 先验证
+python3 tools/import_corpus.py /path/to/incoming.jsonl              # 正式 append
+```
+自动按 `(variety, original)` 去重,reject schema 不合规的行,输出 stats。
+
+## 词音对应表 lexicon (Cycle 22 Stage D)
+
+`data/lexicon.jsonl` 是词典级别的「普通话词 → 方言词」对应,每条:
+```json
+{"variety":"shanghai_mandarin_style","mandarin":"漂亮","local":"嗲","category":"idiom","ipa":"tia44","example_sentence":"侬嗲伐","source":"https://wiktionary.org/wiki/嗲"}
+```
+
+与 corpus 平行存在:**corpus 给 LLM 句子级 few-shot,lexicon 给词级 hint**。
+每次 `/api/rewrite` 调用时同样用 BM25 检索 top-5,以「【词音参考】」块注入 system prompt
+(口吻:"如果能自然用上几个就用,不要强塞")。
+
+**导入 Cowork 给的 lexicon**:
+```bash
+python3 tools/import_lexicon.py /path/to/incoming.jsonl --dry-run
+python3 tools/import_lexicon.py /path/to/incoming.jsonl
+```
+按 `(variety, mandarin, local)` 主键去重。
+
+**抽查质量**:
+```bash
+python3 tools/verify_corpus_quality.py --corpus 20 --lexicon 20
+```
+随机抽 N 条做 HTTP HEAD 检查 source URL 是否可访问;按 variety breakdown verified 率。
+
+**临时关掉**:`NCGA_LEXICON_DISABLE=1 python3 app.py`。
+
 ## 测试
 
 ```bash
