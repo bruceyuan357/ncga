@@ -69,7 +69,7 @@ async function refresh() {
     lockBtn.classList.remove("hidden");
     textArea.focus();
   } else {
-    showStatus("Token 已锁定 — 输 passphrase 解锁(30 分钟自动锁)。", "warn");
+    showStatus("Token 已锁定 — 输 passphrase 解锁(关浏览器才会锁)。", "warn");
     unlockPanel.classList.remove("hidden");
     rewritePanel.classList.add("hidden");
     lockBtn.classList.add("hidden");

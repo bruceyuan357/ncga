@@ -19,7 +19,11 @@ import { decrypt } from "../lib/crypto.js";
 
 const STORAGE_KEY = "ncga.config.v1";
 const SESSION_KEY = "ncga.session.v1";  // chrome.storage.session
-const IDLE_CLEAR_MS = 30 * 60 * 1000;   // 30 min token cache TTL
+// 之前 30min idle TTL → 用户报告反复输 passphrase 太烦。
+// 改为"实际不过期"(永远远期):chrome.storage.session 本身
+// 在浏览器关掉后会自动清空,所以这里设无穷大也是安全的——
+// 一次浏览器 session 内只需要解锁一次,关浏览器再开还是要重输 passphrase。
+const IDLE_CLEAR_MS = Number.MAX_SAFE_INTEGER;
 
 // 10 varieties hard-coded for context menu titles. Sourced from
 // native_chinese_assistant/presets.py; kept in sync manually for now.

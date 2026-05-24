@@ -396,7 +396,7 @@
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
     const text = sel.toString().trim();
-    if (text.length < 3) return;
+    if (text.length < 2) return;   // 之前 3 → 2,放宽触发阈值
     // Avoid re-firing on same selection (selectionchange fires per micro-movement)
     if (text === lastTriggeredText && hostEl) return;
     lastTriggeredText = text;
