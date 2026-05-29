@@ -20,22 +20,22 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO_ROOT / "data" / "lexicon.jsonl"
 
-VALID_VARIETIES = frozenset({
-    "standard_putonghua",
-    "beijing_mandarin",
-    "dongbei_mandarin",
-    "sichuan_chongqing_mandarin",
-    "jianghuai_or_lower_yangtze_mandarin",
-    "guangdong_mandarin",
-    "shanghai_mandarin_style",
-    "cantonese_written",
-    "hokkien_written",
-    "minnan_written",
-})
+VALID_VARIETIES = frozenset(
+    {
+        "standard_putonghua",
+        "beijing_mandarin",
+        "dongbei_mandarin",
+        "sichuan_chongqing_mandarin",
+        "jianghuai_or_lower_yangtze_mandarin",
+        "guangdong_mandarin",
+        "shanghai_mandarin_style",
+        "cantonese_written",
+        "hokkien_written",
+        "minnan_written",
+    }
+)
 
-VALID_CATEGORIES = frozenset({
-    "particle", "verb", "noun", "greeting", "idiom", "pronoun", "other"
-})
+VALID_CATEGORIES = frozenset({"particle", "verb", "noun", "greeting", "idiom", "pronoun", "other"})
 
 REQUIRED_FIELDS = ("variety", "mandarin", "local")
 
@@ -80,11 +80,13 @@ def existing_keys(out_path):
             continue
         try:
             obj = json.loads(s)
-            keys.add((
-                str(obj["variety"]),
-                str(obj["mandarin"]).strip(),
-                str(obj["local"]).strip(),
-            ))
+            keys.add(
+                (
+                    str(obj["variety"]),
+                    str(obj["mandarin"]).strip(),
+                    str(obj["local"]).strip(),
+                )
+            )
         except (KeyError, ValueError, TypeError):
             continue
     return keys
@@ -151,8 +153,12 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     existing_text = out_path.read_text(encoding="utf-8") if out_path.is_file() else ""
     with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, dir=str(out_path.parent),
-        prefix=".lexicon.", suffix=".jsonl.tmp", encoding="utf-8"
+        mode="w",
+        delete=False,
+        dir=str(out_path.parent),
+        prefix=".lexicon.",
+        suffix=".jsonl.tmp",
+        encoding="utf-8",
     ) as tf:
         tf.write(existing_text)
         if existing_text and not existing_text.endswith("\n"):

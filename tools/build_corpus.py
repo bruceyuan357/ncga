@@ -133,8 +133,12 @@ def main() -> int:
         print(f"  {v}: have {have_counts.get(v, 0)} → need {max(0, args.target - have_counts.get(v, 0))}")
     print()
 
-    client = None if args.dry_run else ChatCompletionsClient(
-        LLMConfig.from_env(),
+    client = (
+        None
+        if args.dry_run
+        else ChatCompletionsClient(
+            LLMConfig.from_env(),
+        )
     )
 
     out_path = Path(args.out)
@@ -155,18 +159,12 @@ def main() -> int:
                 continue
             try:
                 resp = client.general_chat(
-                    system_prompt=(
-                        "你是中文方言语料生成助手。严格按要求输出 JSON,无 markdown,无解释。"
-                    ),
+                    system_prompt=("你是中文方言语料生成助手。严格按要求输出 JSON,无 markdown,无解释。"),
                     user_prompt=prompt,
                     max_tokens=400,
                 )
                 # general_chat returns parsed JSON dict (when LLM behaves)
-                obj = (
-                    resp
-                    if isinstance(resp, dict)
-                    else json.loads(resp if isinstance(resp, str) else "")
-                )
+                obj = resp if isinstance(resp, dict) else json.loads(resp if isinstance(resp, str) else "")
                 original = str(obj.get("original", "")).strip()
                 rewrite = str(obj.get("rewrite", "")).strip()
                 notes = str(obj.get("notes", "")).strip()

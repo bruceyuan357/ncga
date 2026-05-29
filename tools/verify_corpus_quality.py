@@ -99,7 +99,7 @@ def verify_corpus(n: int, timeout: float) -> int:
         print(f"  {mark} [{i:>2}/{len(sample)}] {status:<22} {url}")
         ok_n += int(ok)
         bad_n += int(not ok)
-    print(f"\n  result: {ok_n} ok / {bad_n} bad ({ok_n/(ok_n+bad_n)*100:.0f}% reachable)")
+    print(f"\n  result: {ok_n} ok / {bad_n} bad ({ok_n / (ok_n + bad_n) * 100:.0f}% reachable)")
     return 0
 
 
@@ -124,7 +124,7 @@ def verify_lexicon(n: int, timeout: float) -> int:
         print(f"  {mark} [{i:>2}/{len(sample)}] {status:<22} {r['mandarin']} → {r['local']:<10} {url}")
         ok_n += int(ok)
         bad_n += int(not ok)
-    print(f"\n  result: {ok_n} ok / {bad_n} bad ({ok_n/(ok_n+bad_n)*100:.0f}% reachable)")
+    print(f"\n  result: {ok_n} ok / {bad_n} bad ({ok_n / (ok_n + bad_n) * 100:.0f}% reachable)")
     return 0
 
 

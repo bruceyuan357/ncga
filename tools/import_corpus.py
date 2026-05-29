@@ -32,23 +32,35 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO_ROOT / "data" / "corpus.jsonl"
 
-VALID_VARIETIES = frozenset({
-    "standard_putonghua",
-    "beijing_mandarin",
-    "dongbei_mandarin",
-    "sichuan_chongqing_mandarin",
-    "jianghuai_or_lower_yangtze_mandarin",
-    "guangdong_mandarin",
-    "shanghai_mandarin_style",
-    "cantonese_written",
-    "hokkien_written",
-    "minnan_written",
-})
+VALID_VARIETIES = frozenset(
+    {
+        "standard_putonghua",
+        "beijing_mandarin",
+        "dongbei_mandarin",
+        "sichuan_chongqing_mandarin",
+        "jianghuai_or_lower_yangtze_mandarin",
+        "guangdong_mandarin",
+        "shanghai_mandarin_style",
+        "cantonese_written",
+        "hokkien_written",
+        "minnan_written",
+    }
+)
 
-VALID_SCENARIOS = frozenset({
-    "complaint", "request", "praise", "greeting", "small_talk",
-    "self_depreciate", "teach_kid", "comfort", "invite", "apology",
-})
+VALID_SCENARIOS = frozenset(
+    {
+        "complaint",
+        "request",
+        "praise",
+        "greeting",
+        "small_talk",
+        "self_depreciate",
+        "teach_kid",
+        "comfort",
+        "invite",
+        "apology",
+    }
+)
 
 REQUIRED_FIELDS = ("variety", "scenario", "original", "rewrite", "quality_tier")
 
@@ -110,8 +122,7 @@ def main():
     ap = argparse.ArgumentParser(description="Incremental corpus.jsonl import")
     ap.add_argument("incoming", help="Path to incoming JSONL file")
     ap.add_argument("--dry-run", action="store_true", help="Validate only, don't write")
-    ap.add_argument("--out", default=str(DEFAULT_OUT),
-                    help=f"Output corpus path (default: {DEFAULT_OUT})")
+    ap.add_argument("--out", default=str(DEFAULT_OUT), help=f"Output corpus path (default: {DEFAULT_OUT})")
     args = ap.parse_args()
 
     incoming = Path(args.incoming)
@@ -146,7 +157,7 @@ def main():
         if key in existing:
             duplicates += 1
             continue
-        existing.add(key)         # prevent intra-file dupes too
+        existing.add(key)  # prevent intra-file dupes too
         valid_new.append(normalized)
 
     print(f"incoming total:    {total}")
@@ -169,8 +180,12 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     existing_text = out_path.read_text(encoding="utf-8") if out_path.is_file() else ""
     with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, dir=str(out_path.parent),
-        prefix=".corpus.", suffix=".jsonl.tmp", encoding="utf-8"
+        mode="w",
+        delete=False,
+        dir=str(out_path.parent),
+        prefix=".corpus.",
+        suffix=".jsonl.tmp",
+        encoding="utf-8",
     ) as tf:
         tf.write(existing_text)
         if existing_text and not existing_text.endswith("\n"):

@@ -169,10 +169,7 @@ def build_system_prompt(
         filtered = [ln for ln in example_lines if ln and ln.strip()]
         if filtered:
             joined = "\n".join(filtered)
-            body += (
-                "【本地人示例】（参考这些真实的本地说法,不要逐字复制,要学语气和句式）\n"
-                f"{joined}\n\n"
-            )
+            body += f"【本地人示例】（参考这些真实的本地说法,不要逐字复制,要学语气和句式）\n{joined}\n\n"
     if lexicon_lines:
         # Cycle 22 Stage D: dictionary-level word mappings retrieved from
         # data/lexicon.jsonl. Distinct from glossary (user-defined brand voice):

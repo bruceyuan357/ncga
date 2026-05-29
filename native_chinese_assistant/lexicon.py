@@ -45,9 +45,7 @@ from native_chinese_assistant.corpus import _tokenize
 _DEFAULT_LEXICON_PATH = Path(__file__).parent.parent / "data" / "lexicon.jsonl"
 
 # Categories per the schema; entries with unknown category fall back to "other".
-_VALID_CATEGORIES = frozenset({
-    "particle", "verb", "noun", "greeting", "idiom", "pronoun", "other"
-})
+_VALID_CATEGORIES = frozenset({"particle", "verb", "noun", "greeting", "idiom", "pronoun", "other"})
 
 
 @dataclass(frozen=True)

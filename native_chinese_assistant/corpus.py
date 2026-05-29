@@ -105,11 +105,7 @@ def _tokenize(text: str) -> list[str]:
         ascii_run: list[str] = []
         for ch in chunk:
             cp = ord(ch)
-            is_cjk = (
-                0x4E00 <= cp <= 0x9FFF
-                or 0x3400 <= cp <= 0x4DBF
-                or 0xF900 <= cp <= 0xFAFF
-            )
+            is_cjk = 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF or 0xF900 <= cp <= 0xFAFF
             if is_cjk:
                 if ascii_run:
                     tokens.append("".join(ascii_run).lower())
