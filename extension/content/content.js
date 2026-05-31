@@ -391,7 +391,11 @@
     try {
       cfg = (await chrome.storage.local.get("ncga.config.v1"))["ncga.config.v1"] || {};
     } catch (_e) { return; }
-    if (!cfg.autoRewriteOnSelection) return;     // feature is off
+    // Instant mode only. on_demand (default) never auto-fires on selection —
+    // that's the right-click menu's job, and auto-firing here is what collided
+    // with it. Back-compat: legacy boolean autoRewriteOnSelection === instant.
+    const mode = cfg.mode || (cfg.autoRewriteOnSelection ? "instant" : "on_demand");
+    if (mode !== "instant") return;
 
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;

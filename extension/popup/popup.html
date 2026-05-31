@@ -25,11 +25,15 @@
 
   <!-- Quick-rewrite panel: shown when ready -->
   <section id="rewrite-panel" class="panel hidden">
-    <label class="toggle-row">
-      <input id="auto-rewrite-toggle" type="checkbox">
-      <span>选中网页文字自动改写(在选区下弹小窗)</span>
-    </label>
-    <label for="text">要改写的文字</label>
+    <div class="mode-switch" role="radiogroup" aria-label="网页改写模式">
+      <span class="mode-title">网页改写模式</span>
+      <div class="mode-opts">
+        <button type="button" class="mode-opt" data-mode="on_demand" role="radio" aria-checked="true">点选</button>
+        <button type="button" class="mode-opt" data-mode="instant" role="radio" aria-checked="false">即时</button>
+      </div>
+      <p class="mode-hint" id="mode-hint"></p>
+    </div>
+    <label for="text">在弹窗里改写</label>
     <textarea id="text" rows="3" placeholder="贴一段话…"></textarea>
     <div class="row">
       <label for="variety" class="small">改写为</label>

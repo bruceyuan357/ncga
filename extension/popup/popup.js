@@ -16,24 +16,58 @@ const rewriteBtn = $("#rewrite-btn");
 const resultEl = $("#result");
 const openOptions = $("#open-options");
 const lockBtn = $("#lock-btn");
-const autoToggle = $("#auto-rewrite-toggle");
+const modeOpts = document.querySelectorAll(".mode-opt");
+const modeHint = $("#mode-hint");
 
 const CONFIG_KEY = "ncga.config.v1";
 
-async function loadAutoToggle() {
+// Two mutually-exclusive on-page modes (replaces the old auto-rewrite checkbox,
+// which collided with the right-click menu by layering on top of it):
+//   on_demand (点选 / On-Demand): right-click → pick a variety → corner overlay.
+//                                 Selection NEVER auto-fires. Default.
+//   instant   (即时 / Instant):   select text → auto popover under the selection
+//                                 using the default variety. No clicks.
+const MODE_HINTS = {
+  on_demand: "点选:选中文字 → 右键「改写为」→ 自己挑方言。选中不会自动弹窗。",
+  instant: "即时:选中文字(≥2 字)→ 立刻在选区下方弹出改写,用下面选的默认方言。",
+};
+
+function _migrateMode(cfg) {
+  // Back-compat: old config used a boolean autoRewriteOnSelection.
+  if (cfg.mode === "on_demand" || cfg.mode === "instant") return cfg.mode;
+  if (cfg.autoRewriteOnSelection) return "instant";
+  return "on_demand";
+}
+
+function _paintMode(mode) {
+  modeOpts.forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.setAttribute("aria-checked", on ? "true" : "false");
+  });
+  modeHint.textContent = MODE_HINTS[mode] || "";
+}
+
+async function loadModeSwitch() {
   try {
     const s = await chrome.storage.local.get(CONFIG_KEY);
     const cfg = s[CONFIG_KEY] || {};
-    autoToggle.checked = !!cfg.autoRewriteOnSelection;
+    _paintMode(_migrateMode(cfg));
     if (cfg.defaultVariety) varietySel.value = cfg.defaultVariety;
-  } catch (_e) { /* keep defaults */ }
+  } catch (_e) {
+    _paintMode("on_demand");
+  }
 }
 
-autoToggle.addEventListener("change", async () => {
-  const s = await chrome.storage.local.get(CONFIG_KEY);
-  const cfg = s[CONFIG_KEY] || {};
-  cfg.autoRewriteOnSelection = autoToggle.checked;
-  await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+modeOpts.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const mode = btn.dataset.mode;
+    _paintMode(mode);
+    const s = await chrome.storage.local.get(CONFIG_KEY);
+    const cfg = s[CONFIG_KEY] || {};
+    cfg.mode = mode;
+    delete cfg.autoRewriteOnSelection; // drop the legacy flag
+    await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+  });
 });
 
 varietySel.addEventListener("change", async () => {
@@ -133,4 +167,4 @@ lockBtn.addEventListener("click", async (e) => {
 });
 
 refresh();
-loadAutoToggle();
+loadModeSwitch();
