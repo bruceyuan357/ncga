@@ -104,6 +104,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true;
   }
+  // Popup-initiated: ensure content.js is live in the active tab so 即时 mode's
+  // selectionchange listener exists. Without this, instant mode silently does
+  // nothing on any page that was already open before the extension was
+  // installed/reloaded (static content_scripts only cover later-loaded pages,
+  // and — unlike the right-click path — the selection path has no inject trigger).
+  // The popup gesture grants activeTab, so executeScript into the active tab is
+  // allowed here. content.js has a re-injection guard, so this is idempotent.
+  if (msg && msg.type === "ncga:ensure-content-injected") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab || !tab.id) {
+          sendResponse({ ok: false, error: "no active tab" });
+          return;
+        }
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content/content.js"] });
+        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ["content/overlay.css"] });
+        sendResponse({ ok: true });
+      } catch (e) {
+        // chrome:// / Web Store / pdf viewer etc. can't be injected — not fatal.
+        sendResponse({ ok: false, error: String((e && e.message) || e) });
+      }
+    })();
+    return true;
+  }
   // Options-initiated config save (after encrypting token there)
   if (msg && msg.type === "ncga:config-saved") {
     sendResponse({ ok: true });

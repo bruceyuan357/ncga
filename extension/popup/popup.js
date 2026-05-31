@@ -47,12 +47,25 @@ function _paintMode(mode) {
   modeHint.textContent = MODE_HINTS[mode] || "";
 }
 
+// 即时 mode needs content.js live in the active tab to hear selectionchange.
+// Static content_scripts only cover pages loaded after the extension reload, so
+// ask the SW to inject into the current tab (idempotent — content.js guards
+// against double-injection). No-op / harmless on un-injectable pages.
+async function ensureInjectedFor(mode) {
+  if (mode !== "instant") return;
+  try {
+    await chrome.runtime.sendMessage({ type: "ncga:ensure-content-injected" });
+  } catch (_e) { /* un-injectable page (chrome://, store) — ignore */ }
+}
+
 async function loadModeSwitch() {
   try {
     const s = await chrome.storage.local.get(CONFIG_KEY);
     const cfg = s[CONFIG_KEY] || {};
-    _paintMode(_migrateMode(cfg));
+    const mode = _migrateMode(cfg);
+    _paintMode(mode);
     if (cfg.defaultVariety) varietySel.value = cfg.defaultVariety;
+    await ensureInjectedFor(mode);
   } catch (_e) {
     _paintMode("on_demand");
   }
@@ -67,6 +80,9 @@ modeOpts.forEach((btn) => {
     cfg.mode = mode;
     delete cfg.autoRewriteOnSelection; // drop the legacy flag
     await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+    // Switching to 即时 right now: inject into the current tab so it works
+    // immediately, without making the user reload the page.
+    await ensureInjectedFor(mode);
   });
 });
 
