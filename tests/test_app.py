@@ -1235,12 +1235,33 @@ class PhraseOfTheDayTests(unittest.TestCase):
         # Override the cache path env var so tests don't pollute ~/.local/share
         self._tmpdir = Path(tempfile.mkdtemp(prefix="ncga-phrase-"))
         os.environ["XDG_DATA_HOME"] = str(self._tmpdir)
+        # Pin the clock so phrase tests are deterministic regardless of wall-clock.
+        # These tests assume pool generation 0 (the free in-code seed pool, no LLM
+        # refresh call). Once real time passes POOL_EPOCH + 30 days the live clock
+        # flips to generation 1+, which adds a pool-refresh LLM call and breaks the
+        # call-count + generation assertions. Pinning to a date inside generation 0
+        # makes them hermetic. (This is the bug that surfaced 2026-05-31: epoch
+        # 2026-05-01 + day 30 → gen 1 → an 11th LLM call the tests didn't expect.)
+        from datetime import date as _date
+
+        import native_chinese_assistant.daily_phrase as _dp
+
+        self._dp = _dp
+        self._real_date = _dp.date
+
+        class _FixedDate(_date):
+            @classmethod
+            def today(cls):
+                return _date(2026, 5, 10)  # POOL_EPOCH + 9 days → generation 0
+
+        _dp.date = _FixedDate
 
     def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self._tmpdir, ignore_errors=True)
         os.environ.pop("XDG_DATA_HOME", None)
+        self._dp.date = self._real_date
 
     def test_phrase_endpoint_returns_all_10_varieties(self) -> None:
         client, _ = _build_client(_llm_json("好的（mocked）"))
@@ -1260,7 +1281,9 @@ class PhraseOfTheDayTests(unittest.TestCase):
             self.assertIn("caption", img)
             self.assertIn("·", img["caption"])
             self.assertIn("commons.wikimedia.org", img["url"])
-        # Cycle 18 v2 (A1): pool generation surfaced — gen 0 today (within first 30 days)
+        # Cycle 18 v2 (A1): pool generation surfaced. The clock is pinned to a
+        # generation-0 date in setUp, so this is deterministically 0 regardless of
+        # the real wall-clock (which has since advanced past generation 0).
         self.assertIn("pool_generation", payload)
         self.assertEqual(payload["pool_generation"], 0)
 

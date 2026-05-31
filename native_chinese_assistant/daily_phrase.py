@@ -214,7 +214,12 @@ def _generate_fresh_pool(service: RewriteService) -> list[WisdomSeed]:
     """Ask the LLM for 30 fresh phrases as a JSON array. Falls back to _SEED_POOL on
     any failure (parse error, timeout, etc.) — refresh failure must NEVER take the
     daily-phrase feature offline. The seed pool is always a valid backup."""
-    if service._client is None:
+    # getattr (not service._client) so a service object that simply has no
+    # client attribute falls back to the seed pool too — the docstring promises
+    # refresh failure NEVER takes the feature offline, and an AttributeError
+    # here would break that promise (it did: a cold cache + a client-less
+    # service raised instead of degrading gracefully).
+    if getattr(service, "_client", None) is None:
         logger.warning("phrase-pool refresh skipped: no LLM client")
         return list(_SEED_POOL)
     try:
