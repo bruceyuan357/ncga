@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>地道中文 · NCGA — 功能与架构总览</title>
+<style>
+  :root{
+    --bg:#FFF8F4; --bg-soft:#FCEEE8; --ink:#1A1A1A; --ink-soft:#5A4844;
+    --rule:#F0D9CF; --pink:#E89BB0; --pink-deep:#C95F7D; --green:#8FB99B;
+    --gold:#C9A85E; --card:#FFFFFF;
+    --serif:"Noto Serif SC","Songti SC",serif;
+    --sans:"Inter","Noto Sans SC",-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 1.5rem}
+
+  /* hero */
+  .hero{position:relative;text-align:center;padding:5rem 1.5rem 3.5rem;overflow:hidden;
+        background:radial-gradient(ellipse 70% 80% at 50% 0%,rgba(232,155,176,.18),transparent 60%)}
+  .hero .seal{display:inline-flex;align-items:center;justify-content:center;width:84px;height:84px;border-radius:24px;
+       background:linear-gradient(145deg,#FFE8E2,#F4C4C8);box-shadow:0 8px 28px rgba(201,95,125,.25);margin-bottom:1.4rem;
+       font-family:var(--serif);font-size:38px;color:var(--pink-deep);font-weight:700}
+  .hero h1{font-size:clamp(34px,6vw,56px);font-weight:800;letter-spacing:-.02em;margin-bottom:.5rem}
+  .hero .en{font-size:clamp(13px,2vw,16px);text-transform:uppercase;letter-spacing:.22em;color:var(--pink-deep);font-weight:600;margin-bottom:1.2rem}
+  .hero .lede{max-width:660px;margin:0 auto;font-size:clamp(16px,2.4vw,20px);color:var(--ink-soft);font-family:var(--serif)}
+  .petal{position:absolute;width:16px;height:16px;opacity:.7;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2 C14 6 18 8 22 8 C18 10 16 14 16 18 C14 14 10 14 8 18 C8 14 6 10 2 8 C6 8 10 6 12 2 Z' fill='%23F4B3C6'/></svg>") no-repeat center/contain}
+
+  /* stats */
+  .stats{display:flex;flex-wrap:wrap;justify-content:center;gap:.8rem;margin:2.4rem auto 0;max-width:860px}
+  .stat{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:.9rem 1.3rem;min-width:130px;text-align:center}
+  .stat b{display:block;font-size:26px;font-weight:800;color:var(--pink-deep);font-family:var(--sans)}
+  .stat span{font-size:12px;color:var(--ink-soft)}
+
+  section{padding:3.2rem 0}
+  .kicker{text-align:center;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--pink-deep);font-weight:700;margin-bottom:.5rem}
+  h2{text-align:center;font-size:clamp(24px,4vw,34px);font-weight:800;letter-spacing:-.01em;margin-bottom:.6rem}
+  .sub{text-align:center;color:var(--ink-soft);max-width:640px;margin:0 auto 2.2rem}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.2rem}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:16px;padding:1.5rem 1.6rem;transition:transform .2s,box-shadow .2s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,.06)}
+  .card .ic{font-size:22px;margin-bottom:.6rem}
+  .card h3{font-size:17px;font-weight:700;margin-bottom:.4rem}
+  .card h3 .tag{font-size:10px;font-weight:600;vertical-align:middle;margin-left:.5em;padding:.1em .55em;border-radius:999px;background:var(--bg-soft);color:var(--pink-deep);text-transform:uppercase;letter-spacing:.05em}
+  .card h3 .tag.beta{background:#FFF1D6;color:#9A7B2E}
+  .card p{font-size:14px;color:var(--ink-soft)}
+
+  /* varieties */
+  .varieties{background:var(--bg-soft)}
+  .vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.7rem;max-width:900px;margin:0 auto}
+  .v{display:flex;align-items:center;gap:.7rem;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:.7rem .9rem}
+  .v .glyph{width:34px;height:34px;flex:none;border-radius:9px;background:linear-gradient(145deg,#FFE8E2,#F4C4C8);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;color:var(--pink-deep)}
+  .v small{display:block;color:var(--ink-soft);font-size:11px}
+
+  /* flow */
+  .flow{background:var(--ink);color:#F4EAD8;border-radius:20px;padding:2.2rem;max-width:920px;margin:0 auto;font-family:var(--sans)}
+  .flow h3{color:#fff;text-align:center;margin-bottom:1.4rem;font-size:18px}
+  .pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:.6rem;justify-content:center}
+  .step{flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(244,179,198,.25);border-radius:12px;padding:1rem}
+  .step .n{font-size:11px;color:var(--pink);font-weight:700;letter-spacing:.1em}
+  .step b{display:block;margin:.3rem 0;font-size:14px;color:#fff}
+  .step span{font-size:12px;color:#C9BBB0}
+  .arrow{align-self:center;color:var(--pink);font-size:20px}
+  .flow .ex{margin-top:1.4rem;background:rgba(232,155,176,.1);border-radius:10px;padding:.9rem 1.1rem;font-family:var(--serif);font-size:14px;text-align:center}
+  .flow .ex .ar{color:var(--pink);margin:0 .5em}
+
+  /* arch */
+  .arch .card h3{color:var(--pink-deep)}
+  .why{max-width:760px;margin:1.6rem auto 0;font-size:14px;color:var(--ink-soft)}
+  .why li{margin:.5rem 0;padding-left:1.4rem;position:relative}
+  .why li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700}
+
+  footer{text-align:center;padding:3rem 1.5rem;color:var(--ink-soft);font-size:13px;border-top:1px solid var(--rule)}
+  footer code{background:var(--bg-soft);padding:.15em .5em;border-radius:6px;font-size:12px}
+  .badge{display:inline-block;margin:.2rem;padding:.3rem .8rem;border-radius:999px;background:var(--bg-soft);border:1px solid var(--rule);font-size:12px;color:var(--ink-soft)}
+  @media(max-width:600px){.arrow{display:none}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="petal" style="left:8%;top:20%"></div>
+  <div class="petal" style="left:88%;top:30%;width:12px;height:12px"></div>
+  <div class="petal" style="left:78%;top:65%"></div>
+  <div class="petal" style="left:15%;top:70%;width:13px;height:13px"></div>
+  <div class="seal">语</div>
+  <div class="en">Native Chinese Grammar Assistant</div>
+  <h1>地道中文 · NCGA</h1>
+  <p class="lede">把任意语言的一句话,揉成十种中国地方乡音 —— 不是翻译腔,而是<strong>本地人原本就会那样说</strong>的样子。</p>
+  <div class="stats">
+    <div class="stat"><b>10</b><span>方言 / 语体</span></div>
+    <div class="stat"><b>6</b><span>语境场景</span></div>
+    <div class="stat"><b>400</b><span>句级语料</span></div>
+    <div class="stat"><b>1189</b><span>词级词典</span></div>
+    <div class="stat"><b>198</b><span>离线测试</span></div>
+    <div class="stat"><b>0</b><span>运行时依赖*</span></div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">What it does</div>
+    <h2>核心功能</h2>
+    <p class="sub">一个把"标准化中文"重新染上地方色彩的写作 / 沟通工具 —— Grammarly 修拼写,NCGA 修"口音"。</p>
+    <div class="grid">
+      <div class="card"><div class="ic">🗣️</div><h3>多方言改写</h3><p>输入任意语言(中/英/日/法…),输出锁定为你选的中文方言。十种地域语体,从北京胡同到粤语书面、闽南汉字。</p></div>
+      <div class="card"><div class="ic">🎭</div><h3>语境场景</h3><p>同一句话,对长辈、对同事、在网上、在吐槽时说法不同。6 种场景调节口吻分寸。</p></div>
+      <div class="card"><div class="ic">⚖️</div><h3>多方言对比</h3><p>一次并排生成多个方言版本,直观看同一个意思在不同乡音里的差别。</p></div>
+      <div class="card"><div class="ic">🔍</div><h3>AI 讲解</h3><p>挑出改写里最有"方言味"的 3–6 处变化,逐条解释为什么这样写更地道。</p></div>
+      <div class="card"><div class="ic">⭐</div><h3>质量评分 + 自我改进</h3><p>对结果打分;当某方言长期低分,系统用 Reflexion 思路重写自己的"场景指引",越用越准。</p></div>
+      <div class="card"><div class="ic">📚</div><h3>批量工作台</h3><p>一次贴多行,并行改写,可排序、挑选、导出 CSV —— 给需要规模化处理的场景。</p></div>
+      <div class="card"><div class="ic">🏷️</div><h3>品牌语调字典</h3><p>自定义"原词 → 必须改成的词",强制注入,保证术语统一。</p></div>
+      <div class="card"><div class="ic">🌸</div><h3>今日方言一句 · 随四时</h3><p>每天一句谚语 × 十种乡音;UI 随春樱/夏绿/秋枫/冬青四季流转,带 24 节气与古诗轮换。</p></div>
+      <div class="card"><div class="ic">🧩</div><h3>Chrome 扩展 <span class="tag beta">code-complete</span></h3><p>网页任意选中文字即可改写。两种模式:<strong>点选</strong>(右键挑方言)与<strong>即时</strong>(选中自动弹出)。Token 用 AES-GCM 本地加密。</p></div>
+      <div class="card"><div class="ic">💬</div><h3>反馈表单</h3><p>内嵌反馈入口,JSONL 落盘,IP 加盐哈希,0o600 权限 —— 收真实用户意见而不泄隐私。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="varieties">
+  <div class="wrap">
+    <div class="kicker">Ten voices</div>
+    <h2>十种乡音</h2>
+    <p class="sub">每种方言在 <code>presets.py</code> 里只是一处元数据 —— 加一种新方言只改一个文件。</p>
+    <div class="vlist">
+      <div class="v"><div class="glyph">通</div><div>标准普通话<small>自然口语 · 基准</small></div></div>
+      <div class="v"><div class="glyph">京</div><div>北京话<small>儿化 · 侃大山</small></div></div>
+      <div class="v"><div class="glyph">东</div><div>东北话<small>贼 · 嘎嘎 · 唠嗑</small></div></div>
+      <div class="v"><div class="glyph">川</div><div>四川/重庆话<small>巴适 · 安逸 · 嘛</small></div></div>
+      <div class="v"><div class="glyph">淮</div><div>江淮/下江官话<small>南京·扬州·合肥</small></div></div>
+      <div class="v"><div class="glyph">粤</div><div>广东普通话<small>粤味普通话</small></div></div>
+      <div class="v"><div class="glyph">沪</div><div>上海话风格<small>侬 · 嗲 · 老好</small></div></div>
+      <div class="v"><div class="glyph">粵</div><div>粤语书面语<small>係 · 咁 · 咗 · 啲</small></div></div>
+      <div class="v"><div class="glyph">臺</div><div>闽南语书面（台湾）<small>毋通 · 媠 · 逐擺</small></div></div>
+      <div class="v"><div class="glyph">閩</div><div>闽南语书面（福建）<small>厦门腔差异</small></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">How it stays native</div>
+    <h2>关键机制:为风格而做的检索增强</h2>
+    <p class="sub">不是训练模型,而是在每次改写时,把真实的"本地人怎么说"证据塞进提示词。改数据即时生效,无需重训。</p>
+    <div class="flow">
+      <h3>RAG-for-style · 每次 /api/rewrite 的数据流</h3>
+      <div class="pipe">
+        <div class="step"><div class="n">输入</div><b>你的文字</b><span>任意语言,作为检索 query</span></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="n">检索 · 纯 stdlib BM25</div><b>句级 top-3 + 词级 top-5</b><span>只在目标方言池里找最相似的</span></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="n">注入</div><b>【本地人示例】+【词音参考】</b><span>拼进 system prompt</span></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="n">生成</div><b>带证据的方言输出</b><span>不再凭描述脑补</span></div>
+      </div>
+      <div class="ex">「你今天看起来很漂亮」<span class="ar">→</span>词典递上 漂亮=嗲 · 你=侬<span class="ar">→</span>「侬今朝看起来老嗲额!」</div>
+    </div>
+  </div>
+</section>
+
+<section class="arch">
+  <div class="wrap">
+    <div class="kicker">Why it's well-built</div>
+    <h2>值得说的工程结构</h2>
+    <p class="sub">小,但每一处都为可维护、可信任、可分享而设计。</p>
+    <div class="grid">
+      <div class="card"><h3>零运行时依赖</h3><p>后端纯 Python 标准库(仅 certifi),前端原生 JS/CSS,无构建步骤。连方言检索都用手写 BM25,不引 PyTorch。clone 即跑。</p></div>
+      <div class="card"><h3>单一真相源</h3><p>方言/场景元数据只活在 <code>presets.py</code>,前端从 <code>/api/presets</code> 读取。加方言=改一个文件,前端自动同步。</p></div>
+      <div class="card"><h3>优雅降级</h3><p>LLM 挂了→本地启发式改写并明示降级;语料检索出错→照常改写。任何增强失败都不拖垮主路径。</p></div>
+      <div class="card"><h3>纵深安全</h3><p>CSP 无 <code>unsafe-inline</code> · 质量数据 AES-GCM 落盘 · 双轨认证(HMAC Cookie + Bearer)· 每 IP 限流 · 路径穿越拒绝 · HSTS。</p></div>
+      <div class="card"><h3>两层测试</h3><p>198 个离线单元测试(LLM 被 mock,秒级跑完)+ 14 项真实 LLM 冒烟脚本 —— 抓"协议变了"这类 mock 测不出的回归。</p></div>
+      <div class="card"><h3>扩展隔离</h3><p>Chrome 扩展用 Shadow DOM 渲染浮窗,宿主页 CSS 互不污染;token 仅以 AES-GCM 密文存于浏览器,passphrase 永不落盘。</p></div>
+    </div>
+    <ul class="why">
+      <li><b>数据可编辑、可溯源</b> —— 400 句语料 + 1189 词条均带来源标注;改一行 JSONL、重启即生效。</li>
+      <li><b>弱势方言收益最大</b> —— 粤语 / 闽南在通用模型里训练样本稀少,正是带出处的语料给它们提供真实依据。</li>
+      <li><b>诚实的质量分级</b> —— 已核验 390 条、保留 10 条待母语者校对,绝不把没把握的标成"已验证"。</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p style="margin-bottom:1rem"><strong>地道中文 · NCGA</strong> —— 让 AI 时代的中文,重新带上"哪里人"的味道。</p>
+    <span class="badge">Python 3.10+ · WSGI</span>
+    <span class="badge">原生前端 · 无构建</span>
+    <span class="badge">DeepSeek / OpenAI 兼容</span>
+    <span class="badge">198 tests · ruff clean</span>
+    <span class="badge">MIT-friendly</span>
+    <p style="margin-top:1.4rem;font-size:12px;opacity:.8">* 除 <code>certifi</code> 外零运行时依赖。生产部署用 waitress + TLS 反代。<br>
+    本页为项目功能与架构总览,由项目自身的代码与数据事实生成。</p>
+  </div>
+</footer>
+
+</body>
+</html>
