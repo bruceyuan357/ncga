@@ -2344,12 +2344,6 @@ mark.kw-hl {
   background: var(--panel);
   display: flex; flex-direction: column; gap: 0.4rem;
 }
-.quality-bucket.has-override { border-left: 3px solid var(--gold); }
-.quality-bucket.needs-reflection { border-left: 3px solid var(--accent); animation: pulse-attention 2s ease-in-out infinite; }
-@keyframes pulse-attention {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(200,62,42,0); }
-  50% { box-shadow: 0 0 0 4px rgba(200,62,42,.15); }
-}
 .quality-bucket-head {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 0.85rem; font-weight: 600;
@@ -2378,135 +2372,8 @@ mark.kw-hl {
   background: linear-gradient(90deg, var(--warning) 0%, var(--gold) 50%, var(--success) 100%);
   transition: width 0.4s ease;
 }
-.quality-bucket-distribution .marker {
-  position: absolute;
-  top: 0; bottom: 0;
-  width: 2px;
-  background: var(--ink);
-  opacity: 0.6;
-  /* Cycle 20: was inline style="left:70%". The 3.5/5 threshold position is
-     fixed → move to CSS so we can drop CSP unsafe-inline on style-src. */
-  left: 70%;
-}
 /* Cycle 20: short skeleton (replaces inline style="width:60%"). */
 .skeleton-row--short { width: 60% !important; }
-.quality-bucket-actions {
-  display: flex; gap: 0.4rem; flex-wrap: wrap;
-}
-.quality-bucket-override {
-  font-size: 0.78rem;
-  color: var(--ink-muted);
-  font-style: italic;
-  padding: 0.4rem;
-  background: var(--panel-soft);
-  border-radius: var(--radius-xs);
-  border-left: 2px solid var(--gold);
-}
-.quality-bucket-override strong { color: var(--gold); font-style: normal; }
-
-/* Cycle 10: draft state + A/B delta */
-.quality-bucket.has-draft {
-  border-left: 3px solid var(--accent);
-  animation: pulse-attention 2s ease-in-out infinite;
-}
-.quality-bucket-draft {
-  font-size: 0.78rem;
-  color: var(--ink);
-  padding: 0.5rem;
-  background: rgba(200, 62, 42, 0.08);
-  border-radius: var(--radius-xs);
-  border-left: 2px solid var(--accent);
-  display: flex; flex-direction: column; gap: 0.3rem;
-}
-.quality-bucket-draft .draft-label {
-  font-weight: 600;
-  color: var(--accent);
-  display: flex; align-items: center; gap: 0.3rem;
-}
-.quality-bucket-ab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-  padding: 0.3rem 0.55rem;
-  background: var(--panel-soft);
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--line);
-}
-.quality-bucket-ab.improved { border-color: var(--success); color: var(--success); }
-.quality-bucket-ab.degraded { border-color: var(--warning); color: var(--warning); }
-.quality-bucket-ab .delta-arrow { font-size: 0.9em; }
-
-/* Override review modal */
-.override-modal-content {
-  max-width: 880px;
-  width: 92%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-.override-diff {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
-  margin: 0.7rem 0;
-  flex: 1;
-  min-height: 0;
-}
-.override-block {
-  display: flex; flex-direction: column;
-  background: var(--panel-soft);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  padding: 0.55rem 0.7rem;
-  min-height: 200px;
-}
-.override-block h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ink-muted);
-  display: flex; align-items: center; gap: 0.3rem;
-}
-.override-block-old h4::before { content: "\f060"; font-family: "Font Awesome 6 Free"; font-weight: 900; color: var(--ink-muted); }
-.override-block-new h4::before { content: "\f061"; font-family: "Font Awesome 6 Free"; font-weight: 900; color: var(--gold); }
-.override-block pre,
-.override-block textarea {
-  flex: 1;
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 0.86rem;
-  line-height: 1.55;
-  padding: 0;
-  margin: 0;
-  resize: none;
-  outline: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow: auto;
-}
-.override-block-new textarea:focus { color: var(--ink); }
-.override-meta {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  font-size: 0.82rem;
-  color: var(--ink-muted);
-  margin: 0.4rem 0;
-  padding: 0.5rem 0.7rem;
-  background: var(--panel-soft);
-  border-radius: var(--radius-xs);
-}
-.override-meta strong { color: var(--ink); }
-
-@media (max-width: 720px) {
-  .override-diff { grid-template-columns: 1fr; }
-}
 
 /* ============================================================
    Scenario picker (Cycle 2 — native register steering)

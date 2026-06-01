@@ -96,7 +96,7 @@
     <div class="stat"><b>6</b><span>语境场景</span></div>
     <div class="stat"><b>400</b><span>句级语料</span></div>
     <div class="stat"><b>1189</b><span>词级词典</span></div>
-    <div class="stat"><b>198</b><span>离线测试</span></div>
+    <div class="stat"><b>180</b><span>离线测试</span></div>
     <div class="stat"><b>0</b><span>运行时依赖*</span></div>
   </div>
 </header>
@@ -111,7 +111,7 @@
       <div class="card"><div class="ic">🎭</div><h3>语境场景</h3><p>同一句话,对长辈、对同事、在网上、在吐槽时说法不同。6 种场景调节口吻分寸。</p></div>
       <div class="card"><div class="ic">⚖️</div><h3>多方言对比</h3><p>一次并排生成多个方言版本,直观看同一个意思在不同乡音里的差别。</p></div>
       <div class="card"><div class="ic">🔍</div><h3>AI 讲解</h3><p>挑出改写里最有"方言味"的 3–6 处变化,逐条解释为什么这样写更地道。</p></div>
-      <div class="card"><div class="ic">⭐</div><h3>质量评分 + 自我改进</h3><p>对结果打分;当某方言长期低分,系统用 Reflexion 思路重写自己的"场景指引",越用越准。</p></div>
+      <div class="card"><div class="ic">⭐</div><h3>质量评分</h3><p>可选地给每次改写打一个"地道度"分数,按(方言 × 场景)聚合成平均分、标准差与分布,在设置页一眼看清哪些乡音改得更稳。</p></div>
       <div class="card"><div class="ic">📚</div><h3>批量工作台</h3><p>一次贴多行,并行改写,可排序、挑选、导出 CSV —— 给需要规模化处理的场景。</p></div>
       <div class="card"><div class="ic">🏷️</div><h3>品牌语调字典</h3><p>自定义"原词 → 必须改成的词",强制注入,保证术语统一。</p></div>
       <div class="card"><div class="ic">🌸</div><h3>今日方言一句 · 随四时</h3><p>每天一句谚语 × 十种乡音;UI 随春樱/夏绿/秋枫/冬青四季流转,带 24 节气与古诗轮换。</p></div>
@@ -172,7 +172,7 @@
       <div class="card"><h3>单一真相源</h3><p>方言/场景元数据只活在 <code>presets.py</code>,前端从 <code>/api/presets</code> 读取。加方言=改一个文件,前端自动同步。</p></div>
       <div class="card"><h3>优雅降级</h3><p>LLM 挂了→本地启发式改写并明示降级;语料检索出错→照常改写。任何增强失败都不拖垮主路径。</p></div>
       <div class="card"><h3>纵深安全</h3><p>CSP 无 <code>unsafe-inline</code> · 质量数据 AES-GCM 落盘 · 双轨认证(HMAC Cookie + Bearer)· 每 IP 限流 · 路径穿越拒绝 · HSTS。</p></div>
-      <div class="card"><h3>两层测试</h3><p>198 个离线单元测试(LLM 被 mock,秒级跑完)+ 14 项真实 LLM 冒烟脚本 —— 抓"协议变了"这类 mock 测不出的回归。</p></div>
+      <div class="card"><h3>两层测试</h3><p>180 个离线单元测试(LLM 被 mock,秒级跑完)+ 14 项真实 LLM 冒烟脚本 —— 抓"协议变了"这类 mock 测不出的回归。</p></div>
       <div class="card"><h3>扩展隔离</h3><p>Chrome 扩展用 Shadow DOM 渲染浮窗,宿主页 CSS 互不污染;token 仅以 AES-GCM 密文存于浏览器,passphrase 永不落盘。</p></div>
     </div>
     <ul class="why">
@@ -189,7 +189,7 @@
     <span class="badge">Python 3.10+ · WSGI</span>
     <span class="badge">原生前端 · 无构建</span>
     <span class="badge">DeepSeek / OpenAI 兼容</span>
-    <span class="badge">198 tests · ruff clean</span>
+    <span class="badge">180 tests · ruff clean</span>
     <span class="badge">MIT-friendly</span>
     <p style="margin-top:1.4rem;font-size:12px;opacity:.8">* 除 <code>certifi</code> 外零运行时依赖。生产部署用 waitress + TLS 反代。<br>
     本页为项目功能与架构总览,由项目自身的代码与数据事实生成。</p>

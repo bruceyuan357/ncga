@@ -135,16 +135,12 @@ def build_system_prompt(
     *,
     scenario: Scenario = Scenario.FRIENDS_CASUAL,
     strict_json: bool = False,
-    addendum_override: str | None = None,
     glossary_lines: list[str] | None = None,
     example_lines: list[str] | None = None,
     lexicon_lines: list[str] | None = None,
 ) -> str:
     """Compose the system prompt.
 
-    Cycle 9 additions:
-    - addendum_override: if provided, replaces the scenario's default prompt_addendum
-      (used by the self-improving prompt system)
     - glossary_lines: brand-voice term substitutions, one per line as
       "中文 → 方言写法"; injected as an extra rule
 
@@ -156,7 +152,7 @@ def build_system_prompt(
     # f-string: no .format() ⇒ literal `{` / `}` in metadata strings can never break templating.
     header = _SYSTEM_PROMPT_HEADER.replace("{label}", metadata.label)
     scenario_meta = SCENARIO_METADATA[scenario]
-    addendum = addendum_override or scenario_meta.prompt_addendum
+    addendum = scenario_meta.prompt_addendum
     body = (
         f"{header}{_SYSTEM_PROMPT_RULES}"
         f"【口吻定位】{metadata.register}\n"
@@ -563,7 +559,6 @@ class ChatCompletionsClient:
         *,
         scenario: Scenario,
         strict_json: bool,
-        addendum_override: str | None = None,
         glossary_lines: list[str] | None = None,
     ) -> dict[str, Any]:
         metadata = PRESET_METADATA[target]
@@ -609,7 +604,6 @@ class ChatCompletionsClient:
                         metadata,
                         scenario=scenario,
                         strict_json=strict_json,
-                        addendum_override=addendum_override,
                         glossary_lines=glossary_lines,
                         example_lines=example_lines,
                         lexicon_lines=lexicon_lines,
@@ -631,7 +625,6 @@ class ChatCompletionsClient:
         *,
         scenario: Scenario,
         strict_json: bool,
-        addendum_override: str | None = None,
         glossary_lines: list[str] | None = None,
     ) -> str:
         payload = self._build_payload(
@@ -639,7 +632,6 @@ class ChatCompletionsClient:
             target,
             scenario=scenario,
             strict_json=strict_json,
-            addendum_override=addendum_override,
             glossary_lines=glossary_lines,
         )
         body = json.dumps(payload).encode("utf-8")
@@ -739,7 +731,6 @@ class ChatCompletionsClient:
         target: VarietyPreset,
         scenario: Scenario = Scenario.FRIENDS_CASUAL,
         *,
-        addendum_override: str | None = None,
         glossary_lines: list[str] | None = None,
     ) -> RewriteResult:
         metadata = PRESET_METADATA[target]
@@ -752,7 +743,6 @@ class ChatCompletionsClient:
                     target,
                     scenario=scenario,
                     strict_json=strict,
-                    addendum_override=addendum_override,
                     glossary_lines=glossary_lines,
                 )
                 parsed = _parse_llm_json(content)
@@ -793,8 +783,8 @@ class ChatCompletionsClient:
     ) -> str:
         """Generic chat-completions wrapper with HTTPError-aware retry on 5xx.
 
-        Cycle 14: this replaces direct `_transport.post` access from rate_quality and
-        meta_refine. Centralizes:
+        Cycle 14: this replaces direct `_transport.post` access from rate_quality.
+        Centralizes:
           - SSL context resolution
           - Timeout
           - Auth header
@@ -1099,9 +1089,6 @@ class RewriteService:
     ) -> RewriteResult:
         normalized = validate_text(text)
         started = time.perf_counter()
-        addendum_override = None
-        if self.quality_store is not None:
-            addendum_override = self.quality_store.get_override_addendum(target.value, scenario.value)
         if self._client is None:
             result = self._fallback.rewrite(normalized, target, reason="No LLM provider is configured.")
             self._log_request(target, started, degraded=True)
@@ -1112,7 +1099,6 @@ class RewriteService:
                 normalized,
                 target,
                 scenario=scenario,
-                addendum_override=addendum_override,
                 glossary_lines=glossary_lines,
             )
             self._log_request(target, started, degraded=result.degraded)
@@ -1129,15 +1115,14 @@ class RewriteService:
         target: VarietyPreset,
         *,
         scenario: Scenario | None = None,
-        original: str = "",
     ) -> dict[str, Any]:
         """Service wrapper: rate the native-ness of `rewritten` in `target`.
 
         Cycle 17: replaced the awkward `record_for=(variety_value, scenario_value)`
         tuple — the caller had to pass both `target` and `target.value`. Now the
         caller passes the `scenario` enum directly; we derive the storage keys.
-        If `scenario` is provided and a quality_store is attached, the result is
-        recorded for the self-improving loop.
+        If `scenario` is provided and a quality_store is attached, the score is
+        recorded into the per-(variety, scenario) quality stats.
         """
         if self._client is None:
             raise RewriteError("评分功能需要 LLM 服务。请先配置 LLM_API_KEY 后再试。")
@@ -1151,81 +1136,8 @@ class RewriteService:
                 variety=target.value,
                 scenario=scenario.value,
                 score=float(result.get("score", 0)),
-                original=original,
-                rewritten=rewritten,
-                reason=str(result.get("reason", "")),
             )
         return result
-
-    def meta_refine(self, target: VarietyPreset, scenario: Scenario) -> dict[str, Any]:
-        """Reflexion-style: ask the LLM to look at hi/lo scoring samples for this
-        (variety, scenario) and propose a refined prompt addendum.
-
-        Returns {new_addendum, diff_summary, baseline_mean, sample_count}.
-        Raises RewriteError if the store doesn't have enough data, or LLM fails.
-        """
-        from native_chinese_assistant.feedback import (  # local import to avoid cycle
-            REFINER_SYSTEM_PROMPT,
-            build_refiner_user_prompt,
-        )
-
-        if self._client is None:
-            raise RewriteError("自反馈功能需要 LLM 服务。请先配置 LLM_API_KEY 后再试。")
-        if self.quality_store is None:
-            raise RewriteError("尚未启用 quality store，无法进行自反馈。")
-        bucket = self.quality_store.get_bucket(target.value, scenario.value)
-        if not bucket or bucket.stats.n < self.quality_store.trigger_min_count:
-            raise ValueError(
-                f"样本不足（需 ≥ {self.quality_store.trigger_min_count}，目前 {bucket.stats.n if bucket else 0}）"
-            )
-        hi, lo = self.quality_store.hi_lo_examples(target.value, scenario.value)
-        metadata = PRESET_METADATA[target]
-        scenario_meta = SCENARIO_METADATA[scenario]
-        current_addendum = bucket.override_addendum or scenario_meta.prompt_addendum
-        user_prompt = build_refiner_user_prompt(
-            variety_label=metadata.label,
-            scenario_label=scenario_meta.label,
-            current_addendum=current_addendum,
-            hi_samples=hi,
-            lo_samples=lo,
-        )
-        # Cycle 14: route through public general_chat (no more _transport peek).
-        # Inherits 5xx + network retry + clean error wrapping for free.
-        content = self._client.general_chat(
-            [
-                {"role": "system", "content": REFINER_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=800,
-            temperature=0.3,
-        )
-        try:
-            parsed = _parse_llm_json(content)
-        except (json.JSONDecodeError, RewriteError) as exc:
-            raise RewriteError(f"Refiner returned invalid JSON: {exc}") from exc
-        new_addendum = str(parsed.get("new_addendum", "")).strip()
-        diff_summary = str(parsed.get("diff_summary", "")).strip()
-        if not new_addendum:
-            raise RewriteError("Refiner returned empty new_addendum.")
-        baseline_mean = bucket.stats.mean
-        # Cycle 10: write to DRAFT, not directly to active override.
-        # User must explicitly call activate_override (via /api/override-activate) to apply.
-        self.quality_store.set_draft(
-            variety=target.value,
-            scenario=scenario.value,
-            addendum=new_addendum,
-            reason=diff_summary or "auto-refined from quality samples",
-            baseline_mean=baseline_mean,
-        )
-        return {
-            "new_addendum": new_addendum,
-            "diff_summary": diff_summary,
-            "baseline_mean": round(baseline_mean, 2),
-            "sample_count": bucket.stats.n,
-            "hi_count": len(hi),
-            "lo_count": len(lo),
-            "status": "draft",  # explicit signal to caller: not yet active
-        }
 
     def rewrite_stream(
         self,
