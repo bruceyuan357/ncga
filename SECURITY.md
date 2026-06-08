@@ -34,7 +34,7 @@ NCGA is a single-user / small-team Chinese rewriting tool. The threat model is:
 | Control | How |
 |---|---|
 | **TLS** | Always run behind a reverse proxy (Caddy / Nginx / Cloudflare) that terminates HTTPS. NCGA itself only serves HTTP. |
-| **Bearer-token auth** | Set `NCGA_AUTH_TOKEN=<random 32+ chars>` env. All `POST /api/*` then require `Authorization: Bearer <token>`. The token is injected into served `index.html` via a `<meta>` tag the SPA reads at boot. |
+| **Auth (dual-track)** | Set `NCGA_AUTH_TOKEN=<random 32+ chars>` env. Then `POST /api/*` accepts either: (1) `Authorization: Bearer <token>` for scripts / CLI / the extension (token stays in `.env`); or (2) an HMAC-signed HttpOnly `ncga_sess` cookie for the SPA, set on each `index.html` serve and signed with `NCGA_AUTH_TOKEN` (rotating the token revokes every cookie). The SPA detects auth-is-on via a no-secret `<meta name="ncga-auth-mode" content="cookie">` marker — the raw token is **never** injected into HTML. |
 | **At-rest encryption of quality store** | Set `NCGA_DATA_KEY=<base64 32 bytes>` env. AES-GCM (NIST-approved). Without this env, NCGA auto-generates a key under `~/.local/share/ncga/data.key` (mode 0600) on first run; *or* falls back to plaintext with a warning if neither is writable. |
 | **X-Forwarded-For** | Default: **NOT trusted** (prevents per-IP rate-limit spoofing). Set `NCGA_TRUST_FORWARDED_FOR=true` only when behind a trusted proxy. |
 | **CSP** | `script-src 'self' 'nonce-...'` — no `unsafe-inline`. Per-response nonce attached to inline boot script. |

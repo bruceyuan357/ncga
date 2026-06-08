@@ -8,7 +8,7 @@
 
 | 条件 | 怎么检查 |
 |---|---|
-| 服务器在跑 | Terminal 进 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf` 后跑 `python3 app.py`,看到 `Listening on http://127.0.0.1:8000` 就 OK |
+| 服务器在跑 | Terminal 进 `/Users/bruce/NCGA` 后跑 `python3 app.py`,看到 `Listening on http://127.0.0.1:8000` 就 OK |
 | 服务器开了 token | 跑 `grep NCGA_AUTH_TOKEN .env`,有一行像 `NCGA_AUTH_TOKEN=xxxxxxxx` |
 | 没 token? | 编辑 `.env` 加一行 `NCGA_AUTH_TOKEN=` + 一段你自定义的字符串(32 位以上,随便打),保存,**重启 app** |
 | Chrome 是新版 | 地址栏输 `chrome://version`,要 ≥ 116 |
@@ -20,14 +20,14 @@
 1. Chrome 地址栏输 `chrome://extensions`
 2. 右上角 **开发者模式** 切到开
 3. 左上角点 **加载已解压的扩展程序**
-4. 选择 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf/extension` 文件夹
+4. 选择 `/Users/bruce/NCGA/extension` 文件夹
 5. 应该看到一张卡:**地道中文 · NCGA  v0.1.0**(带粉色方块图标)
 
 ✅ **预期:** 卡片底色白,**没有红色错误提示**
 
 ❌ **若有红色** "Could not load icon ..." → icons 文件夹缺图,跑:
 ```bash
-cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
+cd /Users/bruce/NCGA && ls extension/icons/
 ```
 应该 4 个 PNG,缺了告诉我,我用脚本重生成
 
@@ -69,7 +69,7 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 ## 4. 解锁
 
 1. 工具栏粉色方块 → 弹窗
-2. 顶上一行:**Token 已锁定 — 输 passphrase 解锁(30 分钟自动锁)**
+2. 顶上一行:**Token 已锁定 — 输 passphrase 解锁(关浏览器后自动失效)**
 3. 输你刚才设的 passphrase → **解锁**
 4. 弹窗变成:**已就绪 · http://localhost:8000**(绿色)
 
@@ -117,10 +117,10 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 
 ---
 
-## 8. 30 分钟自动锁
+## 8. Token 有效期
 
-- token 在 `chrome.storage.session` 缓存,30 分钟无活动自动失效
-- 浏览器关掉所有窗口也自动清(session storage 设计)
+- token 存在 `chrome.storage.session`,**关掉所有浏览器窗口即自动清空**(session storage 设计 — 一次浏览器会话内只需解锁一次)
+- 不再有 30 分钟 idle 超时(老版本反复要输 passphrase 太烦,已改为会话级)
 - 想立刻锁:扩展弹窗底部「锁回去」
 
 ---
@@ -151,7 +151,7 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 ## 11. 升级 / 修代码后
 
 ```bash
-cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf
+cd /Users/bruce/NCGA
 git pull             # 拉 Claude 推的最新改动
 ```
 然后 `chrome://extensions` → NCGA → 点刷新箭头,新代码生效。

@@ -1077,7 +1077,7 @@ class RewriteService:
             self._config = config if config is not None else load_llm_config()
             self._client = ChatCompletionsClient(self._config) if self._config else None
         self._fallback = HeuristicRewriter()
-        self.quality_store = quality_store  # if None, no self-improvement; otherwise lookup overrides
+        self.quality_store = quality_store  # if None, ratings not persisted; else rate_quality records them
 
     def rewrite(
         self,

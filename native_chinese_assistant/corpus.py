@@ -6,8 +6,8 @@ similar examples for the target variety and inject them into the system
 prompt as "学一下这些本地人怎么说" few-shot examples.
 
 Why BM25 instead of sentence embeddings:
-- Zero external deps (stays consistent with NCGA's "no runtime deps except
-  certifi" rule). sentence-transformers + torch would be ~1GB on first import.
+- No heavy ML deps (consistent with NCGA's minimal-deps rule: only certifi +
+  cryptography at runtime). sentence-transformers + torch would be ~1GB on first import.
 - For short text (<50 chars), BM25 with char-bigram tokenization performs
   competitively with dense retrieval. The downside is poor synonym handling,
   but our corpus is small enough that any missed match falls back to "use any

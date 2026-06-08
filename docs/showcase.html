@@ -97,7 +97,7 @@
     <div class="stat"><b>400</b><span>句级语料</span></div>
     <div class="stat"><b>1189</b><span>词级词典</span></div>
     <div class="stat"><b>180</b><span>离线测试</span></div>
-    <div class="stat"><b>0</b><span>运行时依赖*</span></div>
+    <div class="stat"><b>2</b><span>运行时依赖*</span></div>
   </div>
 </header>
 
@@ -168,7 +168,7 @@
     <h2>值得说的工程结构</h2>
     <p class="sub">小,但每一处都为可维护、可信任、可分享而设计。</p>
     <div class="grid">
-      <div class="card"><h3>零运行时依赖</h3><p>后端纯 Python 标准库(仅 certifi),前端原生 JS/CSS,无构建步骤。连方言检索都用手写 BM25,不引 PyTorch。clone 即跑。</p></div>
+      <div class="card"><h3>极简依赖</h3><p>后端仅 Python 标准库 + certifi + cryptography(AES-GCM 加密),前端原生 JS/CSS,无构建步骤。连方言检索都用手写 BM25,不引 PyTorch。clone 即跑。</p></div>
       <div class="card"><h3>单一真相源</h3><p>方言/场景元数据只活在 <code>presets.py</code>,前端从 <code>/api/presets</code> 读取。加方言=改一个文件,前端自动同步。</p></div>
       <div class="card"><h3>优雅降级</h3><p>LLM 挂了→本地启发式改写并明示降级;语料检索出错→照常改写。任何增强失败都不拖垮主路径。</p></div>
       <div class="card"><h3>纵深安全</h3><p>CSP 无 <code>unsafe-inline</code> · 质量数据 AES-GCM 落盘 · 双轨认证(HMAC Cookie + Bearer)· 每 IP 限流 · 路径穿越拒绝 · HSTS。</p></div>
@@ -191,7 +191,7 @@
     <span class="badge">DeepSeek / OpenAI 兼容</span>
     <span class="badge">180 tests · ruff clean</span>
     <span class="badge">MIT-friendly</span>
-    <p style="margin-top:1.4rem;font-size:12px;opacity:.8">* 除 <code>certifi</code> 外零运行时依赖。生产部署用 waitress + TLS 反代。<br>
+    <p style="margin-top:1.4rem;font-size:12px;opacity:.8">* 运行时依赖仅 <code>certifi</code> + <code>cryptography</code>(AES-GCM)。生产部署用 waitress + TLS 反代。<br>
     本页为项目功能与架构总览,由项目自身的代码与数据事实生成。</p>
   </div>
 </footer>

@@ -21,7 +21,7 @@
 > - **settings 加「随四时」切换器** — 古朴 / 墨韵 / 随四时 三选
 > - 切回 v2/v1:右下角 sidebar 底部 version-switch 点其他选项
 
-- 后端：Python 3.10+，零运行时依赖（除 `certifi`）。WSGI。
+- 后端：Python 3.10+，运行时依赖仅 `certifi` + `cryptography`（AES-GCM 落盘加密）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
 - LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时回退到本地启发式重写并明示降级。
 
@@ -62,14 +62,14 @@ python app.py                          # http://127.0.0.1:8000
 
 ## 语料库与少样本注入 (Cycle 22 Stage C)
 
-`data/corpus.jsonl` 是手写的方言语料(100 条:10 方言 × 10 场景),每条:
+`data/corpus.jsonl` 是手写的方言语料(400 条:10 方言 × 40 条/方言),每条:
 ```json
 {"variety":"shanghai_mandarin_style","scenario":"request","original":"我能借一下你的笔吗","rewrite":"支笔借拨我用一道好伐","quality_tier":"verified","notes":"拨+用一道+伐"}
 ```
 
 每次 `/api/rewrite` 调用时,后端用纯 stdlib BM25(`native_chinese_assistant/corpus.py`)从目标方言池里检索 top-3 最像的示例,以「【本地人示例】参考这些真实的本地说法,不要逐字复制」块注入 system prompt。LLM 因此能看到具体的「原文 → 本地说法」对子,而非仅靠风格描述脑补。
 
-**当前状态**:70 条 verified(普通话/京/东北/川渝/江淮/广普/上海)+ 30 条 needs_review(粤书/台闽南/福建闽南 — 母语者欢迎 PR)。
+**当前状态**:390 条 verified + 10 条 needs_review(后者均为「闽南语书面语·福建」,母语者欢迎 PR)。
 
 **扩到 30 条/方言**(需 `DEEPSEEK_API_KEY`):
 ```bash
@@ -152,8 +152,8 @@ waitress-serve --host 0.0.0.0 --port 8000 native_chinese_assistant.web:applicati
 详见 [SECURITY.md](SECURITY.md)。**公网部署前**至少做以下三件：
 
 1. **TLS 反代**（Caddy / Nginx / Cloudflare）。NCGA 自身只跑 HTTP，永远不要直接暴露到公网。
-2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走 bearer 鉴权，前端通过服务端注入的 `<meta>` 自动附 `Authorization` 头。
-3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（包含用户原文 + 评分等敏感数据）。
+2. **设 `NCGA_AUTH_TOKEN`**：开启双轨认证 —— 浏览器 SPA 走 HMAC 签名 cookie（服务端注入 `<meta name="ncga-auth-mode">` 标记触发，原始 token 不入 HTML），扩展/脚本走 `Authorization: Bearer` 头。
+3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（Cycle 23 起仅存评分统计,不再含用户原文）。
 
 ```bash
 # 生成两个密钥
