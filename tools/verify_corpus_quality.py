@@ -25,16 +25,38 @@ CORPUS_PATH = REPO_ROOT / "data" / "corpus.jsonl"
 LEXICON_PATH = REPO_ROOT / "data" / "lexicon.jsonl"
 
 
+# Build one SSL context with a real CA bundle. On python.org framework
+# installs (e.g. 3.14 on macOS where "Install Certificates.command" was never
+# run) ssl.create_default_context() trusts NOTHING — cafile/capath are both
+# None — so every HTTPS check dies with CERTIFICATE_VERIFY_FAILED and the tool
+# reports a maximally misleading 0% reachable. The app's own LLM client already
+# avoids this via certifi (native_chinese_assistant/rewrite.py); mirror that.
+def _build_ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+_SSL_CTX = _build_ssl_context()
+
+# A browser-like UA: some sources (Chinese reference sites, wiki mirrors) 403
+# obvious bot UAs. This is verification traffic, not scraping.
+_BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+
+
 def head_check(url: str, timeout: float = 8.0) -> tuple[bool, str]:
     """Return (is_ok, status_string) — try HEAD first, GET fallback."""
     if not url or not url.startswith(("http://", "https://")):
         return False, "no-scheme"
-    ctx = ssl.create_default_context()
+    ctx = _SSL_CTX
     for method in ("HEAD", "GET"):
         req = urllib.request.Request(
             url,
             method=method,
-            headers={"User-Agent": "NCGA-verify/0.1"},
+            headers={"User-Agent": _BROWSER_UA},
         )
         try:
             with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
