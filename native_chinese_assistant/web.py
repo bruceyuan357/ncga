@@ -519,7 +519,7 @@ class App:
         max_body_bytes: int | None = None,
         quality_store: QualityStore | None = None,
     ) -> None:
-        # If a quality_store is given, attach it to the service so prompt overrides apply.
+        # If a quality_store is given, attach it to the service so ratings are recorded.
         if quality_store is None:
             store_path = os.environ.get("NCGA_QUALITY_STORE", "").strip()
             if store_path:
@@ -655,10 +655,6 @@ class App:
             ("POST", "/api/rate"): self.handle_rate,
             ("POST", "/api/explain"): self.handle_explain,
             ("POST", "/api/characterize"): self.handle_characterize,
-            ("POST", "/api/meta-refine"): self.handle_meta_refine,
-            ("POST", "/api/quality-stats/clear-override"): self.handle_clear_override,
-            ("POST", "/api/override-activate"): self.handle_override_activate,
-            ("POST", "/api/override-reject"): self.handle_override_reject,
             ("POST", "/api/feedback"): self.handle_feedback,
             ("POST", "/api/login"): self.handle_login,
             ("POST", "/api/logout"): self.handle_logout,
@@ -986,7 +982,6 @@ class App:
             rewritten = payload["rewritten"]
             target = parse_variety(payload["target_variety"])
             scenario = parse_scenario(payload.get("scenario"))
-            original = str(payload.get("original", "") or "")
         except KeyError as exc:
             field = exc.args[0] if exc.args else "<unknown>"
             return json_response(
@@ -1003,14 +998,11 @@ class App:
                 rewritten,
                 target,
                 scenario=scenario,
-                original=original,
             )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
-        # Surface whether reflection is now warranted, so the UI can prompt user
-        data = {**data, "needs_reflection": self.quality_store.needs_reflection(target.value, scenario.value)}
         return json_response(start_response, "200 OK", data)
 
     def handle_transform(self, environ: dict, start_response: Callable) -> list[bytes]:
@@ -1138,14 +1130,7 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
-        self.quality_store.record(
-            f"mode:{mode.value}",
-            "transform",
-            float(data["score"]),
-            original,
-            transformed,
-            data.get("reason", ""),
-        )
+        self.quality_store.record(f"mode:{mode.value}", "transform", float(data["score"]))
         return json_response(start_response, "200 OK", data)
 
     def handle_rewrite_batch(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -1240,106 +1225,6 @@ class App:
             glossary_lines=glossary_lines,
             max_parallel=max_parallel,
         )
-
-    def handle_meta_refine(self, environ: dict, start_response: Callable) -> list[bytes]:
-        """Trigger Reflexion-style prompt refinement for (variety, scenario)."""
-        ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "meta-refine")
-        if cap_err is not None:
-            return cap_err
-        if not self.rate_limiter.allow(ip):
-            return json_response(
-                start_response,
-                "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
-            )
-        payload, err = self._read_json_body(environ, start_response)
-        if err is not None:
-            return err
-        try:
-            target = parse_variety(payload["target_variety"])
-            scenario = parse_scenario(payload.get("scenario"))
-        except KeyError as exc:
-            field = exc.args[0] if exc.args else "<unknown>"
-            return json_response(
-                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
-            )
-        except ValueError as exc:
-            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        try:
-            data = self.rewrite_service.meta_refine(target, scenario)
-        except ValueError as exc:
-            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        except RewriteError as exc:
-            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
-        return json_response(start_response, "200 OK", data)
-
-    def handle_override_activate(self, environ: dict, start_response: Callable) -> list[bytes]:
-        """Promote a draft override to active. Optionally accept user-edited addendum text."""
-        payload, err = self._read_json_body(environ, start_response)
-        if err is not None:
-            return err
-        try:
-            target = parse_variety(payload["target_variety"])
-            scenario = parse_scenario(payload.get("scenario"))
-        except KeyError as exc:
-            field = exc.args[0] if exc.args else "<unknown>"
-            return json_response(
-                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
-            )
-        except ValueError as exc:
-            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        # Optional user override of the addendum text (lets them edit before activating)
-        edited_addendum = payload.get("addendum")
-        if edited_addendum is not None and not isinstance(edited_addendum, str):
-            return json_response(start_response, "400 Bad Request", {"error": "`addendum` must be a string."})
-        if edited_addendum is not None and len(edited_addendum) > 2000:
-            return json_response(
-                start_response, "400 Bad Request", {"error": "Addendum too long (max 2000 chars)."}
-            )
-        ok = self.quality_store.activate_override(
-            target.value,
-            scenario.value,
-            addendum=edited_addendum,
-            reason=payload.get("reason"),
-        )
-        return json_response(start_response, "200 OK", {"activated": ok})
-
-    def handle_override_reject(self, environ: dict, start_response: Callable) -> list[bytes]:
-        """Discard a draft without activating. Stats are kept; cooldown still applies."""
-        payload, err = self._read_json_body(environ, start_response)
-        if err is not None:
-            return err
-        try:
-            target = parse_variety(payload["target_variety"])
-            scenario = parse_scenario(payload.get("scenario"))
-        except KeyError as exc:
-            field = exc.args[0] if exc.args else "<unknown>"
-            return json_response(
-                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
-            )
-        except ValueError as exc:
-            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        rejected = self.quality_store.reject_draft(target.value, scenario.value)
-        return json_response(start_response, "200 OK", {"rejected": rejected})
-
-    def handle_clear_override(self, environ: dict, start_response: Callable) -> list[bytes]:
-        """Reset a (variety, scenario) override back to the default scenario addendum."""
-        payload, err = self._read_json_body(environ, start_response)
-        if err is not None:
-            return err
-        try:
-            target = parse_variety(payload["target_variety"])
-            scenario = parse_scenario(payload.get("scenario"))
-        except KeyError as exc:
-            field = exc.args[0] if exc.args else "<unknown>"
-            return json_response(
-                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
-            )
-        except ValueError as exc:
-            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
-        cleared = self.quality_store.clear_override(target.value, scenario.value)
-        return json_response(start_response, "200 OK", {"cleared": cleared})
 
     def handle_quality_stats(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Cycle 21 self-audit #2: was a bare lambda, no rate limit. A leaked
@@ -1708,9 +1593,34 @@ def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, ma
     yield _sse_event("done", {"summary": {"ok": ok_count, "failed": fail_count, "total": total}})
 
 
-# Module-level WSGI entry point so production servers can use
-# `waitress-serve native_chinese_assistant.web:application` directly.
-application = App()
+class _LazyApp:
+    """Module-level WSGI entry point that defers App() construction to first use.
+
+    Importing this module must stay side-effect free: App() opens (and decrypts)
+    the QualityStore, and at import time .env is typically not loaded yet. An
+    eager `App()` here meant every `stop`/`status` invocation, test import, and
+    even the normal `start` path (import runs before run_server's load_dotenv)
+    decrypted the real store with the fallback keyfile instead of NCGA_DATA_KEY —
+    quarantining a healthy store every time (~16 incidents, 2026-04 → 2026-06).
+    """
+
+    def __init__(self) -> None:
+        self._app: App | None = None
+        self._lock = threading.Lock()
+
+    def resolve(self) -> App:
+        with self._lock:
+            if self._app is None:
+                self._app = App()
+            return self._app
+
+    def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
+        return self.resolve()(environ, start_response)
+
+
+# Production servers can still use `waitress-serve native_chinese_assistant.web:application`;
+# the real App is built on first request (env vars must be set, as before).
+application = _LazyApp()
 
 
 # ---------------- logging setup ----------------
@@ -1993,6 +1903,11 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
     load_dotenv()
     configure_logging(os.environ.get("NCGA_LOG_LEVEL", "INFO"))
 
+    # Build the App NOW — after load_dotenv, before serving — so a key/store
+    # misconfiguration aborts startup with a clear error instead of 500-ing
+    # every request later.
+    application.resolve()
+
     host = host or os.environ.get("NCGA_HOST", "127.0.0.1")
     port = port or int(os.environ.get("NCGA_PORT", "8000"))
     pid_file = _default_pid_file()
@@ -2058,6 +1973,10 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
 def main() -> None:
     """Entry point with subcommands: start (default), stop, status."""
     import sys
+
+    # All subcommands want .env: start for keys/auth, stop/status for
+    # NCGA_HOST/NCGA_PORT. setdefault semantics — shell env still wins.
+    load_dotenv()
 
     args = sys.argv[1:]
     if not args or args[0] in ("start", "run"):

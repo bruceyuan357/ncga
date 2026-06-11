@@ -27,7 +27,7 @@
 > - **总结** (`summarize`) — 压缩成一句话或要点列表
 > - **白话解释** (`explain`) — 术语/法条/难句,用大白话讲明白;deepseek 下默认走更强的 `deepseek-v4-pro` 模型(其他 provider 跟随全局 `LLM_MODEL`)
 
-- 后端：Python 3.10+。运行时依赖仅 `certifi` + `cryptography`（见 `requirements.txt`）。WSGI。
+- 后端：Python 3.10+。运行时依赖仅 `certifi` + `cryptography`（AES-GCM 落盘加密；见 `requirements.txt`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
 - LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时**方言改写**回退到本地启发式重写并明示降级；**文本变换**（Cycle 23）无启发式回退，直接返回 503。
 
@@ -165,8 +165,8 @@ waitress-serve --host 0.0.0.0 --port 8000 native_chinese_assistant.web:applicati
 详见 [SECURITY.md](SECURITY.md)。**公网部署前**至少做以下三件：
 
 1. **TLS 反代**（Caddy / Nginx / Cloudflare）。NCGA 自身只跑 HTTP，永远不要直接暴露到公网。
-2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走双轨鉴权 — 浏览器 SPA 用 HMAC 签名 cookie(`GET /` 时下发,token 本身**不再注入 HTML**),API / 扩展 / 脚本用 `Authorization: Bearer` 头。服务端只注入一个无密钥的 `<meta name="ncga-auth-mode">` 标记,让前端知道 cookie 模式已开。
-3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（包含用户原文 + 评分等敏感数据）。
+2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走双轨鉴权 — 浏览器 SPA 用 HMAC 签名 cookie(`POST /api/login` 用 token 换发,已认证的 `GET /` 刷新;token 本身**不注入 HTML**),API / 扩展 / 脚本用 `Authorization: Bearer` 头。服务端只注入一个无密钥的 `<meta name="ncga-auth-mode">` 标记,让前端知道 cookie 模式已开。
+3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（自 Refiner 移除起仅存评分统计聚合,不再含用户原文）。
 
 ```bash
 # 生成两个密钥

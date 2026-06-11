@@ -1051,18 +1051,6 @@ class ValidationDiagnosticsTests(unittest.TestCase):
         self.assertIn("Missing required field", payload["error"])
         self.assertIn("target_variety", payload["error"])
 
-    def test_meta_refine_invalid_variety_echoes_value(self) -> None:
-        status, _, body = call_app(
-            self._make_app(),
-            "POST",
-            "/api/meta-refine",
-            body=json.dumps({"target_variety": "not_a_dialect"}).encode("utf-8"),
-        )
-        payload = json.loads(body.decode("utf-8"))
-        self.assertEqual(status, "400 Bad Request")
-        self.assertIn("Unsupported target variety", payload["error"])
-        self.assertIn("not_a_dialect", payload["error"])
-
 
 # ---------------- Cycle 18 — Function 1: 情境向导 ----------------
 
@@ -1581,65 +1569,20 @@ class FeedbackStoreTests(unittest.TestCase):
         from native_chinese_assistant.feedback import QualityStore
 
         s1 = QualityStore(path=self.tmp)
-        s1.record("beijing_mandarin", "friends_casual", 4.0, "原", "改", "好")
-        s1.record("beijing_mandarin", "friends_casual", 2.0, "原2", "改2", "差")
+        s1.record("beijing_mandarin", "friends_casual", 4.0)
+        s1.record("beijing_mandarin", "friends_casual", 2.0)
         s2 = QualityStore(path=self.tmp)  # reload
         bucket = s2.get_bucket("beijing_mandarin", "friends_casual")
         self.assertEqual(bucket.stats.n, 2)
         self.assertAlmostEqual(bucket.stats.mean, 3.0, places=2)
-        self.assertEqual(len(bucket.samples), 2)
-
-    def test_needs_reflection_below_threshold(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=self.tmp, trigger_min_count=3, trigger_threshold=3.5, reflect_cooldown_s=0)
-        for x in [2.0, 2.5, 3.0]:
-            s.record("v", "sc", x, "o", "r", "")
-        self.assertTrue(s.needs_reflection("v", "sc"))
-
-    def test_needs_reflection_false_when_mean_high(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=self.tmp, trigger_min_count=3, trigger_threshold=3.5, reflect_cooldown_s=0)
-        for x in [4.0, 4.5, 5.0]:
-            s.record("v", "sc", x, "o", "r", "")
-        self.assertFalse(s.needs_reflection("v", "sc"))
-
-    def test_set_override_blocks_reflection_until_cooldown(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=self.tmp, trigger_min_count=2, trigger_threshold=3.5, reflect_cooldown_s=300)
-        s.record("v", "sc", 1.0, "o", "r", "")
-        s.record("v", "sc", 2.0, "o", "r", "")
-        s.set_override("v", "sc", "新指引", "test override", baseline_mean=1.5)
-        self.assertFalse(s.needs_reflection("v", "sc"))
-        self.assertEqual(s.get_override_addendum("v", "sc"), "新指引")
-
-    def test_clear_override(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=self.tmp)
-        s.set_override("v", "sc", "X", "r")
-        self.assertTrue(s.clear_override("v", "sc"))
-        self.assertIsNone(s.get_override_addendum("v", "sc"))
-        self.assertFalse(s.clear_override("v", "sc"))  # already cleared
-
-    def test_hi_lo_examples(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=self.tmp)
-        for i, score in enumerate([1.0, 2.0, 3.0, 4.0, 5.0]):
-            s.record("v", "sc", score, f"o{i}", f"r{i}", "")
-        hi, lo = s.hi_lo_examples("v", "sc", n_each=2)
-        self.assertEqual([h.score for h in hi], [5.0, 4.0])
-        self.assertEqual([lr.score for lr in lo], [1.0, 2.0])
 
     def test_load_failure_quarantines_file_instead_of_clobbering(self) -> None:
-        """Cycle 17: an unreadable store file (e.g., wrong key, parse error) must NOT
-        be silently overwritten with an empty store on the next persist. It gets
+        """Cycle 17: a genuinely corrupt store file (parse error) must NOT be
+        silently overwritten with an empty store on the next persist. It gets
         renamed aside so the user can recover the original bytes.
-        Ground truth: this exact pattern destroyed 14 real samples on 2026-04-30 when
-        a stale ~/.local/share/ncga/data.key drifted from .env's NCGA_DATA_KEY.
+        Ground truth: silent clobbering destroyed 14 real samples on 2026-04-30.
+        Note: a wrong/missing key is NOT corruption and must not land here — see
+        test_wrong_key_refuses_to_load_and_leaves_file_untouched.
         """
         from native_chinese_assistant.feedback import QualityStore
 
@@ -1654,22 +1597,14 @@ class FeedbackStoreTests(unittest.TestCase):
         self.assertEqual(siblings[0].read_bytes(), b"this is not valid quality data")
         self.assertFalse(self.tmp.exists())
         # A fresh round-trip works
-        s.record("v", "sc", 4.0, "o", "r", "")
+        s.record("v", "sc", 4.0)
         s2 = QualityStore(path=self.tmp)
         snap = s2.stats_snapshot()
         self.assertEqual(snap[0]["stats"]["count"], 1)
 
 
-class GlossaryAndOverrideTests(unittest.TestCase):
-    """Cycle 9: prompt-level features."""
-
-    def test_build_system_prompt_uses_addendum_override(self) -> None:
-        from native_chinese_assistant.rewrite import build_system_prompt
-
-        meta = PRESET_METADATA[VarietyPreset.BEIJING_MANDARIN]
-        custom = "【场景】特别测试用的指引——必须出现这个标记"
-        prompt = build_system_prompt(meta, addendum_override=custom)
-        self.assertIn("特别测试用的指引", prompt)
+class GlossaryTests(unittest.TestCase):
+    """Cycle 9: prompt-level features (brand-voice glossary)."""
 
     def test_build_system_prompt_includes_glossary(self) -> None:
         from native_chinese_assistant.rewrite import build_system_prompt
@@ -1698,265 +1633,10 @@ class GlossaryAndOverrideTests(unittest.TestCase):
             "测试",
             VarietyPreset.BEIJING_MANDARIN,
             scenario=Scenario.FRIENDS_CASUAL,
-            original="原",
         )
         bucket = store.get_bucket("beijing_mandarin", "friends_casual")
         self.assertEqual(bucket.stats.n, 1)
         self.assertEqual(bucket.stats.mean, 4.0)
-
-
-class MetaRefineTests(unittest.TestCase):
-    def test_meta_refine_happy_path_sets_override(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        store = QualityStore(
-            path=Path(tempfile.mkdtemp()) / "s.json",
-            trigger_min_count=3,
-            trigger_threshold=4.5,
-        )
-        for x in [2.0, 2.5, 3.0]:
-            store.record("beijing_mandarin", "friends_casual", x, "原", "改", "差")
-
-        refine_resp = json.dumps(
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": json.dumps(
-                                {
-                                    "new_addendum": "【场景】更具体的新指引：必须用儿化音 ≥3 个，禁止 emoji。",
-                                    "diff_summary": "强制儿化音并禁 emoji",
-                                }
-                            )
-                        }
-                    }
-                ]
-            }
-        ).encode("utf-8")
-        client, _ = _build_client(refine_resp)
-        service = RewriteService(client=client, quality_store=store)
-        result = service.meta_refine(VarietyPreset.BEIJING_MANDARIN, Scenario.FRIENDS_CASUAL)
-        self.assertIn("儿化音", result["new_addendum"])
-        self.assertEqual(result["sample_count"], 3)
-        # Cycle 10 change: meta_refine writes to DRAFT, not active override.
-        # Active override should NOT be set yet (requires activate_override).
-        self.assertIsNone(store.get_override_addendum("beijing_mandarin", "friends_casual"))
-        self.assertEqual(result["status"], "draft")
-        bucket = store.get_bucket("beijing_mandarin", "friends_casual")
-        self.assertEqual(bucket.draft_addendum, result["new_addendum"])
-        # Activating it promotes draft → override
-        self.assertTrue(store.activate_override("beijing_mandarin", "friends_casual"))
-        self.assertEqual(
-            store.get_override_addendum("beijing_mandarin", "friends_casual"),
-            result["new_addendum"],
-        )
-        # Draft was cleared after activation
-        self.assertIsNone(store.get_bucket("beijing_mandarin", "friends_casual").draft_addendum)
-
-    def test_set_draft_does_not_activate(self) -> None:
-        """Cycle 10: meta-refine writes draft, not active override."""
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        s.set_draft("v", "sc", "新指引", "测试理由", baseline_mean=2.0)
-        # Override should still be None
-        self.assertIsNone(s.get_override_addendum("v", "sc"))
-        # Draft is set
-        bucket = s.get_bucket("v", "sc")
-        self.assertEqual(bucket.draft_addendum, "新指引")
-        self.assertEqual(bucket.draft_baseline_mean, 2.0)
-
-    def test_activate_override_promotes_draft(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        # Add some samples so we have a baseline mean for A/B snapshot
-        for x in [3.0, 3.5, 2.5]:
-            s.record("v", "sc", x, "o", "r", "")
-        s.set_draft("v", "sc", "草稿", "原因", baseline_mean=3.0)
-        ok = s.activate_override("v", "sc")
-        self.assertTrue(ok)
-        # Override is now active
-        self.assertEqual(s.get_override_addendum("v", "sc"), "草稿")
-        # Draft cleared
-        self.assertIsNone(s.get_bucket("v", "sc").draft_addendum)
-        # Baseline was snapshotted
-        bucket = s.get_bucket("v", "sc")
-        self.assertEqual(bucket.activation_baseline_count, 3)
-        self.assertAlmostEqual(bucket.activation_baseline_mean, 3.0, places=2)
-
-    def test_activate_override_with_edited_addendum(self) -> None:
-        """User edits the LLM's draft before activating."""
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        s.set_draft("v", "sc", "原始草稿", "r")
-        ok = s.activate_override("v", "sc", addendum="人工修改后的版本", reason="手动调整")
-        self.assertTrue(ok)
-        self.assertEqual(s.get_override_addendum("v", "sc"), "人工修改后的版本")
-        self.assertEqual(s.get_bucket("v", "sc").override_reason, "手动调整")
-
-    def test_reject_draft_keeps_stats_clears_draft(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        s.record("v", "sc", 2.0, "o", "r", "")
-        s.set_draft("v", "sc", "bad draft", "r")
-        ok = s.reject_draft("v", "sc")
-        self.assertTrue(ok)
-        bucket = s.get_bucket("v", "sc")
-        self.assertIsNone(bucket.draft_addendum)
-        # Stats survived rejection
-        self.assertEqual(bucket.stats.n, 1)
-        # Cooldown still applied (so we don't immediately re-refine)
-        self.assertGreater(bucket.last_reflected_at, 0)
-
-    def test_ab_delta_after_activation(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        # Baseline: 3 samples averaging 2.0
-        for x in [2.0, 2.0, 2.0]:
-            s.record("v", "sc", x, "o", "r", "")
-        s.set_draft("v", "sc", "新指引", "r")
-        s.activate_override("v", "sc")
-        # New samples after activation, averaging 4.0 — improvement!
-        for x in [4.0, 4.0, 4.0]:
-            s.record("v", "sc", x, "o", "r", "")
-        ab = s.ab_delta("v", "sc")
-        self.assertEqual(ab["baseline_count"], 3)
-        self.assertEqual(ab["post_count"], 3)
-        self.assertAlmostEqual(ab["baseline_mean"], 2.0, places=2)
-        self.assertAlmostEqual(ab["post_mean"], 4.0, places=2)
-        self.assertAlmostEqual(ab["delta"], 2.0, places=2)
-
-    def test_concurrent_record_during_ab_delta_does_not_explode(self) -> None:
-        """Cycle 21 self-audit #5: ab_delta used to slice + iterate
-        bucket.samples without the lock — concurrent record() append could
-        cause `RuntimeError: list changed size during iteration`. Hammer
-        both calls concurrently and assert nothing raises.
-        """
-        import threading
-
-        from native_chinese_assistant.feedback import QualityStore
-
-        s = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        for x in [2.0] * 5:
-            s.record("v", "sc", x, "o", "r", "")
-        s.set_draft("v", "sc", "addendum", "r")
-        s.activate_override("v", "sc")
-
-        stop = threading.Event()
-        errors: list[BaseException] = []
-
-        def writer() -> None:
-            while not stop.is_set():
-                try:
-                    s.record("v", "sc", 4.0, "o", "r", "")
-                except BaseException as e:
-                    errors.append(e)
-                    return
-
-        def reader() -> None:
-            for _ in range(200):
-                try:
-                    s.ab_delta("v", "sc")
-                    s.hi_lo_examples("v", "sc")
-                    s.stats_snapshot()
-                except BaseException as e:
-                    errors.append(e)
-                    return
-
-        ws = [threading.Thread(target=writer) for _ in range(3)]
-        rs = [threading.Thread(target=reader) for _ in range(3)]
-        for t in ws + rs:
-            t.start()
-        for t in rs:
-            t.join()
-        stop.set()
-        for t in ws:
-            t.join()
-        self.assertEqual(errors, [], msg=f"thread errors: {errors[:3]}")
-
-    def test_persistence_round_trip_with_new_fields(self) -> None:
-        """Cycle 10 schema additions must persist + reload."""
-        from native_chinese_assistant.feedback import QualityStore
-
-        path = Path(tempfile.mkdtemp()) / "s.json"
-        s1 = QualityStore(path=path)
-        for x in [2.0, 2.5]:
-            s1.record("v", "sc", x, "o", "r", "")
-        s1.set_draft("v", "sc", "draft", "reason", baseline_mean=2.25)
-        s1.activate_override("v", "sc")
-        # Add post-activation sample
-        s1.record("v", "sc", 4.0, "o", "r", "")
-        # Reload
-        s2 = QualityStore(path=path)
-        bucket = s2.get_bucket("v", "sc")
-        self.assertEqual(bucket.override_addendum, "draft")
-        self.assertEqual(bucket.activation_baseline_count, 2)
-        self.assertAlmostEqual(bucket.activation_baseline_mean, 2.25, places=2)
-        ab = s2.ab_delta("v", "sc")
-        self.assertEqual(ab["post_count"], 1)
-        self.assertAlmostEqual(ab["post_mean"], 4.0, places=2)
-
-    def test_override_activate_endpoint(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        store = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        store.set_draft("beijing_mandarin", "friends_casual", "草稿规则", "test", 2.0)
-        client, _ = _build_client(_llm_json("ok"))
-        service = RewriteService(client=client, quality_store=store)
-        app = App(rewrite_service=service, quality_store=store)
-        status, _, body = call_app(
-            app,
-            "POST",
-            "/api/override-activate",
-            body=json.dumps({"target_variety": "beijing_mandarin", "scenario": "friends_casual"}).encode(
-                "utf-8"
-            ),
-        )
-        self.assertEqual(status, "200 OK")
-        self.assertTrue(json.loads(body)["activated"])
-        self.assertEqual(store.get_override_addendum("beijing_mandarin", "friends_casual"), "草稿规则")
-
-    def test_override_reject_endpoint(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        store = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json")
-        store.set_draft("beijing_mandarin", "friends_casual", "bad", "test")
-        client, _ = _build_client(_llm_json("ok"))
-        service = RewriteService(client=client, quality_store=store)
-        app = App(rewrite_service=service, quality_store=store)
-        status, _, body = call_app(
-            app,
-            "POST",
-            "/api/override-reject",
-            body=json.dumps({"target_variety": "beijing_mandarin", "scenario": "friends_casual"}).encode(
-                "utf-8"
-            ),
-        )
-        self.assertEqual(status, "200 OK")
-        self.assertTrue(json.loads(body)["rejected"])
-        self.assertIsNone(store.get_bucket("beijing_mandarin", "friends_casual").draft_addendum)
-
-    def test_meta_refine_endpoint_400_when_too_few_samples(self) -> None:
-        from native_chinese_assistant.feedback import QualityStore
-
-        store = QualityStore(path=Path(tempfile.mkdtemp()) / "s.json", trigger_min_count=8)
-        client, _ = _build_client(_llm_json("ok"))
-        service = RewriteService(client=client, quality_store=store)
-        app = App(rewrite_service=service, quality_store=store)
-        status, _, body = call_app(
-            app,
-            "POST",
-            "/api/meta-refine",
-            body=json.dumps({"target_variety": "beijing_mandarin", "scenario": "friends_casual"}).encode(
-                "utf-8"
-            ),
-        )
-        self.assertEqual(status, "400 Bad Request")
-        self.assertIn("样本不足", json.loads(body)["error"])
 
 
 class StreamingRewriteEndpointTests(unittest.TestCase):
@@ -2017,42 +1697,35 @@ class StreamingRewriteEndpointTests(unittest.TestCase):
         # falls back to friends_casual — and that fallback is now visible.
         self.assertIn('"effective_scenario": "friends_casual"', text)
 
-    def test_stream_threads_glossary_and_override_into_payload(self) -> None:
-        """Review fix P2: the streaming path must consult the Reflexion override
-        and the request glossary, mirroring non-streaming /api/rewrite. Before
-        the fix both were silently dropped on this (primary) path."""
+    def test_stream_threads_glossary_into_payload(self) -> None:
+        """Review fix P2: the streaming path must thread the request glossary,
+        mirroring non-streaming /api/rewrite. Before the fix it was silently
+        dropped on this (primary) path. (The Reflexion-override half of the
+        original test left with the Refiner removal.)"""
         sse = b"".join(
             [
                 b'data: {"choices":[{"delta":{"content":"{\\"rewritten_text\\": \\"ok\\"}"}}]}\n',
                 b"data: [DONE]\n",
             ]
         )
-        from native_chinese_assistant.feedback import QualityStore
-
         client, transport = _build_client(sse, streaming=True)
-        with tempfile.TemporaryDirectory(prefix="ncga-stream-ovr-") as tmpdir:
-            store = QualityStore(path=Path(tmpdir) / "q.json")
-            store.set_override(
-                "standard_putonghua", "friends_casual", "OVERRIDE-MARKER-XYZ", "review-fix-P2 test"
-            )
-            service = RewriteService(client=client, quality_store=store)
-            app = App(rewrite_service=service)
-            status, _, _ = call_app(
-                app,
-                "POST",
-                "/api/rewrite-stream",
-                body=json.dumps(
-                    {
-                        "text": "你好",
-                        "target_variety": "standard_putonghua",
-                        "glossary": ["拼车 → 搭子车"],
-                    }
-                ).encode("utf-8"),
-            )
+        service = RewriteService(client=client)
+        app = App(rewrite_service=service)
+        status, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite-stream",
+            body=json.dumps(
+                {
+                    "text": "你好",
+                    "target_variety": "standard_putonghua",
+                    "glossary": ["拼车 → 搭子车"],
+                }
+            ).encode("utf-8"),
+        )
         self.assertEqual(status, "200 OK")
         sent = json.loads(transport.calls[-1]["body"].decode("utf-8"))
         system_prompt = sent["messages"][0]["content"]
-        self.assertIn("OVERRIDE-MARKER-XYZ", system_prompt)
         self.assertIn("拼车 → 搭子车", system_prompt)
 
     def test_stream_done_event_flags_degraded_fallback(self) -> None:
@@ -2406,7 +2079,7 @@ class LifecycleTests(unittest.TestCase):
 
 
 class GeneralChatRetryTests(unittest.TestCase):
-    """Cycle 14: rate_quality / meta_refine route through general_chat which retries 5xx."""
+    """Cycle 14: rate_quality routes through general_chat which retries 5xx."""
 
     def test_general_chat_retries_on_500(self) -> None:
         from urllib.error import HTTPError
@@ -2556,23 +2229,19 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertEqual(decrypt(ct, key), b"hello world")
 
     def test_crypto_tamper_detection(self) -> None:
-        from cryptography.exceptions import InvalidTag
-
-        from native_chinese_assistant.crypto import decrypt, encrypt
+        from native_chinese_assistant.crypto import KeyMismatchError, decrypt, encrypt
 
         key = b"\x00" * 32
         ct = encrypt(b"secret", key)
         tampered = ct[:-1] + bytes([ct[-1] ^ 0xFF])
-        with self.assertRaises(InvalidTag):
+        with self.assertRaises(KeyMismatchError):
             decrypt(tampered, key)
 
     def test_crypto_wrong_key_fails(self) -> None:
-        from cryptography.exceptions import InvalidTag
-
-        from native_chinese_assistant.crypto import decrypt, encrypt
+        from native_chinese_assistant.crypto import KeyMismatchError, decrypt, encrypt
 
         ct = encrypt(b"secret", b"\x00" * 32)
-        with self.assertRaises(InvalidTag):
+        with self.assertRaises(KeyMismatchError):
             decrypt(ct, b"\x01" * 32)
 
     def test_quality_store_persists_encrypted_when_key_set(self) -> None:
@@ -2584,7 +2253,7 @@ class SecurityCycle13Tests(unittest.TestCase):
         os.environ["NCGA_DATA_KEY"] = base64.urlsafe_b64encode(b"\x42" * 32).decode()
         path = Path(tempfile.mkdtemp()) / "store.json"
         s1 = QualityStore(path=path)
-        s1.record("v", "sc", 4.0, "原", "改", "")
+        s1.record("v", "sc", 4.0)
         # File on disk must start with magic — i.e., be encrypted
         self.assertTrue(path.read_bytes().startswith(MAGIC))
         # Reload: same key → readable
@@ -2605,6 +2274,59 @@ class SecurityCycle13Tests(unittest.TestCase):
         os.environ.pop("NCGA_DATA_KEY", None)
         s = QualityStore(path=path)
         self.assertEqual(s.get_bucket("v", "sc").stats.n, 1)
+
+    def test_wrong_key_refuses_to_load_and_leaves_file_untouched(self) -> None:
+        """Regression for 2026-06-11: a key mismatch (.env not loaded → resolve_key
+        fell back to the user keyfile) was treated as corruption and quarantined
+        ~16 healthy stores. Wrong key must raise and leave the file byte-identical."""
+        import base64
+
+        from native_chinese_assistant.feedback import QualityStore
+
+        path = Path(tempfile.mkdtemp()) / "quality.json"
+        os.environ["NCGA_DATA_KEY"] = base64.urlsafe_b64encode(b"\x11" * 32).decode()
+        s1 = QualityStore(path=path)
+        s1.record("v", "sc", 4.0)
+        original = path.read_bytes()
+
+        os.environ["NCGA_DATA_KEY"] = base64.urlsafe_b64encode(b"\x22" * 32).decode()
+        with self.assertRaises(RuntimeError) as cm:
+            QualityStore(path=path)
+        self.assertIn("left untouched", str(cm.exception))
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(list(path.parent.glob("quality.json.corrupt-*")), [])
+
+    def test_import_web_module_does_not_touch_quality_store(self) -> None:
+        """Regression for 2026-06-11: `python3 -m native_chinese_assistant.web stop`
+        (or any bare import — pytest collection, tools) used to build App() at module
+        import, decrypting the real store before .env was loaded and quarantining it.
+        Importing web must not read, decrypt, or rename the store at all."""
+        import subprocess
+        import sys
+
+        from native_chinese_assistant.crypto import encrypt
+
+        tmp = Path(tempfile.mkdtemp())
+        store = tmp / "quality.json"
+        payload = b'{"v::sc":{"stats":{"n":1,"mean":4.0,"m2":0,"min":4.0,"max":4.0}}}'
+        store.write_bytes(encrypt(payload, b"\x33" * 32))
+        original = store.read_bytes()
+
+        env = os.environ.copy()
+        env["NCGA_QUALITY_STORE"] = str(store)
+        env["NCGA_DATA_KEY"] = ""  # key unavailable, like a shell that never sourced .env
+        env["XDG_DATA_HOME"] = str(tmp)  # keep any keyfile fallback inside the sandbox
+        proc = subprocess.run(
+            [sys.executable, "-c", "import native_chinese_assistant.web"],
+            cwd=str(Path(__file__).resolve().parent.parent),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(store.read_bytes(), original)
+        self.assertEqual(list(tmp.glob("quality.json.corrupt-*")), [])
 
     # --- Auth ---
     def test_post_requires_bearer_when_token_set(self) -> None:

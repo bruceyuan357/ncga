@@ -2559,14 +2559,6 @@
       batchData[idx].outputs[variety].score = data.score;
       batchData[idx].outputs[variety].reason = data.reason;
       setCellScore(idx, variety, data.score, data.reason);
-      // If server says reflection threshold tripped, hint user
-      if (data.needs_reflection) {
-        // Avoid toast spam: throttle to once per 60s
-        if (!maybeScore._lastHint || Date.now() - maybeScore._lastHint > 60000) {
-          maybeScore._lastHint = Date.now();
-          showToast(`AI 自反馈触发：${VARIETIES[variety]?.label} 平均分偏低，去「设置」可触发 prompt 重写`, "fa-brain");
-        }
-      }
     } catch (_) { /* ignore — scoring is best-effort */ }
   }
 
@@ -2953,18 +2945,6 @@
         const pct = Math.max(0, Math.min(100, parseFloat(el.dataset.width || "0")));
         el.style.width = pct + "%";
       });
-      $$(".quality-bucket [data-act='refine']", panel).forEach((btn) => {
-        btn.addEventListener("click", () => triggerMetaRefine(btn.dataset.variety, btn.dataset.scenario, btn));
-      });
-      $$(".quality-bucket [data-act='clear-override']", panel).forEach((btn) => {
-        btn.addEventListener("click", () => clearOverride(btn.dataset.variety, btn.dataset.scenario));
-      });
-      $$(".quality-bucket [data-act='review-draft']", panel).forEach((btn) => {
-        btn.addEventListener("click", () => openOverrideReview(btn.dataset.variety, btn.dataset.scenario));
-      });
-      $$(".quality-bucket [data-act='reject-draft']", panel).forEach((btn) => {
-        btn.addEventListener("click", () => rejectDraft(btn.dataset.variety, btn.dataset.scenario));
-      });
     } catch (err) {
       panel.innerHTML = `<p class="warning">加载失败：${escapeHtml(err.message)}</p>`;
     }
@@ -2993,55 +2973,8 @@
     // 方言桶 0-5 分，transform 桶 0-100 分（/api/rate-transform 契约）。
     const denom = isModeBucket(b) ? 100 : 5;
     const meanPct = Math.max(0, Math.min(100, (stats.mean / denom) * 100));
-    const classes = ["quality-bucket"];
-    if (b.has_override) classes.push("has-override");
-    if (b.has_draft) classes.push("has-draft");
-    if (b.needs_reflection) classes.push("needs-reflection");
-
-    // A/B delta block (Cycle 10): only shown when override active and post samples exist
-    let abBlock = "";
-    if (b.ab && b.ab.post_count > 0) {
-      const d = b.ab.delta;
-      const arrow = d > 0.05 ? "↑" : d < -0.05 ? "↓" : "→";
-      const cls = d > 0.05 ? "improved" : d < -0.05 ? "degraded" : "";
-      const sign = d > 0 ? "+" : "";
-      abBlock = `<div class="quality-bucket-ab ${cls}" title="启用 override 前 ${b.ab.baseline_count} 样本均值 vs 启用后 ${b.ab.post_count} 样本均值">
-          A/B: ${b.ab.baseline_mean} <span class="delta-arrow">${arrow}</span> ${b.ab.post_mean} (${sign}${d})
-        </div>`;
-    }
-
-    // Draft block: shows when has_draft. Click "审核" opens review modal.
-    let draftBlock = "";
-    if (b.has_draft) {
-      draftBlock = `<div class="quality-bucket-draft">
-        <span class="draft-label"><i class="fas fa-file-pen" aria-hidden="true"></i> 待审核草稿</span>
-        <span>${escapeHtml(b.draft_reason || "(无诊断)")}</span>
-        <div class="quality-bucket-actions">
-          <button class="primary-btn" data-act="review-draft" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}">
-            <i class="fas fa-eye" aria-hidden="true"></i> 审核草稿
-          </button>
-          <button class="ghost-btn danger" data-act="reject-draft" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}">
-            <i class="fas fa-xmark" aria-hidden="true"></i> 直接拒绝
-          </button>
-        </div>
-      </div>`;
-    }
-
-    // Cycle 23: transform 桶没有 Reflexion（v1 只测量）—— 自反馈/还原按钮不渲染，
-    // 点了也只会被服务端 400（parse_variety 不认识 "mode:*"）。
-    const actionsBlock = isModeBucket(b) ? "" : `
-        <div class="quality-bucket-actions">
-          <button class="ghost-btn" data-act="refine" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}"
-                  ${b.needs_reflection || b.has_draft ? "" : 'title="需要 ≥8 样本且 μ<3.5；或直接强制触发"'}>
-            <i class="fas fa-brain" aria-hidden="true"></i> ${b.has_override ? "再次自反馈" : (b.has_draft ? "重新生成草稿" : "触发自反馈")}
-          </button>
-          ${b.has_override ? `<button class="ghost-btn danger" data-act="clear-override" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}">
-            <i class="fas fa-rotate-left" aria-hidden="true"></i> 还原默认
-          </button>` : ""}
-        </div>`;
-
     return `
-      <div class="${classes.join(" ")}">
+      <div class="quality-bucket">
         <div class="quality-bucket-head">
           <span>${escapeHtml(bucketVarietyLabel(b))}</span>
           <span class="scenario-tag">${escapeHtml(bucketScenarioLabel(b))}</span>
@@ -3054,161 +2987,8 @@
         </div>
         <div class="quality-bucket-distribution" title="平均分 ${(stats.mean ?? 0).toFixed(2)}/${denom}">
           <div class="fill" data-width="${meanPct}"></div>
-          ${isModeBucket(b) ? "" : '<div class="marker" title="阈值 3.5"></div>'}
         </div>
-        ${abBlock}
-        ${draftBlock}
-        ${b.has_override ? `<div class="quality-bucket-override"><strong>已激活自定义指引</strong>（基线 μ=${(b.override_baseline_mean ?? 0).toFixed(2)}）：${escapeHtml(b.override_reason || "")}</div>` : ""}
-        ${actionsBlock}
       </div>`;
-  }
-
-  async function triggerMetaRefine(variety, scenario, btn) {
-    if (!variety || !scenario) return;
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> AI 反思中…';
-    try {
-      const res = await fetch("/api/meta-refine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_variety: variety, scenario }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      // Cycle 10: meta-refine now writes a DRAFT; open the review modal so user
-      // can approve/reject before it goes live.
-      showToast("AI 写好草稿，等你审核", "fa-file-pen");
-      await loadQualityStats();
-      openOverrideReview(variety, scenario);
-    } catch (err) {
-      showToast(`自反馈失败：${err.message}`, "fa-triangle-exclamation");
-      btn.innerHTML = orig;
-      btn.disabled = false;
-    }
-  }
-
-  // ---------- Override review modal (Cycle 10) ----------
-  const overrideModal = $("#override-modal");
-  const overrideModalTitle = $("#override-modal-title");
-  const overrideModalSub = $("#override-modal-sub");
-  const overrideModalOld = $("#override-modal-old");
-  const overrideModalNew = $("#override-modal-new");
-  const overrideModalReason = $("#override-modal-reason");
-  const overrideModalBaseline = $("#override-modal-baseline");
-  const overrideActivateBtn = $("#override-activate-btn");
-  const overrideRejectBtn = $("#override-reject-btn");
-  const overrideModalCancel = $("#override-modal-cancel");
-  const overrideModalClose = $("#override-modal-close");
-  let _reviewState = null;  // { variety, scenario }
-
-  async function openOverrideReview(variety, scenario) {
-    _reviewState = { variety, scenario };
-    // Fetch fresh stats so we always show the current draft
-    let bucket = null;
-    try {
-      const res = await fetch("/api/quality-stats");
-      const data = await res.json();
-      bucket = (data.buckets || []).find(
-        (b) => b.variety === variety && b.scenario === scenario,
-      );
-    } catch (_) { /* ignore */ }
-    if (!bucket || !bucket.has_draft) {
-      showToast("此 (方言, 场景) 当前没有草稿可审核", "fa-circle-info");
-      return;
-    }
-    const v = VARIETIES[variety] || {};
-    const s = SCENARIOS[scenario] || {};
-    overrideModalTitle.textContent = `${v.label || variety} · ${s.label || scenario} · 审核草稿`;
-    // Show current addendum (active override or default scenario addendum)
-    overrideModalOld.textContent =
-      bucket.override_reason
-        ? `(已激活的旧指引)\n${bucket.override_reason}`  // active override exists
-        : `(场景默认指引)\n${s.description || ""}`;
-    overrideModalNew.value = bucket.draft_addendum || "";
-    overrideModalReason.textContent = bucket.draft_reason || "—";
-    overrideModalBaseline.textContent = (bucket.draft_baseline_mean ?? bucket.stats?.mean ?? 0).toFixed(2);
-    overrideModal.hidden = false;
-    setTimeout(() => overrideModalNew.focus(), 60);
-  }
-
-  function closeOverrideReview() {
-    overrideModal.hidden = true;
-    _reviewState = null;
-  }
-
-  async function activateReviewedOverride() {
-    if (!_reviewState) return;
-    const { variety, scenario } = _reviewState;
-    const edited = overrideModalNew.value.trim();
-    if (!edited) {
-      showToast("不能为空", "fa-triangle-exclamation");
-      return;
-    }
-    overrideActivateBtn.disabled = true;
-    try {
-      const res = await fetch("/api/override-activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target_variety: variety,
-          scenario,
-          addendum: edited,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      showToast("新指引已启用", "fa-check-circle");
-      closeOverrideReview();
-      await loadQualityStats();
-    } catch (err) {
-      showToast(`启用失败：${err.message}`, "fa-triangle-exclamation");
-    } finally {
-      overrideActivateBtn.disabled = false;
-    }
-  }
-
-  async function rejectDraft(variety, scenario) {
-    if (!variety || !scenario) {
-      if (!_reviewState) return;
-      ({ variety, scenario } = _reviewState);
-    }
-    if (!confirm("确认丢弃这份草稿？(冷却期仍生效，5 分钟内不会再自动触发)")) return;
-    try {
-      const res = await fetch("/api/override-reject", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_variety: variety, scenario }),
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      showToast("草稿已拒绝", "fa-rotate-left");
-      closeOverrideReview();
-      await loadQualityStats();
-    } catch (err) { showToast(`失败：${err.message}`, "fa-triangle-exclamation"); }
-  }
-
-  if (overrideActivateBtn) overrideActivateBtn.addEventListener("click", activateReviewedOverride);
-  if (overrideRejectBtn) overrideRejectBtn.addEventListener("click", () => rejectDraft());
-  if (overrideModalCancel) overrideModalCancel.addEventListener("click", closeOverrideReview);
-  if (overrideModalClose) overrideModalClose.addEventListener("click", closeOverrideReview);
-  if (overrideModal) {
-    overrideModal.addEventListener("click", (e) => {
-      if (e.target === overrideModal) closeOverrideReview();
-    });
-  }
-
-  async function clearOverride(variety, scenario) {
-    if (!confirm(`确认还原 ${VARIETIES[variety]?.label} / ${SCENARIOS[scenario]?.label} 的默认指引？`)) return;
-    try {
-      const res = await fetch("/api/quality-stats/clear-override", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_variety: variety, scenario }),
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      showToast("已还原默认", "fa-rotate-left");
-      await loadQualityStats();
-    } catch (err) { showToast(`失败：${err.message}`, "fa-triangle-exclamation"); }
   }
 
   function bindBatch() {

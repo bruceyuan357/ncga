@@ -8,7 +8,7 @@
 
 | 条件 | 怎么检查 |
 |---|---|
-| 服务器在跑 | Terminal 进 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf` 后跑 `python3 app.py`,看到 `Listening on http://127.0.0.1:8000` 就 OK |
+| 服务器在跑 | Terminal 进 `/Users/bruce/NCGA` 后跑 `python3 app.py`,看到 `Listening on http://127.0.0.1:8000` 就 OK |
 | 服务器开了 token | 跑 `grep NCGA_AUTH_TOKEN .env`,有一行像 `NCGA_AUTH_TOKEN=xxxxxxxx` |
 | 没 token? | 编辑 `.env` 加一行 `NCGA_AUTH_TOKEN=` + 一段你自定义的字符串(32 位以上,随便打),保存,**重启 app** |
 | Chrome 是新版 | 地址栏输 `chrome://version`,要 ≥ 116 |
@@ -27,7 +27,7 @@
 
 ❌ **若有红色** "Could not load icon ..." → icons 文件夹缺图,跑:
 ```bash
-cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
+cd /Users/bruce/NCGA && ls extension/icons/
 ```
 应该 4 个 PNG,缺了告诉我,我用脚本重生成
 
@@ -188,7 +188,7 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 ## 11. 升级 / 修代码后
 
 ```bash
-cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf
+cd /Users/bruce/NCGA
 git pull             # 拉 Claude 推的最新改动
 ```
 然后 `chrome://extensions` → NCGA → 点刷新箭头,新代码生效。

@@ -321,8 +321,8 @@ class TransformEndpointTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         self.assertEqual(json.loads(body)["score"], 87)
         bucket = app.quality_store._buckets[("mode:polish", "transform")]
-        self.assertEqual(len(bucket.samples), 1)
         self.assertEqual(bucket.stats.n, 1)
+        self.assertEqual(bucket.stats.mean, 87.0)
 
     def test_stream_endpoint_rejects_overlong_raw_text_with_400(self):
         # Review follow-up: the raw cap must reject BEFORE the SSE stream starts,

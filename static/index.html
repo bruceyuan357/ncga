@@ -646,9 +646,9 @@ deadline → 截止日期
           </article>
 
           <article class="settings-card wide">
-            <header><i class="fas fa-brain" aria-hidden="true"></i> AI 自反馈（实验）</header>
-            <p>每次评分都被记录；当某 (方言, 场景) 的平均分低于 3.5 (≥8 个样本时)，可触发 DeepSeek
-              对照高分/低分例子重写【场景指引】，从此使用新指引。</p>
+            <header><i class="fas fa-chart-line" aria-hidden="true"></i> 质量评分</header>
+            <p>每次评分（在重写台勾选「评分」，或在批量台开启「质量评分」）都会按 (方言, 场景)
+              聚合，显示平均分、标准差与分布，帮你看出哪些方言 / 场景的改写更稳。</p>
             <div class="quality-stats" id="quality-stats">
               <p class="settings-hint">还没有评分数据。在重写台勾选「评分」，或在批量工作台开启「质量评分」。</p>
             </div>
@@ -834,42 +834,6 @@ deadline → 截止日期
           </button>
           <button type="button" class="primary-btn" id="context-wizard-done" hidden>
             <i class="fas fa-circle-check" aria-hidden="true"></i> 完成
-          </button>
-        </footer>
-      </div>
-    </div>
-
-    <!-- Cycle 10 — Override review modal (human-in-the-loop gate) -->
-    <div class="landmark-modal" id="override-modal" role="dialog" aria-modal="true" aria-labelledby="override-modal-title" hidden>
-      <div class="landmark-modal-content override-modal-content">
-        <button class="landmark-close" id="override-modal-close" type="button" aria-label="关闭">
-          <i class="fas fa-xmark" aria-hidden="true"></i>
-        </button>
-        <header>
-          <h3 id="override-modal-title">AI 自反馈：审核草稿</h3>
-          <p id="override-modal-sub">DeepSeek 根据样本提议了新【场景指引】。请审核后再启用。</p>
-        </header>
-        <div class="override-diff">
-          <div class="override-block override-block-old">
-            <h4>当前指引</h4>
-            <pre id="override-modal-old"></pre>
-          </div>
-          <div class="override-block override-block-new">
-            <h4>AI 提议（可编辑）</h4>
-            <textarea id="override-modal-new" rows="10" spellcheck="false"></textarea>
-          </div>
-        </div>
-        <div class="override-meta">
-          <span>诊断：<strong id="override-modal-reason">—</strong></span>
-          <span>样本基线 μ = <strong id="override-modal-baseline">—</strong></span>
-        </div>
-        <footer>
-          <button type="button" class="ghost-btn danger" id="override-reject-btn">
-            <i class="fas fa-xmark" aria-hidden="true"></i> 拒绝草稿
-          </button>
-          <button type="button" class="ghost-btn" id="override-modal-cancel">取消</button>
-          <button type="button" class="primary-btn" id="override-activate-btn">
-            <i class="fas fa-circle-check" aria-hidden="true"></i> 启用此指引
           </button>
         </footer>
       </div>
