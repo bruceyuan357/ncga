@@ -44,7 +44,10 @@ run "GET /api/scenarios"    200 "$BASE/api/scenarios"
 run "GET /api/quality-stats" 200 "$BASE/api/quality-stats"
 run "GET / (SPA)"           200 "$BASE/"
 run "GET /static/app.js"    200 "$BASE/static/app.js"
-run "GET /static/../app.py (path traversal denied)" 404 "$BASE/static/../app.py"
+# --path-as-is stops curl from squashing /static/../app.py to /app.py client-side,
+# so the server actually receives the dot-dot path.
+run "GET /static/../app.py (path traversal denied)" 404 --path-as-is "$BASE/static/../app.py"
+run "GET /static/%2e%2e%2fapp.py (encoded traversal denied)" 404 --path-as-is "$BASE/static/%2e%2e%2fapp.py"
 
 # --- auth gating ---
 run "POST /api/rewrite (no auth → 401)" 401 -X POST -H 'Content-Type: application/json' \

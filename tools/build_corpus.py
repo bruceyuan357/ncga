@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import random
 import sys
 import time
@@ -31,11 +30,11 @@ from native_chinese_assistant.corpus import load_corpus  # noqa: E402
 from native_chinese_assistant.presets import PRESET_METADATA, VarietyPreset  # noqa: E402
 from native_chinese_assistant.rewrite import (  # noqa: E402
     ChatCompletionsClient,
-    LLMConfig,
-    load_dotenv,
+    load_llm_config,
 )
 
-# Scenarios we want covered (same enum as data/corpus.jsonl uses)
+# Scenarios we want covered — must stay aligned with VALID_SCENARIOS in
+# tools/import_corpus.py (the canonical 10-value enum data/corpus.jsonl uses).
 SCENARIOS = [
     "complaint",
     "request",
@@ -47,18 +46,24 @@ SCENARIOS = [
     "comfort",
     "invite",
     "apology",
-    # extras for size > 10
-    "thanks",
-    "surprise",
-    "agreement",
-    "disagreement",
-    "encouragement",
-    "joke",
-    "sympathy",
-    "negotiation",
-    "advice",
-    "scolding_mild",
 ]
+
+SYSTEM_PROMPT = "你是中文方言语料生成助手。严格按要求输出 JSON,无 markdown,无解释。"
+
+
+def chat_request_kwargs(prompt: str) -> dict:
+    """Kwargs for ChatCompletionsClient.general_chat.
+
+    Kept in one place so tests can bind them against the real
+    inspect.signature of general_chat (api-contract regression guard).
+    """
+    return {
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 400,
+    }
 
 # Topic seeds to vary the "original" text so we don't get 30 nearly-identical samples
 TOPIC_SEEDS = [
@@ -111,11 +116,15 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    load_dotenv()
-    api_key = os.environ.get("DEEPSEEK_API_KEY")
-    if not args.dry_run and not api_key:
-        print("ERROR: DEEPSEEK_API_KEY not set (in env or .env)", file=sys.stderr)
-        return 2
+    config = None
+    if not args.dry_run:
+        config = load_llm_config()  # reads .env itself; None means no API key
+        if config is None:
+            print(
+                "ERROR: no API key — set DEEPSEEK_API_KEY or LLM_API_KEY (in env or .env)",
+                file=sys.stderr,
+            )
+            return 2
 
     existing = load_corpus()
     have_counts: dict[str, int] = {}
@@ -133,20 +142,16 @@ def main() -> int:
         print(f"  {v}: have {have_counts.get(v, 0)} → need {max(0, args.target - have_counts.get(v, 0))}")
     print()
 
-    client = (
-        None
-        if args.dry_run
-        else ChatCompletionsClient(
-            LLMConfig.from_env(),
-        )
-    )
+    client = None if args.dry_run else ChatCompletionsClient(config)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     total_generated = 0
+    total_needed = 0
     for variety_key in selected:
         need = max(0, args.target - have_counts.get(variety_key, 0))
+        total_needed += need
         if need == 0:
             continue
         print(f"\n=== {variety_key}: generating {need} ===")
@@ -158,13 +163,12 @@ def main() -> int:
                 print(f"  [{i + 1}/{need}] scenario={scenario}, seed={seed}")
                 continue
             try:
-                resp = client.general_chat(
-                    system_prompt=("你是中文方言语料生成助手。严格按要求输出 JSON,无 markdown,无解释。"),
-                    user_prompt=prompt,
-                    max_tokens=400,
-                )
-                # general_chat returns parsed JSON dict (when LLM behaves)
-                obj = resp if isinstance(resp, dict) else json.loads(resp if isinstance(resp, str) else "")
+                # general_chat returns the raw content string from the first choice
+                resp = client.general_chat(**chat_request_kwargs(prompt))
+                obj = json.loads(resp)
+                if not isinstance(obj, dict):
+                    print(f"  [{i + 1}/{need}] BAD response (not a JSON object), skipping")
+                    continue
                 original = str(obj.get("original", "")).strip()
                 rewrite = str(obj.get("rewrite", "")).strip()
                 notes = str(obj.get("notes", "")).strip()
@@ -190,6 +194,9 @@ def main() -> int:
                 time.sleep(0.3)
             except Exception as e:
                 print(f"  [{i + 1}/{need}] FAIL: {e}")
+    if not args.dry_run and total_needed > 0 and total_generated == 0:
+        print("\nERROR: 0 entries generated (every attempt failed) — see FAIL lines above", file=sys.stderr)
+        return 1
     print(f"\n✓ generated {total_generated} new entries → {out_path}")
     print("Next: python3 tools/review_corpus.py")
     return 0
