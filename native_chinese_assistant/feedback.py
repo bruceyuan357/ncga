@@ -178,6 +178,10 @@ class QualityStore:
         decrypt-fail meant subsequent record() calls clobbered legitimate data
         encrypted under a now-rotated/mismatched key. Quarantining preserves the
         bytes so the user can recover (or at least diagnose) what happened.
+
+        Only for files that are genuinely unparseable (truncated blob, bad JSON).
+        Key problems (missing key, KeyMismatchError) must NOT come here — they
+        raise in _load() instead, leaving the healthy file in place.
         """
         try:
             from datetime import datetime
@@ -204,7 +208,7 @@ class QualityStore:
             raise RuntimeError(f"QualityStore unreadable and quarantine failed at {self.path}") from exc
 
     def _load(self) -> None:
-        from native_chinese_assistant.crypto import decrypt, is_encrypted, resolve_key
+        from native_chinese_assistant.crypto import KeyMismatchError, decrypt, is_encrypted, resolve_key
 
         try:
             blob = self.path.read_bytes()
@@ -222,7 +226,21 @@ class QualityStore:
                 )
             try:
                 blob = decrypt(blob, key)
+            except KeyMismatchError as exc:
+                # Wrong key — same treatment as key-missing above: refuse, leave the
+                # file untouched. Quarantining here is how healthy stores got benched
+                # 16 times between 2026-04 and 2026-06 (resolve_key() fell back to the
+                # user keyfile whenever .env wasn't loaded). The file is almost
+                # certainly fine under the right key; renaming it aside just hides it.
+                raise RuntimeError(
+                    f"QualityStore at {self.path} could not be authenticated with the "
+                    f"resolved data key ({exc}). Likely a wrong or unloaded NCGA_DATA_KEY "
+                    f"(e.g. .env not sourced), or a stale user keyfile. File left "
+                    f"untouched — load the correct key, or remove/rename the file to "
+                    f"start fresh."
+                ) from exc
             except Exception as exc:  # noqa: BLE001
+                # Structurally broken blob (truncated, bad framing) — genuinely corrupt.
                 self._quarantine(f"decrypt failed: {exc}")
                 return
         try:

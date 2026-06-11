@@ -1340,9 +1340,34 @@ def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, ma
     yield _sse_event("done", {"summary": {"ok": ok_count, "failed": fail_count, "total": total}})
 
 
-# Module-level WSGI entry point so production servers can use
-# `waitress-serve native_chinese_assistant.web:application` directly.
-application = App()
+class _LazyApp:
+    """Module-level WSGI entry point that defers App() construction to first use.
+
+    Importing this module must stay side-effect free: App() opens (and decrypts)
+    the QualityStore, and at import time .env is typically not loaded yet. An
+    eager `App()` here meant every `stop`/`status` invocation, test import, and
+    even the normal `start` path (import runs before run_server's load_dotenv)
+    decrypted the real store with the fallback keyfile instead of NCGA_DATA_KEY —
+    quarantining a healthy store every time (~16 incidents, 2026-04 → 2026-06).
+    """
+
+    def __init__(self) -> None:
+        self._app: App | None = None
+        self._lock = threading.Lock()
+
+    def resolve(self) -> App:
+        with self._lock:
+            if self._app is None:
+                self._app = App()
+            return self._app
+
+    def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
+        return self.resolve()(environ, start_response)
+
+
+# Production servers can still use `waitress-serve native_chinese_assistant.web:application`;
+# the real App is built on first request (env vars must be set, as before).
+application = _LazyApp()
 
 
 # ---------------- logging setup ----------------
@@ -1625,6 +1650,11 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
     load_dotenv()
     configure_logging(os.environ.get("NCGA_LOG_LEVEL", "INFO"))
 
+    # Build the App NOW — after load_dotenv, before serving — so a key/store
+    # misconfiguration aborts startup with a clear error instead of 500-ing
+    # every request later.
+    application.resolve()
+
     host = host or os.environ.get("NCGA_HOST", "127.0.0.1")
     port = port or int(os.environ.get("NCGA_PORT", "8000"))
     pid_file = _default_pid_file()
@@ -1690,6 +1720,10 @@ def run_server(host: str | None = None, port: int | None = None) -> None:
 def main() -> None:
     """Entry point with subcommands: start (default), stop, status."""
     import sys
+
+    # All subcommands want .env: start for keys/auth, stop/status for
+    # NCGA_HOST/NCGA_PORT. setdefault semantics — shell env still wins.
+    load_dotenv()
 
     args = sys.argv[1:]
     if not args or args[0] in ("start", "run"):

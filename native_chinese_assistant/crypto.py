@@ -25,6 +25,7 @@ import os
 import secrets
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger("ncga.crypto")
@@ -32,6 +33,13 @@ logger = logging.getLogger("ncga.crypto")
 MAGIC = b"NCG1"
 NONCE_SIZE = 12  # AES-GCM standard
 KEY_SIZE = 32  # AES-256
+
+
+class KeyMismatchError(Exception):
+    """AES-GCM authentication failed: wrong key (the common case — e.g. .env not
+    loaded, so resolve_key() fell back to the user keyfile) or tampered ciphertext.
+    Either way the file on disk may be perfectly healthy under the right key, so
+    callers must NOT treat this as file corruption."""
 
 
 def _user_key_path() -> Path:
@@ -93,14 +101,19 @@ def encrypt(plaintext: bytes, key: bytes) -> bytes:
 
 
 def decrypt(blob: bytes, key: bytes) -> bytes:
-    """Reverses encrypt(). Raises on tamper / wrong key / not encrypted."""
+    """Reverses encrypt(). Raises ValueError on a structurally broken blob,
+    KeyMismatchError on wrong key / tampered ciphertext."""
     if not blob.startswith(MAGIC):
         raise ValueError("not an NCG1-encrypted blob")
     if len(blob) < len(MAGIC) + NONCE_SIZE + 16:  # 16 = GCM tag
         raise ValueError("blob too short")
     nonce = blob[len(MAGIC) : len(MAGIC) + NONCE_SIZE]
     ct = blob[len(MAGIC) + NONCE_SIZE :]
-    return AESGCM(key).decrypt(nonce, ct, associated_data=MAGIC)
+    try:
+        return AESGCM(key).decrypt(nonce, ct, associated_data=MAGIC)
+    except InvalidTag as exc:
+        # InvalidTag stringifies to "" — replace it with something actionable.
+        raise KeyMismatchError("AES-GCM tag check failed (wrong key or tampered data)") from exc
 
 
 def is_encrypted(blob: bytes) -> bool:

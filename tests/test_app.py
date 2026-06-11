@@ -1577,11 +1577,12 @@ class FeedbackStoreTests(unittest.TestCase):
         self.assertAlmostEqual(bucket.stats.mean, 3.0, places=2)
 
     def test_load_failure_quarantines_file_instead_of_clobbering(self) -> None:
-        """Cycle 17: an unreadable store file (e.g., wrong key, parse error) must NOT
-        be silently overwritten with an empty store on the next persist. It gets
+        """Cycle 17: a genuinely corrupt store file (parse error) must NOT be
+        silently overwritten with an empty store on the next persist. It gets
         renamed aside so the user can recover the original bytes.
-        Ground truth: this exact pattern destroyed 14 real samples on 2026-04-30 when
-        a stale ~/.local/share/ncga/data.key drifted from .env's NCGA_DATA_KEY.
+        Ground truth: silent clobbering destroyed 14 real samples on 2026-04-30.
+        Note: a wrong/missing key is NOT corruption and must not land here — see
+        test_wrong_key_refuses_to_load_and_leaves_file_untouched.
         """
         from native_chinese_assistant.feedback import QualityStore
 
@@ -2180,23 +2181,19 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertEqual(decrypt(ct, key), b"hello world")
 
     def test_crypto_tamper_detection(self) -> None:
-        from cryptography.exceptions import InvalidTag
-
-        from native_chinese_assistant.crypto import decrypt, encrypt
+        from native_chinese_assistant.crypto import KeyMismatchError, decrypt, encrypt
 
         key = b"\x00" * 32
         ct = encrypt(b"secret", key)
         tampered = ct[:-1] + bytes([ct[-1] ^ 0xFF])
-        with self.assertRaises(InvalidTag):
+        with self.assertRaises(KeyMismatchError):
             decrypt(tampered, key)
 
     def test_crypto_wrong_key_fails(self) -> None:
-        from cryptography.exceptions import InvalidTag
-
-        from native_chinese_assistant.crypto import decrypt, encrypt
+        from native_chinese_assistant.crypto import KeyMismatchError, decrypt, encrypt
 
         ct = encrypt(b"secret", b"\x00" * 32)
-        with self.assertRaises(InvalidTag):
+        with self.assertRaises(KeyMismatchError):
             decrypt(ct, b"\x01" * 32)
 
     def test_quality_store_persists_encrypted_when_key_set(self) -> None:
@@ -2229,6 +2226,59 @@ class SecurityCycle13Tests(unittest.TestCase):
         os.environ.pop("NCGA_DATA_KEY", None)
         s = QualityStore(path=path)
         self.assertEqual(s.get_bucket("v", "sc").stats.n, 1)
+
+    def test_wrong_key_refuses_to_load_and_leaves_file_untouched(self) -> None:
+        """Regression for 2026-06-11: a key mismatch (.env not loaded → resolve_key
+        fell back to the user keyfile) was treated as corruption and quarantined
+        ~16 healthy stores. Wrong key must raise and leave the file byte-identical."""
+        import base64
+
+        from native_chinese_assistant.feedback import QualityStore
+
+        path = Path(tempfile.mkdtemp()) / "quality.json"
+        os.environ["NCGA_DATA_KEY"] = base64.urlsafe_b64encode(b"\x11" * 32).decode()
+        s1 = QualityStore(path=path)
+        s1.record("v", "sc", 4.0)
+        original = path.read_bytes()
+
+        os.environ["NCGA_DATA_KEY"] = base64.urlsafe_b64encode(b"\x22" * 32).decode()
+        with self.assertRaises(RuntimeError) as cm:
+            QualityStore(path=path)
+        self.assertIn("left untouched", str(cm.exception))
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(list(path.parent.glob("quality.json.corrupt-*")), [])
+
+    def test_import_web_module_does_not_touch_quality_store(self) -> None:
+        """Regression for 2026-06-11: `python3 -m native_chinese_assistant.web stop`
+        (or any bare import — pytest collection, tools) used to build App() at module
+        import, decrypting the real store before .env was loaded and quarantining it.
+        Importing web must not read, decrypt, or rename the store at all."""
+        import subprocess
+        import sys
+
+        from native_chinese_assistant.crypto import encrypt
+
+        tmp = Path(tempfile.mkdtemp())
+        store = tmp / "quality.json"
+        payload = b'{"v::sc":{"stats":{"n":1,"mean":4.0,"m2":0,"min":4.0,"max":4.0}}}'
+        store.write_bytes(encrypt(payload, b"\x33" * 32))
+        original = store.read_bytes()
+
+        env = os.environ.copy()
+        env["NCGA_QUALITY_STORE"] = str(store)
+        env["NCGA_DATA_KEY"] = ""  # key unavailable, like a shell that never sourced .env
+        env["XDG_DATA_HOME"] = str(tmp)  # keep any keyfile fallback inside the sandbox
+        proc = subprocess.run(
+            [sys.executable, "-c", "import native_chinese_assistant.web"],
+            cwd=str(Path(__file__).resolve().parent.parent),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(store.read_bytes(), original)
+        self.assertEqual(list(tmp.glob("quality.json.corrupt-*")), [])
 
     # --- Auth ---
     def test_post_requires_bearer_when_token_set(self) -> None:
