@@ -100,6 +100,51 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   white-space: normal;
 }
 
+.tools { margin-top: 0.7rem; }
+.tools-title {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  margin-bottom: 0.35rem;
+}
+.tools-btns { display: flex; gap: 0.35em; }
+.tool-btn {
+  flex: 1;
+  border: 1px solid var(--rule);
+  background: #FFFFFF;
+  color: var(--text-soft);
+  padding: 0.35rem 0.3rem;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.tool-btn:hover:not(:disabled) { color: var(--accent-deep); border-color: var(--accent); }
+/* last-used mode (lastTransformMode pref) gets the accent outline */
+.tool-btn.is-last { border-color: var(--accent); color: var(--accent-deep); background: #FCEEE8; }
+.tool-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* which model answered — shown for 白话解释 (per-mode routing to pro tier) */
+.model-chip {
+  display: block;
+  width: fit-content;
+  margin: 0 0 0.4rem;
+  padding: 0.1em 0.6em;
+  border: 1px solid #E5DAD5;
+  border-radius: 999px;
+  background: #F6EFEB;
+  color: #8A7770;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: normal;
+}
+
 .err {
   margin: 0.4rem 0 0;
   color: var(--err);

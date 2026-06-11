@@ -2,10 +2,12 @@
 // Type: module (per manifest)
 //
 // Responsibilities:
-//   1. Build the right-click context menu with all 10 NCGA varieties on install
+//   1. Build the right-click context menus on install:
+//      改写为 (10 NCGA varieties) + 文本工具 (4 transform modes, Cycle 23)
 //   2. On menu click, ask the active tab's content script to grab the selection
-//      and post it back here for the rewrite request
-//   3. Make the /api/rewrite call to the configured NCGA server with auth
+//      and post it back here for the rewrite/transform request
+//   3. Make the /api/rewrite or /api/transform call to the configured NCGA
+//      server with auth
 //   4. Forward the result to the content script for overlay rendering
 //
 // Auth model:
@@ -41,6 +43,23 @@ const VARIETIES = [
   { key: "minnan_written",                           label: "福建闽南语" },
 ];
 
+// 4 transform modes hard-coded for the 文本工具 context menu. Sourced from
+// native_chinese_assistant/transform.py MODE_METADATA; kept in sync manually,
+// same convention as VARIETIES above (GET /api/transform-modes also serves them).
+// explain is routed to a stronger model server-side; the response carries
+// "model" so the UI can show which model actually answered.
+const TRANSFORM_MODES = [
+  { key: "polish",    label: "润色",     description: "改通顺、改得体,保持原意" },
+  { key: "translate", label: "中英互译", description: "中文→英文,英文→中文,自动判向" },
+  { key: "summarize", label: "总结",     description: "压缩成一句话或要点列表" },
+  { key: "explain",   label: "白话解释", description: "术语/法条/难句,用大白话讲明白" },
+];
+
+function labelForMode(modeKey) {
+  const m = TRANSFORM_MODES.find((x) => x.key === modeKey);
+  return (m && m.label) || modeKey;
+}
+
 // ============ context menu ============
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -58,24 +77,59 @@ chrome.runtime.onInstalled.addListener(() => {
         contexts: ["selection"],
       });
     }
+    // Second parent: 文本工具 (Cycle 23 transform modes).
+    chrome.contextMenus.create({
+      id: "ncga-tools-root",
+      title: "文本工具(地道中文)",
+      contexts: ["selection"],
+    });
+    for (const m of TRANSFORM_MODES) {
+      chrome.contextMenus.create({
+        id: "ncga-mode-" + m.key,
+        parentId: "ncga-tools-root",
+        title: m.label,
+        contexts: ["selection"],
+      });
+    }
   });
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (!info.menuItemId || !info.menuItemId.startsWith("ncga-variety-")) return;
-  const varietyKey = info.menuItemId.slice("ncga-variety-".length);
+  const menuId = String(info.menuItemId || "");
   const text = (info.selectionText || "").trim();
   if (!text || !tab || !tab.id) return;
   // notifyError throws by design (the popup path surfaces it); here the overlay
   // already shows the error, so swallow to avoid unhandled-rejection noise.
-  await handleRewriteRequest(tab.id, varietyKey, text).catch(() => {});
+  if (menuId.startsWith("ncga-variety-")) {
+    const varietyKey = menuId.slice("ncga-variety-".length);
+    await handleRewriteRequest(tab.id, varietyKey, text).catch(() => {});
+  } else if (menuId.startsWith("ncga-mode-")) {
+    const modeKey = menuId.slice("ncga-mode-".length);
+    await handleTransformRequest(tab.id, modeKey, text).catch(() => {});
+  }
 });
 
 // ============ message handlers ============
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // Popup-initiated rewrite (user types in popup, picks variety)
+  // Popup-initiated rewrite (user types in popup, picks variety).
+  // Messages carrying {mode} instead of {varietyKey} take the transform path
+  // (Cycle 23) — same envelope, routed by field, so the popup keeps one call site.
   if (msg && msg.type === "ncga:rewrite-from-popup") {
+    if (msg.mode) {
+      handleTransformRequest(
+        (sender.tab && sender.tab.id) || null,
+        msg.mode,
+        msg.text,
+      ).then(
+        (r) => sendResponse({
+          ok: true, result: r.text, degraded: r.degraded, warning: r.warning,
+          model: r.model, modeLabel: r.modeLabel,
+        }),
+        (err) => sendResponse({ ok: false, error: String(err && err.message || err) }),
+      );
+      return true; // async response
+    }
     handleRewriteRequest(
       (sender.tab && sender.tab.id) || null,
       msg.varietyKey,
@@ -91,6 +145,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // overlay-loading/overlay-result messages to the tab; the content script in
   // selection mode handles its own overlay locally with anchor positioning.
   // So this handler just does API call + returns text.
+  // {mode} routes to /api/transform (defaultAction = "mode:<key>", Cycle 23);
+  // {varietyKey} keeps the original /api/rewrite path untouched.
   if (msg && msg.type === "ncga:rewrite-from-selection") {
     (async () => {
       try {
@@ -98,6 +154,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!cfg.serverUrl) throw new Error("请先在 Options 填服务器 URL");
         const token = await getCachedToken();
         if (!token) throw new Error("Token 未解锁,点扩展图标输 passphrase");
+        if (msg.mode) {
+          const r = await callTransformAPI(cfg.serverUrl, token, msg.mode, msg.text);
+          sendResponse({
+            ok: true, result: r.text, degraded: r.degraded, warning: r.warning,
+            model: r.model, modeLabel: r.modeLabel,
+          });
+          return;
+        }
         const r = await callRewriteAPI(cfg.serverUrl, token, msg.varietyKey, msg.text);
         sendResponse({ ok: true, result: r.text, degraded: r.degraded, warning: r.warning });
       } catch (e) {
@@ -226,6 +290,89 @@ async function callRewriteAPI(serverUrl, token, varietyKey, text) {
     text: data.rewritten_text || data.text || data.result || "",
     degraded: !!data.degraded,
     warning: data.warning || "",
+  };
+}
+
+// ============ transform pipeline (Cycle 23) ============
+
+// Mirrors handleRewriteRequest, but overlay messages carry {mode, modeLabel,
+// model} instead of {varietyKey} so content.js renders the mode label in the
+// header (and the model chip for explain).
+async function handleTransformRequest(tabId, modeKey, text) {
+  const cfg = await getConfig();
+  if (!cfg.serverUrl) {
+    return notifyError(tabId, "请先在扩展 Options 中填写服务器地址。");
+  }
+  const token = await getCachedToken();
+  if (!token) {
+    return notifyError(tabId, "Token 未解锁,点扩展图标输入 passphrase 解锁。");
+  }
+  if (tabId) {
+    await sendToTab(tabId, {
+      type: "ncga:overlay-loading",
+      mode: modeKey,
+      modeLabel: labelForMode(modeKey),
+      text,
+    });
+  }
+  try {
+    const r = await callTransformAPI(cfg.serverUrl, token, modeKey, text);
+    if (tabId) {
+      await sendToTab(tabId, {
+        type: "ncga:overlay-result",
+        mode: modeKey,
+        modeLabel: r.modeLabel,
+        model: r.model,
+        text,
+        result: r.text,
+        degraded: r.degraded,
+        warning: r.warning,
+      });
+    }
+    return r;
+  } catch (e) {
+    const msg = (e && e.message) || String(e);
+    if (tabId) await sendToTab(tabId, { type: "ncga:overlay-error", error: msg });
+    throw e;
+  }
+}
+
+async function callTransformAPI(serverUrl, token, modeKey, text) {
+  const url = serverUrl.replace(/\/$/, "") + "/api/transform";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token,
+    },
+    body: JSON.stringify({ text, mode: modeKey }),
+  });
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).error || ""; } catch (_e) {}
+    // Two statuses the user can act on get friendly text; the rest surface
+    // the server's error string raw (same convention as callRewriteAPI).
+    if (res.status === 401) {
+      throw new Error("认证失败(HTTP 401)— token 错或已被服务器换掉,打开 Options 重新填 token。");
+    }
+    if (res.status === 503) {
+      // Transforms have no heuristic fallback server-side: 503 covers both an
+      // unconfigured LLM and a transient upstream outage — stay cause-neutral.
+      throw new Error("LLM 暂不可用(未配置或连不上),文本工具无兜底" + (detail ? " · " + detail : ""));
+    }
+    throw new Error("HTTP " + res.status + (detail ? " · " + detail : ""));
+  }
+  const data = await res.json();
+  // /api/transform returns {"transformed_text", "mode", "model", "degraded",
+  // optional "warning"} — see TransformResult.as_dict() in transform.py.
+  // degraded is always false today; kept so the overlay chip wiring matches
+  // the rewrite path. "model" surfaces per-mode routing (explain → pro tier).
+  return {
+    text: data.transformed_text || "",
+    degraded: !!data.degraded,
+    warning: data.warning || "",
+    model: data.model || "",
+    modeLabel: labelForMode(modeKey),
   };
 }
 

@@ -21,7 +21,7 @@
 2. 右上角 **开发者模式** 切到开
 3. 左上角点 **加载已解压的扩展程序**
 4. 选择 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf/extension` 文件夹
-5. 应该看到一张卡:**地道中文 · NCGA  v0.1.0**(带粉色樱花图标)
+5. 应该看到一张卡:**地道中文 · NCGA  v0.2.0**(带粉色樱花图标)
 
 ✅ **预期:** 卡片底色白,**没有红色错误提示**
 
@@ -86,6 +86,17 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 
 ✅ **预期:** 看到改写后的文字。如果服务器在跑、token 对、网络通,这一步必出。
 
+## 5b. 测试场景 A2 — 弹窗内文本工具
+
+1. 弹窗里粘贴一段话(中英都行)
+2. **改写** 按钮下面有一排「文本工具」:**润色 / 中英互译 / 总结 / 白话解释**
+3. 点其中一个 → 显「处理中…」→ 几秒后出结果
+4. 点过的按钮会带粉色描边(= 上次用的工具,下次打开弹窗还在)
+
+✅ **预期:** 点 **白话解释** 时,结果上方多一个灰色小 chip 显模型名
+(白话解释在服务器端路由到更强的模型,chip 让你看得到是哪一个)。
+其余三个工具不显模型 chip。
+
 ---
 
 ## 6. 测试场景 B — 右键菜单(主要使用方式)
@@ -103,6 +114,32 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 7. 按 **ESC** 或 **×** 关闭浮窗
 
 ✅ **预期:** Shadow DOM 隔离 — 浮窗样式完全不受网页 CSS 影响
+
+---
+
+## 6b. 测试场景 B2 — 右键「文本工具」
+
+1. 选中一段文字 → 右键
+2. 「改写为(地道中文)」下面还有一个 **文本工具(地道中文)** ▶
+3. hover → 4 个选项:**润色 / 中英互译 / 总结 / 白话解释**
+4. 点一个 → 右下角浮窗,header 的粉 chip 显的是工具名(不是方言名)
+5. 点 **白话解释** → 结果上方多一个灰色小 chip 显模型名(pro 模型路由可见)
+6. 底部按钮是 **复制结果**
+
+✅ **预期:** 两个菜单组互不影响 — 「改写为」走 `/api/rewrite`,「文本工具」走 `/api/transform`
+
+---
+
+## 6c. 即时模式默认动作(新)
+
+弹窗的「网页改写模式」块里多了一个 **即时默认动作** 下拉:
+
+- 默认跟随你在下面选的方言(老行为,什么都不用动)
+- 也可以选「文本工具」里的一个模式 → 即时模式选中文字后弹的就是该工具的结果
+- 选回方言会和下面的方言选择器自动同步
+
+存储:`ncga.prefs.v1` 里新增 `defaultAction`(`"variety:<key>"` 或 `"mode:<key>"`)。
+旧安装没有这个 key → 行为和以前一模一样(继续用 `defaultVariety`)。
 
 ---
 
@@ -129,8 +166,9 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 
 | 错误 | 原因 | 救法 |
 |---|---|---|
-| 右键没有「改写为」 | 没选中文字 → contextMenus 仅在 selection contexts 显示 | 先选中文字再右键 |
-| 浮窗显 ✗ HTTP 401 | token 错或被服务器换了 | 重新打开 Options 填新 token |
+| 右键没有「改写为」/「文本工具」 | 没选中文字 → contextMenus 仅在 selection contexts 显示;或扩展升级后菜单没重建 | 先选中文字再右键;还没有就去 `chrome://extensions` 点 NCGA 的刷新箭头 |
+| 浮窗显 ✗ HTTP 401 / 认证失败 | token 错或被服务器换了 | 重新打开 Options 填新 token |
+| 文本工具显 ✗ 服务器未配置 LLM | transform 模式没有启发式兜底,LLM 没配置/连不上直接 503 | 服务器 `.env` 配好 LLM key 后重启 app |
 | 浮窗显 ✗ Failed to fetch | 服务器没在跑 / URL 写错 | `python3 app.py` 跑起来,检查 Options URL |
 | 浮窗显 ✗ HTTP 429 | 服务器 IP-rate-limit 命中(默认每 IP 每分钟 30 次) | 等 1 分钟 |
 | popup 显「未配置」但 Options 已存 | Options 没真存盘 | 重开 Options,确认 **当前状态** 框有数据,没数据再点 **加密并保存** 一次 |

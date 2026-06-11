@@ -18,9 +18,14 @@ const openOptions = $("#open-options");
 const lockBtn = $("#lock-btn");
 const modeOpts = document.querySelectorAll(".mode-opt");
 const modeHint = $("#mode-hint");
+const toolBtns = document.querySelectorAll(".tool-btn");
+const defaultActionSel = $("#default-action");
 
 const CONFIG_KEY = "ncga.config.v1";  // {serverUrl, encryptedToken, savedAt} — owned by options.js
-const PREFS_KEY = "ncga.prefs.v1";    // {mode, defaultVariety} — owned by popup; read by content.js
+// {mode, defaultVariety, defaultAction, lastTransformMode} — owned by popup;
+// read by content.js. defaultAction ("variety:<key>" | "mode:<key>") supersedes
+// defaultVariety for instant mode; absent → defaultVariety fallback (Cycle 23).
+const PREFS_KEY = "ncga.prefs.v1";
 
 // Read user prefs. One-time migration: prefs used to live inside CONFIG_KEY,
 // which let an options.js save clobber them — they now have their own key.
@@ -82,12 +87,33 @@ async function ensureInjectedFor(mode) {
   } catch (_e) { /* un-injectable page (chrome://, store) — ignore */ }
 }
 
+// Hydrate the 即时默认动作 select. Migration-safe: prefs saved before the
+// defaultAction key exist without it → derive "variety:" + defaultVariety so
+// the select mirrors what content.js will actually do.
+function _paintDefaultAction(prefs) {
+  const stored = typeof prefs.defaultAction === "string" ? prefs.defaultAction : "";
+  const action = stored || "variety:" + (prefs.defaultVariety || "shanghai_mandarin_style");
+  defaultActionSel.value = action;
+  // Unknown key (e.g. stale pref after a variety rename): fall back visually.
+  if (defaultActionSel.value !== action) defaultActionSel.value = "variety:shanghai_mandarin_style";
+}
+
+// Highlight the last-used 文本工具 button (lastTransformMode pref; "polish"
+// when the key is absent — pre-Cycle-23 prefs need no migration write).
+function _paintLastTool(modeKey) {
+  toolBtns.forEach((b) => {
+    b.classList.toggle("is-last", b.dataset.mode === modeKey);
+  });
+}
+
 async function loadModeSwitch() {
   try {
     const prefs = await loadPrefs();
     const mode = _migrateMode(prefs);
     _paintMode(mode);
     if (prefs.defaultVariety) varietySel.value = prefs.defaultVariety;
+    _paintDefaultAction(prefs);
+    _paintLastTool(prefs.lastTransformMode || "polish");
     await ensureInjectedFor(mode);
   } catch (_e) {
     _paintMode("on_demand");
@@ -108,7 +134,29 @@ modeOpts.forEach((btn) => {
 varietySel.addEventListener("change", async () => {
   // When user changes variety in popup, persist as defaultVariety for
   // selection auto-rewrite path.
-  await savePrefs({ defaultVariety: varietySel.value });
+  const patch = { defaultVariety: varietySel.value };
+  // Pre-defaultAction behavior: this picker also drove instant mode. Keep that
+  // link while defaultAction is absent or still a variety; an explicit "mode:"
+  // choice in the 即时默认动作 select breaks the link on purpose.
+  const prefs = await loadPrefs();
+  const action = typeof prefs.defaultAction === "string" ? prefs.defaultAction : "";
+  if (!action || action.startsWith("variety:")) {
+    patch.defaultAction = "variety:" + varietySel.value;
+  }
+  await savePrefs(patch);
+  if (patch.defaultAction) defaultActionSel.value = patch.defaultAction;
+});
+
+defaultActionSel.addEventListener("change", async () => {
+  const action = defaultActionSel.value;
+  const patch = { defaultAction: action };
+  if (action.startsWith("variety:")) {
+    // Keep the legacy field in sync so pre-split readers (and this popup's
+    // variety picker) agree with what instant mode will do.
+    patch.defaultVariety = action.slice("variety:".length);
+  }
+  await savePrefs(patch);
+  if (patch.defaultVariety) varietySel.value = patch.defaultVariety;
 });
 
 function showStatus(text, kind) {
@@ -193,6 +241,53 @@ rewriteBtn.addEventListener("click", async () => {
   } finally {
     rewriteBtn.disabled = false;
   }
+});
+
+// 文本工具:run a transform mode on the popup's input text via the SW.
+// Same message type as rewrite — the SW routes on the `mode` field.
+toolBtns.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const text = textArea.value.trim();
+    if (!text) return;
+    const mode = btn.dataset.mode;
+    _paintLastTool(mode);
+    await savePrefs({ lastTransformMode: mode });
+    toolBtns.forEach((b) => { b.disabled = true; });
+    rewriteBtn.disabled = true;
+    resultEl.textContent = "处理中…";
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: "ncga:rewrite-from-popup",
+        mode,
+        text,
+      });
+      if (res && res.ok) {
+        resultEl.textContent = "";
+        if (res.degraded) {
+          // transforms send degraded:false today; wiring kept identical to rewrite
+          const chip = document.createElement("span");
+          chip.className = "degraded-chip";
+          chip.textContent = res.warning ? "降级输出 · " + res.warning : "降级输出";
+          resultEl.appendChild(chip);
+        }
+        if (mode === "explain" && res.model) {
+          // 白话解释 routes to a stronger model server-side — show which one.
+          const mchip = document.createElement("span");
+          mchip.className = "model-chip";
+          mchip.textContent = res.model;
+          resultEl.appendChild(mchip);
+        }
+        resultEl.appendChild(document.createTextNode(res.result || "(空)"));
+      } else {
+        resultEl.textContent = "✗ " + (res && res.error || "未知错误");
+      }
+    } catch (e) {
+      resultEl.textContent = "✗ " + (e && e.message || e);
+    } finally {
+      toolBtns.forEach((b) => { b.disabled = false; });
+      rewriteBtn.disabled = false;
+    }
+  });
 });
 
 openOptions.addEventListener("click", (e) => {

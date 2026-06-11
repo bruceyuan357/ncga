@@ -5,6 +5,9 @@
 import { encrypt } from "../lib/crypto.js";
 
 const STORAGE_KEY = "ncga.config.v1";
+// Read-only here: prefs are owned by the popup (split in Cycle 22 so an
+// options save can't clobber them). Shown in 当前状态 for debugging only.
+const PREFS_KEY = "ncga.prefs.v1";
 
 const $ = (s) => document.querySelector(s);
 
@@ -23,13 +26,18 @@ function setMsg(text, kind) {
 }
 
 async function loadStatus() {
-  const store = await chrome.storage.local.get(STORAGE_KEY);
+  const store = await chrome.storage.local.get([STORAGE_KEY, PREFS_KEY]);
   const c = store[STORAGE_KEY] || {};
+  const p = store[PREFS_KEY] || {};
   const lines = [];
   lines.push("serverUrl:        " + (c.serverUrl || "(unset)"));
   lines.push("encryptedToken:   " + (c.encryptedToken ? c.encryptedToken.slice(0, 28) + "…" : "(unset)"));
   lines.push("token blob len:   " + (c.encryptedToken ? c.encryptedToken.length + " chars" : "—"));
   lines.push("saved at:         " + (c.savedAt ? new Date(c.savedAt).toISOString() : "—"));
+  // Prefs (set in the popup; listed here so debugging doesn't need devtools)
+  lines.push("mode:             " + (p.mode || "(unset → on_demand)"));
+  lines.push("defaultAction:    " + (p.defaultAction || "(unset → variety:" + (p.defaultVariety || "shanghai_mandarin_style") + ")"));
+  lines.push("lastTransformMode:" + (p.lastTransformMode ? " " + p.lastTransformMode : " (unset → polish)"));
   statusOut.textContent = lines.join("\n");
   // Hydrate URL into the input if blank
   if (c.serverUrl && !serverInput.value) serverInput.value = c.serverUrl;

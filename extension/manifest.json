@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "地道中文 · NCGA",
-  "version": "0.1.0",
-  "description": "Rewrite selected text into 10 Chinese regional varieties via your local NCGA server. Right-click any selection → 改写为... Token stored encrypted via Web Crypto.",
+  "version": "0.2.0",
+  "description": "Rewrite selected text into 10 Chinese regional varieties, or run 文本工具 (润色/中英互译/总结/白话解释) via your local NCGA server. Right-click any selection → 改写为 / 文本工具. Token stored encrypted via Web Crypto.",
 
   "icons": {
     "16": "icons/icon-16.png",

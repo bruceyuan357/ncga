@@ -174,6 +174,18 @@
         font-size: 10px;
         font-weight: 600;
       }
+      .model-chip {
+        display: inline-block;
+        margin: 0 0 0.5rem;
+        padding: 0.1em 0.6em;
+        border: 1px solid #E5DAD5;
+        border-radius: 999px;
+        background: #F6EFEB;
+        color: #8A7770;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .degraded + .model-chip { margin-left: 0.4em; }
       .ftr {
         padding: 0.5rem 0.9rem;
         border-top: 1px solid #F0D9CF;
@@ -200,10 +212,12 @@
     return shadowRoot;
   }
 
-  function renderLoading(varietyKey, sourceText, anchorRect = null) {
+  // tagLabel overrides the header chip text — used by the transform path
+  // (mode label instead of a dialect name). null keeps the variety lookup.
+  function renderLoading(varietyKey, sourceText, anchorRect = null, tagLabel = null) {
     ensureHost(anchorRect);
     panelEl.textContent = "";
-    panelEl.appendChild(buildHeader(varietyKey, true));
+    panelEl.appendChild(buildHeader(varietyKey, true, tagLabel));
     const body = document.createElement("div");
     body.className = "body";
     const src = document.createElement("p");
@@ -212,15 +226,20 @@
     body.appendChild(src);
     const load = document.createElement("div");
     load.className = "loading";
-    load.textContent = "改写中…";
+    // 「中英互译中…」拗口 — transform 统一显「处理中…」,模式名在 header chip 里。
+    load.textContent = tagLabel ? "处理中…" : "改写中…";
     body.appendChild(load);
     panelEl.appendChild(body);
   }
 
-  function renderResult(varietyKey, sourceText, result, anchorRect = null, degraded = false, warning = "") {
+  // transformMeta = {modeKey, modeLabel, model} for transform results, null for
+  // dialect rewrites. modeLabel replaces the dialect name in the header chip;
+  // model shows as a muted chip when modeKey === "explain" (the user wants to
+  // SEE the per-mode pro-model routing, not just trust it's configured).
+  function renderResult(varietyKey, sourceText, result, anchorRect = null, degraded = false, warning = "", transformMeta = null) {
     ensureHost(anchorRect);
     panelEl.textContent = "";
-    panelEl.appendChild(buildHeader(varietyKey, true));
+    panelEl.appendChild(buildHeader(varietyKey, true, transformMeta && transformMeta.modeLabel));
     const body = document.createElement("div");
     body.className = "body";
     // Collapsible source
@@ -240,26 +259,34 @@
     }
     if (degraded) {
       // Server fell back to a degraded rewrite — badge it (textContent only).
+      // Transforms send degraded:false today; the wiring is shared on purpose.
       const chip = document.createElement("span");
       chip.className = "degraded";
       chip.textContent = warning ? "降级输出 · " + warning : "降级输出";
       body.appendChild(chip);
+    }
+    if (transformMeta && transformMeta.modeKey === "explain" && transformMeta.model) {
+      const mchip = document.createElement("span");
+      mchip.className = "model-chip";
+      mchip.textContent = transformMeta.model;
+      body.appendChild(mchip);
     }
     const out = document.createElement("pre");
     out.className = "result";
     out.textContent = result || "(空)";
     body.appendChild(out);
     panelEl.appendChild(body);
-    // Footer with copy button
+    // Footer with copy button ("复制结果" for transforms — output isn't a 改写)
     const ftr = document.createElement("div");
     ftr.className = "ftr";
     const copyBtn = document.createElement("button");
-    copyBtn.textContent = "复制改写";
+    const copyLabel = transformMeta ? "复制结果" : "复制改写";
+    copyBtn.textContent = copyLabel;
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(result);
         copyBtn.textContent = "已复制 ✓";
-        setTimeout(() => { copyBtn.textContent = "复制改写"; }, 1500);
+        setTimeout(() => { copyBtn.textContent = copyLabel; }, 1500);
       } catch (e) {
         copyBtn.textContent = "复制失败:" + e.message;
       }
@@ -281,7 +308,7 @@
     panelEl.appendChild(body);
   }
 
-  function buildHeader(varietyKey, withClose) {
+  function buildHeader(varietyKey, withClose, tagLabel = null) {
     const hdr = document.createElement("div");
     hdr.className = "hdr";
     const title = document.createElement("div");
@@ -290,7 +317,7 @@
     hdr.appendChild(title);
     const tag = document.createElement("span");
     tag.className = "hdr-variety";
-    tag.textContent = labelForVariety(varietyKey);
+    tag.textContent = tagLabel || labelForVariety(varietyKey);
     hdr.appendChild(tag);
     if (withClose) {
       const close = document.createElement("button");
@@ -315,6 +342,17 @@
       "cantonese_written": "粤书",
       "hokkien_written": "台闽南",
       "minnan_written": "福建闽南",
+    })[key] || key || "—";
+  }
+
+  // Transform-mode labels — mirror MODE_METADATA in transform.py (same manual
+  // sync convention as labelForVariety above).
+  function labelForMode(key) {
+    return ({
+      "polish": "润色",
+      "translate": "中英互译",
+      "summarize": "总结",
+      "explain": "白话解释",
     })[key] || key || "—";
   }
 
@@ -445,22 +483,40 @@
       width: rect.width,
     };
 
-    const variety = prefs.defaultVariety || "shanghai_mandarin_style";
+    // Default action: "variety:<key>" | "mode:<key>" (defaultAction pref,
+    // Cycle 23). Absent/legacy values fall back to defaultVariety — pre-split
+    // installs keep behaving exactly as before.
+    const action = typeof prefs.defaultAction === "string" ? prefs.defaultAction : "";
+    let variety = null;
+    let modeKey = null;
+    if (action.startsWith("mode:")) {
+      modeKey = action.slice("mode:".length);
+    } else if (action.startsWith("variety:")) {
+      variety = action.slice("variety:".length);
+    } else {
+      variety = prefs.defaultVariety || "shanghai_mandarin_style";
+    }
+    const tagLabel = modeKey ? labelForMode(modeKey) : null;
     const requestId = ++rewriteRequestSeq;
     // Render loading immediately at anchor
-    renderLoading(variety, text, anchor);
+    renderLoading(variety || modeKey, text, anchor, tagLabel);
 
     try {
-      const res = await chrome.runtime.sendMessage({
-        type: "ncga:rewrite-from-selection",
-        varietyKey: variety,
-        text,
-      });
+      const res = await chrome.runtime.sendMessage(
+        modeKey
+          ? { type: "ncga:rewrite-from-selection", mode: modeKey, text }
+          : { type: "ncga:rewrite-from-selection", varietyKey: variety, text },
+      );
       // Stale guard: a newer selection fired, or the user closed the overlay
       // (Esc / outside click / ×) while this request was in flight.
       if (requestId !== rewriteRequestSeq || !hostEl) return;
       if (res && res.ok) {
-        renderResult(variety, text, res.result || "", anchor, !!res.degraded, res.warning || "");
+        renderResult(
+          variety || modeKey, text, res.result || "", anchor, !!res.degraded, res.warning || "",
+          modeKey
+            ? { modeKey, modeLabel: res.modeLabel || tagLabel, model: res.model || "" }
+            : null,
+        );
       } else {
         renderError((res && res.error) || "未知错误", anchor);
       }
@@ -473,12 +529,20 @@
   document.addEventListener("selectionchange", onSelectionChange);
 
   // ============ message bridge with background SW ============
+  // Transform overlay messages carry {mode, modeLabel, model} instead of
+  // {varietyKey}; the header chip shows the mode label in that case.
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg || !msg.type) return;
     if (msg.type === "ncga:overlay-loading") {
-      renderLoading(msg.varietyKey, msg.text || "");
+      const tagLabel = msg.mode ? (msg.modeLabel || labelForMode(msg.mode)) : null;
+      renderLoading(msg.varietyKey, msg.text || "", null, tagLabel);
     } else if (msg.type === "ncga:overlay-result") {
-      renderResult(msg.varietyKey, msg.text || "", msg.result || "", null, !!msg.degraded, msg.warning || "");
+      renderResult(
+        msg.varietyKey, msg.text || "", msg.result || "", null, !!msg.degraded, msg.warning || "",
+        msg.mode
+          ? { modeKey: msg.mode, modeLabel: msg.modeLabel || labelForMode(msg.mode), model: msg.model || "" }
+          : null,
+      );
     } else if (msg.type === "ncga:overlay-error") {
       renderError(msg.error || "未知错误");
     }

@@ -8,7 +8,7 @@
 <body>
   <header class="hdr">
     <h1>地道中文</h1>
-    <span class="ver">v0.1.0</span>
+    <span class="ver">v0.2.0</span>
   </header>
 
   <section id="status" class="status">
@@ -32,6 +32,29 @@
         <button type="button" class="mode-opt" data-mode="instant" role="radio" aria-checked="false">即时</button>
       </div>
       <p class="mode-hint" id="mode-hint"></p>
+      <div class="row">
+        <label for="default-action" class="small">即时默认动作</label>
+        <select id="default-action">
+          <optgroup label="改写为(方言)">
+            <option value="variety:standard_putonghua">标准普通话</option>
+            <option value="variety:beijing_mandarin">北京话</option>
+            <option value="variety:dongbei_mandarin">东北话</option>
+            <option value="variety:sichuan_chongqing_mandarin">川渝话</option>
+            <option value="variety:jianghuai_or_lower_yangtze_mandarin">江淮话</option>
+            <option value="variety:guangdong_mandarin">广东普通话</option>
+            <option value="variety:shanghai_mandarin_style">上海话风格</option>
+            <option value="variety:cantonese_written">粤语书面语</option>
+            <option value="variety:hokkien_written">台湾闽南语</option>
+            <option value="variety:minnan_written">福建闽南语</option>
+          </optgroup>
+          <optgroup label="文本工具">
+            <option value="mode:polish">润色</option>
+            <option value="mode:translate">中英互译</option>
+            <option value="mode:summarize">总结</option>
+            <option value="mode:explain">白话解释</option>
+          </optgroup>
+        </select>
+      </div>
     </div>
     <label for="text">在弹窗里改写</label>
     <textarea id="text" rows="3" placeholder="贴一段话…"></textarea>
@@ -51,6 +74,15 @@
       </select>
     </div>
     <button id="rewrite-btn" class="primary">改写</button>
+    <div class="tools">
+      <span class="tools-title">文本工具</span>
+      <div class="tools-btns">
+        <button type="button" class="tool-btn" data-mode="polish">润色</button>
+        <button type="button" class="tool-btn" data-mode="translate">中英互译</button>
+        <button type="button" class="tool-btn" data-mode="summarize">总结</button>
+        <button type="button" class="tool-btn" data-mode="explain">白话解释</button>
+      </div>
+    </div>
     <pre id="result" class="result"></pre>
   </section>
 
