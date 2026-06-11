@@ -2017,6 +2017,61 @@ class StreamingRewriteEndpointTests(unittest.TestCase):
         # falls back to friends_casual — and that fallback is now visible.
         self.assertIn('"effective_scenario": "friends_casual"', text)
 
+    def test_stream_threads_glossary_and_override_into_payload(self) -> None:
+        """Review fix P2: the streaming path must consult the Reflexion override
+        and the request glossary, mirroring non-streaming /api/rewrite. Before
+        the fix both were silently dropped on this (primary) path."""
+        sse = b"".join(
+            [
+                b'data: {"choices":[{"delta":{"content":"{\\"rewritten_text\\": \\"ok\\"}"}}]}\n',
+                b"data: [DONE]\n",
+            ]
+        )
+        from native_chinese_assistant.feedback import QualityStore
+
+        client, transport = _build_client(sse, streaming=True)
+        with tempfile.TemporaryDirectory(prefix="ncga-stream-ovr-") as tmpdir:
+            store = QualityStore(path=Path(tmpdir) / "q.json")
+            store.set_override(
+                "standard_putonghua", "friends_casual", "OVERRIDE-MARKER-XYZ", "review-fix-P2 test"
+            )
+            service = RewriteService(client=client, quality_store=store)
+            app = App(rewrite_service=service)
+            status, _, _ = call_app(
+                app,
+                "POST",
+                "/api/rewrite-stream",
+                body=json.dumps(
+                    {
+                        "text": "你好",
+                        "target_variety": "standard_putonghua",
+                        "glossary": ["拼车 → 搭子车"],
+                    }
+                ).encode("utf-8"),
+            )
+        self.assertEqual(status, "200 OK")
+        sent = json.loads(transport.calls[-1]["body"].decode("utf-8"))
+        system_prompt = sent["messages"][0]["content"]
+        self.assertIn("OVERRIDE-MARKER-XYZ", system_prompt)
+        self.assertIn("拼车 → 搭子车", system_prompt)
+
+    def test_stream_done_event_flags_degraded_fallback(self) -> None:
+        """Review fix P3: when the LLM fails mid-stream, the heuristic fallback
+        must arrive flagged degraded=true in the done event — previously the
+        flag was dropped and the frontend hardcoded degraded:false."""
+        client, _ = _build_client(b"not an sse stream at all", streaming=True)
+        app = App(rewrite_service=RewriteService(client=client))
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/rewrite-stream",
+            body=json.dumps({"text": "你好", "target_variety": "dongbei_mandarin"}).encode("utf-8"),
+        )
+        self.assertEqual(status, "200 OK")
+        text = body.decode("utf-8")
+        self.assertIn("event: done", text)
+        self.assertIn('"degraded": true', text)
+
 
 class RateEndpointTests(unittest.TestCase):
     def test_rate_endpoint_happy_path(self) -> None:
@@ -2599,27 +2654,68 @@ class SecurityCycle13Tests(unittest.TestCase):
 
     def test_index_html_no_longer_leaks_token(self) -> None:
         # Cycle 20: the bearer token used to be injected as
-        # <meta name="ncga-auth" content="<token>">. That made anyone who
-        # could GET / a token-holder. Now we only mark auth-mode and set an
-        # HMAC-signed session cookie — token never leaves the server.
+        # <meta name="ncga-auth" content="<token>">. Review fix P1 went
+        # further: an ANONYMOUS GET / no longer gets a session cookie either
+        # (that handed a full API credential to anyone who could load the
+        # homepage). Cookie now comes from POST /api/login.
         os.environ["NCGA_AUTH_TOKEN"] = "abc-123"
         app = App(rewrite_service=RewriteService(config=None))
         _, headers, body = call_app(app, "GET", "/")
         self.assertNotIn(b"abc-123", body)
         self.assertIn(b'<meta name="ncga-auth-mode" content="cookie">', body)
+        self.assertNotIn("Set-Cookie", headers)
+
+    def _login_cookie(self, app, token):
+        """POST /api/login with the token; return the ncga_sess cookie pair."""
+        s, headers, _ = call_app(
+            app,
+            "POST",
+            "/api/login",
+            body=json.dumps({"token": token}).encode(),
+        )
+        assert s == "200 OK", s
+        return headers["Set-Cookie"].split(";", 1)[0].strip()
+
+    def test_login_exchanges_token_for_cookie(self) -> None:
+        # Review fix P1: /api/login is the only way an anonymous browser
+        # obtains the session cookie, and it must prove the bearer token.
+        os.environ["NCGA_AUTH_TOKEN"] = "login-secret"
+        app = App(rewrite_service=RewriteService(config=None))
+        s, headers, _ = call_app(
+            app, "POST", "/api/login", body=json.dumps({"token": "login-secret"}).encode()
+        )
+        self.assertEqual(s, "200 OK")
         set_cookie = headers.get("Set-Cookie", "")
         self.assertTrue(set_cookie.startswith("ncga_sess="), msg=set_cookie)
         self.assertIn("HttpOnly", set_cookie)
         self.assertIn("SameSite=Lax", set_cookie)
 
+    def test_login_rejects_wrong_token(self) -> None:
+        os.environ["NCGA_AUTH_TOKEN"] = "login-secret"
+        app = App(rewrite_service=RewriteService(config=None))
+        s, headers, _ = call_app(
+            app, "POST", "/api/login", body=json.dumps({"token": "wrong"}).encode()
+        )
+        self.assertEqual(s, "401 Unauthorized")
+        self.assertNotIn("Set-Cookie", headers)
+
+    def test_index_refreshes_cookie_for_already_authed_request(self) -> None:
+        # A browser that already holds a valid cookie gets it refreshed on
+        # GET / (rolling session) — only the anonymous path stopped minting.
+        os.environ["NCGA_AUTH_TOKEN"] = "refresh-secret"
+        app = App(rewrite_service=RewriteService(config=None))
+        cookie_pair = self._login_cookie(app, "refresh-secret")
+        _, headers, _ = call_app(app, "GET", "/", extra_environ={"HTTP_COOKIE": cookie_pair})
+        self.assertIn("Set-Cookie", headers)
+        self.assertTrue(headers["Set-Cookie"].startswith("ncga_sess="))
+
     def test_post_api_accepts_session_cookie(self) -> None:
-        # Cycle 20: SPA path. GET / mints the cookie; browser ships it back;
-        # server lets POST through without a bearer header.
+        # Cycle 20 / review fix P1: browser logs in once via /api/login,
+        # then the HMAC cookie alone authorizes POSTs.
         os.environ["NCGA_AUTH_TOKEN"] = "secret-token-xyz"
         client, _ = _build_client(_llm_json("ok"))
         app = App(rewrite_service=RewriteService(client=client))
-        _, headers, _ = call_app(app, "GET", "/")
-        cookie_pair = headers["Set-Cookie"].split(";", 1)[0].strip()
+        cookie_pair = self._login_cookie(app, "secret-token-xyz")
         s, _, _ = call_app(
             app,
             "POST",
@@ -2663,9 +2759,8 @@ class SecurityCycle13Tests(unittest.TestCase):
         os.environ["NCGA_AUTH_TOKEN"] = "logout-secret"
         client, _ = _build_client(_llm_json("ok"))
         app = App(rewrite_service=RewriteService(client=client))
-        # Mint a cookie via GET /
-        _, headers, _ = call_app(app, "GET", "/")
-        cookie_pair = headers["Set-Cookie"].split(";", 1)[0].strip()
+        # Mint a cookie via /api/login (review fix P1: GET / no longer mints)
+        cookie_pair = self._login_cookie(app, "logout-secret")
         # Confirm it works once
         s, _, _ = call_app(
             app,

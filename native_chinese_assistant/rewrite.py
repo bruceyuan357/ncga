@@ -662,32 +662,56 @@ class ChatCompletionsClient:
         text: str,
         target: VarietyPreset,
         scenario: Scenario = Scenario.FRIENDS_CASUAL,
+        *,
+        addendum_override: str | None = None,
+        glossary_lines: list[str] | None = None,
     ):
-        """Yield (raw_partial_json_text, partial_extracted_text, is_done) tuples.
+        """Yield (delta, partial_extracted_text, is_done, meta) tuples.
 
         Every chunk yielded is whatever the LLM has streamed so far, *plus* an
         attempt to extract `rewritten_text` from the partial JSON if any.
-        Final yield has is_done=True with the full RewriteResult.
+        meta is None on chunks; the final is_done=True yield carries
+        {"degraded": bool, "warning": str | None} so SSE consumers can forward
+        the same contract as non-streaming /api/rewrite (review fix P3 — the
+        old 3-tuple silently dropped warning/degraded on the primary UX path).
+
+        Review fix P2: addendum_override (Reflexion) and glossary_lines now
+        thread into the payload exactly like the non-streaming rewrite() —
+        previously the primary streaming path silently ignored both.
 
         This streams without retry: streaming + retry is complex and the JSON-repair
         retry path is rarely needed in practice (LLMs usually output JSON cleanly
         when response_format is json_object).
         """
-        metadata = PRESET_METADATA[target]
         # Force streaming on for this call
         if not self.config.streaming:
             # If the configured base config has streaming disabled, do a non-streaming
             # call and yield the result as a single chunk. Caller's UX still benefits
             # from a unified streaming interface.
             try:
-                result = self.rewrite(text, target, scenario=scenario)
+                result = self.rewrite(
+                    text,
+                    target,
+                    scenario=scenario,
+                    addendum_override=addendum_override,
+                    glossary_lines=glossary_lines,
+                )
             except RewriteError:
                 raise
-            yield result.rewritten_text, result.rewritten_text, False
-            yield "", "", True  # actually done; caller should also have full result via separate path
+            yield result.rewritten_text, result.rewritten_text, False, None
+            # Final partial carries the full text (was "" — violated the
+            # "empty partial at done means failure" contract for LLM_STREAM=false).
+            yield "", result.rewritten_text, True, {"degraded": result.degraded, "warning": result.warning}
             return
 
-        payload = self._build_payload(text, target, scenario=scenario, strict_json=False)
+        payload = self._build_payload(
+            text,
+            target,
+            scenario=scenario,
+            strict_json=False,
+            addendum_override=addendum_override,
+            glossary_lines=glossary_lines,
+        )
         body = json.dumps(payload).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -705,7 +729,7 @@ class ChatCompletionsClient:
                 accumulated += delta
                 # Try to extract a partial rewritten_text, even from incomplete JSON
                 partial_text = _try_extract_rewritten_text(accumulated)
-                yield delta, partial_text, False
+                yield delta, partial_text, False, None
 
         # Accumulated holds the full JSON. Parse strictly now.
         try:
@@ -721,16 +745,7 @@ class ChatCompletionsClient:
             truncate_warning = "Result truncated to max length."
         raw_warning = (parsed.get("warning") or "").strip() or None
         warning = " | ".join(filter(None, [raw_warning, truncate_warning])) or None
-        result = RewriteResult(
-            rewritten_text=rewritten_text,
-            target_variety=target,
-            script=metadata.script,
-            warning=warning,
-            degraded=False,
-        )
-        yield "", rewritten_text, True
-        # Caller can use the last yielded partial_text + use this returned value via .send/etc.
-        # Simpler: caller calls rewrite_stream() then knows last partial is the final.
+        yield "", rewritten_text, True, {"degraded": False, "warning": warning}
         return
 
     def rewrite(
@@ -1232,24 +1247,42 @@ class RewriteService:
         text: str,
         target: VarietyPreset,
         scenario: Scenario = Scenario.FRIENDS_CASUAL,
+        *,
+        glossary_lines: list[str] | None = None,
     ):
-        """Stream chunks. Yields (delta_text, partial_text, is_done).
+        """Stream chunks. Yields (delta_text, partial_text, is_done, meta).
 
-        On is_done=True, the stream is over; caller should check that partial_text
-        is non-empty (otherwise treat as failure).
-        Falls back gracefully: if no LLM configured, uses heuristic and emits one chunk.
+        meta is None on chunks; on is_done=True it carries
+        {"degraded": bool, "warning": str | None} matching non-streaming
+        rewrite()'s contract (review fix P3). Caller should still check
+        partial_text is non-empty at done (failure signal).
+        Falls back gracefully: if no LLM configured, uses heuristic and emits
+        one chunk — flagged degraded=True instead of impersonating a real result.
+
+        Review fix P2: consults the Reflexion override and threads glossary,
+        mirroring rewrite(). Previously both were silently dropped on this
+        (primary) path, making the self-improvement loop a no-op in the SPA.
         """
         normalized = validate_text(text)
         started = time.perf_counter()
+        addendum_override = None
+        if self.quality_store is not None:
+            addendum_override = self.quality_store.get_override_addendum(target.value, scenario.value)
         if self._client is None:
             result = self._fallback.rewrite(normalized, target, reason="No LLM provider is configured.")
             self._log_request(target, started, degraded=True)
-            yield result.rewritten_text, result.rewritten_text, False
-            yield "", result.rewritten_text, True
+            yield result.rewritten_text, result.rewritten_text, False, None
+            yield "", result.rewritten_text, True, {"degraded": True, "warning": result.warning}
             return
         try:
-            for delta, partial, done in self._client.rewrite_stream(normalized, target, scenario=scenario):
-                yield delta, partial, done
+            for delta, partial, done, meta in self._client.rewrite_stream(
+                normalized,
+                target,
+                scenario=scenario,
+                addendum_override=addendum_override,
+                glossary_lines=glossary_lines,
+            ):
+                yield delta, partial, done, meta
                 if done:
                     break
             self._log_request(target, started, degraded=False)
@@ -1257,8 +1290,8 @@ class RewriteService:
             logger.warning("LLM stream failed; falling back to heuristic: %s", exc)
             result = self._fallback.rewrite(normalized, target, reason=str(exc))
             self._log_request(target, started, degraded=True)
-            yield result.rewritten_text, result.rewritten_text, False
-            yield "", result.rewritten_text, True
+            yield result.rewritten_text, result.rewritten_text, False, None
+            yield "", result.rewritten_text, True, {"degraded": True, "warning": result.warning}
 
     def explain(
         self,

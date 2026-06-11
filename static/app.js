@@ -22,22 +22,51 @@
   const _AUTH_MODE =
     document.querySelector('meta[name="ncga-auth-mode"]')?.content || "open";
   const _origFetch = window.fetch.bind(window);
+
+  // Review fix P1: GET / no longer hands out a free session cookie, so a fresh
+  // browser's first POST gets 401. Ask for the token once, exchange it for a
+  // cookie via POST /api/login, then transparently retry the original request.
+  let _loginInFlight = null;
+  function _promptLogin() {
+    if (_loginInFlight) return _loginInFlight;
+    _loginInFlight = (async () => {
+      try {
+        const token = window.prompt(
+          "需要访问令牌 (NCGA_AUTH_TOKEN)。\n向部署者索取后粘贴到这里:",
+        );
+        if (!token || !token.trim()) return false;
+        const res = await _origFetch("/api/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token.trim() }),
+        });
+        if (res.ok) return true;
+        try {
+          if (typeof showToast === "function") showToast("令牌不对,请重试", "fa-circle-xmark");
+        } catch (_) { /* boot order */ }
+        return false;
+      } catch (_) {
+        return false;
+      } finally {
+        _loginInFlight = null;
+      }
+    })();
+    return _loginInFlight;
+  }
+
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";
     if (url.startsWith("/api/")) {
       init = init || {};
       if (!init.credentials) init.credentials = "same-origin";
     }
-    return _origFetch(input, init).then((res) => {
-      if (res && res.status === 401 && url.startsWith("/api/")) {
-        const now = Date.now();
-        if (!window.__ncga401At || now - window.__ncga401At > 5000) {
-          window.__ncga401At = now;
-          try {
-            if (typeof showToast === "function") {
-              showToast("会话已过期,刷新页面重新登录", "fa-arrow-rotate-left");
-            }
-          } catch (_) { /* showToast may not be defined yet */ }
+    return _origFetch(input, init).then(async (res) => {
+      if (res && res.status === 401 && url.startsWith("/api/") && url !== "/api/login") {
+        const ok = await _promptLogin();
+        if (ok) {
+          // One retry with the fresh cookie; if it 401s again, return as-is.
+          return _origFetch(input, init);
         }
       }
       return res;
@@ -533,13 +562,20 @@
     [1, 6, "小寒"], [1, 20, "大寒"],
   ];
   function currentSolarTerm() {
+    // 取「开始日 <= 今天」里日历序最晚的节气。必须按 month*100+day 排序后比较,
+    // 不能按数组原顺序赋值 —— 原实现把数组末尾的小寒/大寒(1月)在 2-12 月
+    // 永远当成"最近匹配",导致全年 11 个月都显示「大寒」。
+    // 1 月 1-5 日(小寒之前)属于上一年冬至节气,回绕到「冬至」。
     const now = new Date();
-    const m = now.getMonth() + 1, d = now.getDate();
-    let best = "立春";
+    const key = (now.getMonth() + 1) * 100 + now.getDate();
+    let best = "冬至";
+    let bestKey = -1;
     for (const [tm, td, name] of SOLAR_TERMS) {
-      // Pick the latest term whose start date <= today (in calendar order)
-      if (tm < m || (tm === m && td <= d)) best = name;
-      // Special wrap: if Jan and we passed 6/20, "小寒/大寒" handled above naturally
+      const k = tm * 100 + td;
+      if (k <= key && k > bestKey) {
+        bestKey = k;
+        best = name;
+      }
     }
     return best;
   }
@@ -1407,13 +1443,16 @@
     if (streamError) return null;  // server-side error mid-stream — caller falls back
     if (!finalResult) return null;
     // Normalize to the same shape as /api/rewrite returns. The stream's done event
-    // carries `rewritten_text`, `target_variety`, and (Cycle 16) `effective_scenario`.
+    // carries rewritten_text / target_variety / effective_scenario, and (review
+    // fix P3) degraded + warning — previously hardcoded degraded:false here,
+    // which presented heuristic fallback text as a genuine LLM result.
     return {
       rewritten_text: finalResult.rewritten_text || lastPartial,
       target_variety: finalResult.target_variety || varietyKey,
       effective_scenario: finalResult.effective_scenario,
       script: VARIETIES[varietyKey]?.script,
-      degraded: false,
+      degraded: !!finalResult.degraded,
+      warning: finalResult.warning || "",
       _from_stream: true,
     };
   }

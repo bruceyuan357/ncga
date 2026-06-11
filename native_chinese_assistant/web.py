@@ -297,11 +297,18 @@ def static_response(start_response: Callable, path: Path, *, environ: dict | Non
         ("Content-Length", str(len(content))),
         ("Cache-Control", "public, max-age=300" if path.name != "index.html" else "no-store"),
     ]
-    # Cycle 20: mint + set the SPA session cookie on every index.html serve.
+    # Cycle 20: mint + set the SPA session cookie on index.html serves.
     # Cookie is HMAC-signed against NCGA_AUTH_TOKEN so forgery without the
     # secret is infeasible. Same-site Lax allows top-level navigation from
     # external links while blocking cross-site POSTs (CSRF-resistant).
-    if path.name == "index.html":
+    #
+    # Review fix P1: previously the cookie was minted UNCONDITIONALLY, which
+    # let anyone who could GET / harvest a valid credential and call every
+    # LLM-spending endpoint — defeating the bearer gate in two requests.
+    # Now we only refresh the cookie when the request already proves token
+    # possession (a valid cookie or a valid Bearer header). First-time
+    # browsers get the SPA without a cookie and log in via POST /api/login.
+    if path.name == "index.html" and _check_auth(environ or {}):
         cookie_val = _make_session_cookie()
         if cookie_val:
             secure_flag = (bool(environ) and environ.get("wsgi.url_scheme") == "https") or (
@@ -635,6 +642,7 @@ class App:
             ("POST", "/api/override-activate"): self.handle_override_activate,
             ("POST", "/api/override-reject"): self.handle_override_reject,
             ("POST", "/api/feedback"): self.handle_feedback,
+            ("POST", "/api/login"): self.handle_login,
             ("POST", "/api/logout"): self.handle_logout,
         }
 
@@ -647,7 +655,9 @@ class App:
         # Cycle 21 #6: /api/logout is exempt — calling logout when already
         # logged-out / stale-cookie should always be a 200 no-op so the SPA
         # can clean up without first proving auth.
-        _AUTH_EXEMPT_POST_PATHS = {"/api/logout"}
+        # Review fix P1: /api/login is exempt by definition — it's how a
+        # browser without a cookie proves token possession to get one.
+        _AUTH_EXEMPT_POST_PATHS = {"/api/logout", "/api/login"}
         if (
             method == "POST"
             and path.startswith("/api/")
@@ -1335,6 +1345,62 @@ class App:
         )
         return [body]
 
+    def handle_login(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Review fix P1: exchange the bearer token for a session cookie.
+
+        Since static_response no longer mints a cookie for anonymous GET /,
+        a fresh browser proves token possession here once: POST {"token": ...},
+        and on match we mint the same HMAC cookie the SPA uses everywhere.
+
+        Rate-limited (it is a credential-guessing surface) and auth-exempt
+        (it IS the authentication step). When NCGA_AUTH_TOKEN is unset, auth
+        is disabled project-wide; return 200 with no cookie so the SPA's
+        login flow degrades to a no-op.
+        """
+        if not self.rate_limiter.allow(client_ip(environ)):
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Try again in a minute."},
+            )
+        expected = os.environ.get("NCGA_AUTH_TOKEN", "").strip()
+        if not expected:
+            return json_response(start_response, "200 OK", {"ok": True, "auth": "disabled"})
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
+        try:
+            token = str(payload["token"]).strip()
+        except KeyError as exc:
+            return json_response(
+                start_response,
+                "400 Bad Request",
+                {"error": f"Missing field: {exc.args[0]}."},
+            )
+        if not _const_eq(token, expected):
+            return json_response(
+                start_response,
+                "401 Unauthorized",
+                {"error": "Wrong token."},
+            )
+        cookie_val = _make_session_cookie()
+        secure_flag = environ.get("wsgi.url_scheme") == "https" or (
+            environ.get("HTTP_X_FORWARDED_PROTO", "").lower() == "https"
+        )
+        resp = json.dumps({"ok": True}, ensure_ascii=False).encode("utf-8")
+        start_response(
+            "200 OK",
+            _security_headers(
+                [
+                    ("Content-Type", "application/json; charset=utf-8"),
+                    ("Content-Length", str(len(resp))),
+                    ("Cache-Control", "no-store"),
+                    ("Set-Cookie", _format_session_cookie(cookie_val, secure=bool(secure_flag))),
+                ]
+            ),
+        )
+        return [resp]
+
 
 def _coerce_glossary(raw) -> list[str] | None:
     """Coerce the `glossary` field from request body into a clean list of lines.
@@ -1362,19 +1428,26 @@ def _sse_event(event_type: str, data: dict | str) -> bytes:
 def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=None):
     """Generator yielding SSE bytes for a single streamed rewrite.
 
-    glossary_lines is currently logged for parity with non-streaming /api/rewrite
-    but not threaded into the LLM call (rewrite_stream signature would need expansion).
+    Review fixes P2+P3: glossary_lines now actually threads into the LLM call
+    (the old docstring admitted it didn't), and the done event carries the
+    same degraded/warning fields as non-streaming /api/rewrite so heuristic
+    fallbacks are no longer presented as genuine LLM results.
     """
     try:
         last_partial = ""
-        for delta, partial, done in service.rewrite_stream(text, target, scenario=scenario):
+        for delta, partial, done, meta in service.rewrite_stream(
+            text, target, scenario=scenario, glossary_lines=glossary_lines
+        ):
             if done:
+                meta = meta or {}
                 yield _sse_event(
                     "done",
                     {
                         "rewritten_text": partial,
                         "target_variety": target.value,
                         "effective_scenario": scenario.value,
+                        "degraded": bool(meta.get("degraded", False)),
+                        "warning": meta.get("warning") or "",
                     },
                 )
                 return
