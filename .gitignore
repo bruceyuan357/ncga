@@ -13,6 +13,8 @@ ncga.log
 *.log
 
 # Python
+.venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo

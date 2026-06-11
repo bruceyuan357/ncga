@@ -21,7 +21,7 @@
 > - **settings 加「随四时」切换器** — 古朴 / 墨韵 / 随四时 三选
 > - 切回 v2/v1:右下角 sidebar 底部 version-switch 点其他选项
 
-- 后端：Python 3.10+，零运行时依赖（除 `certifi`）。WSGI。
+- 后端：Python 3.10+。运行时依赖仅 `certifi` + `cryptography`（见 `requirements.txt`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
 - LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时回退到本地启发式重写并明示降级。
 
@@ -48,7 +48,10 @@ python app.py                          # http://127.0.0.1:8000
 | `LLM_CA_BUNDLE` | `certifi.where()` | 自定义 CA 文件路径 |
 | `LLM_SKIP_SSL_VERIFY` | `false` | **危险**：跳过 SSL 校验，仅供调试 |
 | `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟可调 `/api/rewrite` 的次数（0 = 关闭） |
-| `NCGA_MAX_BODY_BYTES` | `16384` | 请求体字节上限 |
+| `NCGA_MAX_BODY_BYTES` | `65536` | 请求体字节上限（64 KB，容纳 batch 输入） |
+| `NCGA_BATCH_RATE_LIMIT_PER_MIN` | `6` | 每个 IP 每分钟可调 `/api/rewrite/batch` 的次数 |
+| `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限（rewrite/batch/rate/explain/characterize/phrase 共享） |
+| `NCGA_QUALITY_STORE` | `~/.local/share/ncga/quality.json` | 质量存储路径（用户数据目录不可写时回退到源码目录 `.ncga-quality.json`） |
 | `NCGA_FEEDBACK_RATE_LIMIT_PER_MIN` | `5` | Cycle 20: 每个 IP 每分钟可提交 `/api/feedback` 的次数 |
 | `NCGA_FEEDBACK_MAX_BODY_BYTES` | `8192` | Cycle 20: 反馈表单请求体上限 |
 | `NCGA_FEEDBACK_STORE` | `~/.local/share/ncga/feedback.jsonl` | Cycle 20: 反馈 JSONL 落地路径 (`0o600`) |
@@ -58,22 +61,24 @@ python app.py                          # http://127.0.0.1:8000
 | `NCGA_PORT` | `8000` | 监听端口 |
 | `NCGA_LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `NCGA_CORPUS_PATH` | `data/corpus.jsonl` | Cycle 22 Stage C: 语料库 JSONL 路径(覆盖默认) |
-| `NCGA_CORPUS_DISABLE` | — | Cycle 22 Stage C: 设 `1` 关掉 few-shot 注入(回到无示例 prompt) |
+| `NCGA_CORPUS_DISABLE` | — | Cycle 22 Stage C: 设 `1` 关掉句子级 few-shot 注入(回到无示例 prompt) |
+| `NCGA_LEXICON_PATH` | `data/lexicon.jsonl` | Cycle 22 Stage D: 词音对应表 JSONL 路径(覆盖默认) |
+| `NCGA_LEXICON_DISABLE` | — | Cycle 22 Stage D: 设 `1` 关掉词级 hint 注入 |
 
 ## 语料库与少样本注入 (Cycle 22 Stage C)
 
-`data/corpus.jsonl` 是手写的方言语料(100 条:10 方言 × 10 场景),每条:
+`data/corpus.jsonl` 是人工 + LLM 协作的方言语料(400 条:10 方言 × 40),每条:
 ```json
 {"variety":"shanghai_mandarin_style","scenario":"request","original":"我能借一下你的笔吗","rewrite":"支笔借拨我用一道好伐","quality_tier":"verified","notes":"拨+用一道+伐"}
 ```
 
 每次 `/api/rewrite` 调用时,后端用纯 stdlib BM25(`native_chinese_assistant/corpus.py`)从目标方言池里检索 top-3 最像的示例,以「【本地人示例】参考这些真实的本地说法,不要逐字复制」块注入 system prompt。LLM 因此能看到具体的「原文 → 本地说法」对子,而非仅靠风格描述脑补。
 
-**当前状态**:70 条 verified(普通话/京/东北/川渝/江淮/广普/上海)+ 30 条 needs_review(粤书/台闽南/福建闽南 — 母语者欢迎 PR)。
+**当前状态**:390 条 verified + 10 条 needs_review(全部在福建闽南 — 母语者欢迎 PR)。
 
-**扩到 30 条/方言**(需 `DEEPSEEK_API_KEY`):
+**继续扩充**(每个方言已有 40 条;需 `DEEPSEEK_API_KEY`):
 ```bash
-python3 tools/build_corpus.py --target 30
+python3 tools/build_corpus.py --target 50
 python3 tools/review_corpus.py        # 交互 y/n/e/s/q 审批
 ```
 审批通过的进 `data/corpus.jsonl`,拒绝的进 `data/corpus_rejected.jsonl` 留作审计。
@@ -88,10 +93,11 @@ python3 tools/import_corpus.py /path/to/incoming.jsonl --dry-run    # 先验证
 python3 tools/import_corpus.py /path/to/incoming.jsonl              # 正式 append
 ```
 自动按 `(variety, original)` 去重,reject schema 不合规的行,输出 stats。
+导入后需重启服务,BM25 索引才会重建(索引首次使用后缓存在进程内,不会重读文件)。
 
 ## 词音对应表 lexicon (Cycle 22 Stage D)
 
-`data/lexicon.jsonl` 是词典级别的「普通话词 → 方言词」对应,每条:
+`data/lexicon.jsonl` 是词典级别的「普通话词 → 方言词」对应(1189 条,10 方言),每条:
 ```json
 {"variety":"shanghai_mandarin_style","mandarin":"漂亮","local":"嗲","category":"idiom","ipa":"tia44","example_sentence":"侬嗲伐","source":"https://wiktionary.org/wiki/嗲"}
 ```
@@ -152,7 +158,7 @@ waitress-serve --host 0.0.0.0 --port 8000 native_chinese_assistant.web:applicati
 详见 [SECURITY.md](SECURITY.md)。**公网部署前**至少做以下三件：
 
 1. **TLS 反代**（Caddy / Nginx / Cloudflare）。NCGA 自身只跑 HTTP，永远不要直接暴露到公网。
-2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走 bearer 鉴权，前端通过服务端注入的 `<meta>` 自动附 `Authorization` 头。
+2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走双轨鉴权 — 浏览器 SPA 用 HMAC 签名 cookie(`GET /` 时下发,token 本身**不再注入 HTML**),API / 扩展 / 脚本用 `Authorization: Bearer` 头。服务端只注入一个无密钥的 `<meta name="ncga-auth-mode">` 标记,让前端知道 cookie 模式已开。
 3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（包含用户原文 + 评分等敏感数据）。
 
 ```bash
@@ -193,14 +199,20 @@ docker run -d --name ncga --restart unless-stopped \
 ```
 app.py
 └── native_chinese_assistant/
-    ├── web.py        # WSGI 路由 / 限流 / 安全头
-    ├── rewrite.py    # LLM 客户端 + 启发式 fallback + RewriteService
-    └── presets.py    # 所有方言元数据（label / register / style / landmarks / keywords / letter）
+    ├── web.py           # WSGI 路由 / 限流 / 安全头 / 双轨认证 / 反馈表单
+    ├── rewrite.py       # LLM 客户端 + 启发式 fallback + RewriteService
+    ├── presets.py       # 所有方言元数据（label / register / style / landmarks / keywords / letter）
+    ├── corpus.py        # 句子级方言语料 + 纯 stdlib BM25 检索（few-shot 注入）
+    ├── lexicon.py       # 词级「普通话 → 方言」对应表 + BM25 检索（词音 hint 注入）
+    ├── crypto.py        # 质量存储 AES-GCM 落盘加解密
+    ├── daily_phrase.py  # 今日方言一句：每日确定性选词 + 10 方言改写 + 24h 缓存
+    └── feedback.py      # 质量评分存储 + Reflexion 自我改进 prompt 系统
 static/
 ├── index.html
-├── app.js            # 单文件前端，所有方言数据从 /api/presets 拉
+├── app.js               # 单文件前端，所有方言数据从 /api/presets 拉
 └── styles.css
-tests/test_app.py     # 离线测试，mock 掉 LLM HTTP
+tests/test_app.py        # 离线测试，mock 掉 LLM HTTP
+tests/browser/           # Playwright 真浏览器行为测试（pytest-playwright，仅 dev 依赖）
 ```
 
 ## 加一种新方言

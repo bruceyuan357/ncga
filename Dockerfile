@@ -29,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY app.py ./
 COPY native_chinese_assistant ./native_chinese_assistant
 COPY static ./static
+# Corpus + lexicon JSONL. Without this layer the BM25 few-shot / word-hint
+# features silently disable (loaders return None when data/ is missing).
+COPY data ./data
 
 # Writable user data dir for quality store
 RUN mkdir -p /home/ncga/.local/share/ncga \

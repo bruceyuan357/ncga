@@ -34,7 +34,7 @@ NCGA is a single-user / small-team Chinese rewriting tool. The threat model is:
 | Control | How |
 |---|---|
 | **TLS** | Always run behind a reverse proxy (Caddy / Nginx / Cloudflare) that terminates HTTPS. NCGA itself only serves HTTP. |
-| **Bearer-token auth** | Set `NCGA_AUTH_TOKEN=<random 32+ chars>` env. All `POST /api/*` then require `Authorization: Bearer <token>`. The token is injected into served `index.html` via a `<meta>` tag the SPA reads at boot. |
+| **Dual-track auth** | Set `NCGA_AUTH_TOKEN=<random 32+ chars>` env. All `POST /api/*` then require one of two tracks. **Browser SPA**: an HMAC-SHA256-signed session cookie (`ncga_sess`, HttpOnly, SameSite=Lax, 30-day max-age) minted on `GET /`; the raw token is never injected into HTML — only a no-secret `<meta name="ncga-auth-mode">` marker. Revocation via an in-memory set + `POST /api/logout`; rotating the token invalidates all cookies at once (it is the signing key). **API / extension / scripts**: `Authorization: Bearer <token>` header. |
 | **At-rest encryption of quality store** | Set `NCGA_DATA_KEY=<base64 32 bytes>` env. AES-GCM (NIST-approved). Without this env, NCGA auto-generates a key under `~/.local/share/ncga/data.key` (mode 0600) on first run; *or* falls back to plaintext with a warning if neither is writable. |
 | **X-Forwarded-For** | Default: **NOT trusted** (prevents per-IP rate-limit spoofing). Set `NCGA_TRUST_FORWARDED_FOR=true` only when behind a trusted proxy. |
 | **CSP** | `script-src 'self' 'nonce-...'` — no `unsafe-inline`. Per-response nonce attached to inline boot script. |
@@ -43,6 +43,7 @@ NCGA is a single-user / small-team Chinese rewriting tool. The threat model is:
 | **Body cap** | 64 KB per request. Override via `NCGA_MAX_BODY_BYTES`. |
 | **Path traversal** | `Special:FilePath`-style escapes (`..`, `..%2F`, `%2e%2e/`) all return 404. Static handler resolves and validates `relative_to(STATIC_DIR)`. |
 | **Secrets in repo** | `.env` is `.gitignore`d. Quality store is by default in `~/.local/share/ncga/quality.json`, **not** in the repo. |
+| **Feedback store is plaintext** | `~/.local/share/ncga/feedback.jsonl` (mode 0600) stores user feedback including the **optional contact email in plaintext** — unlike the quality store, it is *not* AES-GCM encrypted. IPs are salted-SHA-256 hashed before storage, but treat the file itself as sensitive. |
 
 ## Generating Strong Tokens
 
