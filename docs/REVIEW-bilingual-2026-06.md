@@ -164,3 +164,15 @@
 ---
 
 *生成方式 / Generated via 7-dimension multi-agent inspection with adversarial verification. 全部发现可在 `file:line` 级复核。All findings are reproducible at `file:line` granularity.*
+
+---
+
+## 8. 修复状态追加 / Fix Status Addendum (2026-06-11)
+
+激进修复清扫已执行:P1-P9 + P11 全部修复并推送(commits `c056f27`…`5227607`),
+每区独立 commit。CI 项目史上首次真实运行并全绿(Python 3.10/3.11/3.12/3.14 × 4 jobs)。
+The aggressive fix sweep landed: P1-P9 + P11 all fixed and pushed, one commit per area.
+CI executed for the first time in project history and passed on all 4 Python versions.
+
+剩余 / Remaining: **P10**(本地 main 分支与已发布分支的合流 + Refiner 删除取舍 — 产品决定,留给用户)、
+扩展实机回归(代码已审,Chrome 端到端未跑)、广东话/上海话重写行的母语者复核(已全部标 needs_review)。
