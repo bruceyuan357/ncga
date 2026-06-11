@@ -123,21 +123,21 @@
 {"variety": "beijing_mandarin", "mandarin": "吧", "local": "呗", "category": "particle", "ipa": "bei5", "example_sentence": "您说怎么办呗。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "啊", "local": "啊", "category": "particle", "ipa": "a5", "example_sentence": "好嘞啊!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "呀", "local": "呀", "category": "particle", "ipa": "ya5", "example_sentence": "瞧瞧呀!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(语气)", "local": "您呐", "category": "particle", "ipa": "nin2 na5", "example_sentence": "您呐,慢走。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "您", "local": "您呐", "category": "particle", "ipa": "nin2 na5", "example_sentence": "您呐,慢走。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "呗", "local": "呗", "category": "particle", "ipa": "bei5", "example_sentence": "您来了就坐呗。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "唉", "local": "嗨", "category": "particle", "ipa": "hai1", "example_sentence": "嗨,提它干嘛。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "哎呀", "local": "哎哟喂", "category": "particle", "ipa": "ai1 you1 wei4", "example_sentence": "哎哟喂,可吓我一跳!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "嗯", "local": "嗯哪", "category": "particle", "ipa": "en4 na5", "example_sentence": "嗯哪,就这么定了。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(感叹)", "local": "嚯", "category": "particle", "ipa": "huo4", "example_sentence": "嚯,您这身行头不便宜啊!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(惊讶)", "local": "瞧您说的", "category": "particle", "ipa": "qiao2 nin2 shuo1 de5", "example_sentence": "瞧您说的,客气!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(强调)", "local": "可不是嘛", "category": "particle", "ipa": "ke3 bu2 shi4 ma5", "example_sentence": "可不是嘛,谁说不是呢!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(无奈)", "local": "嘿", "category": "particle", "ipa": "hei1", "example_sentence": "嘿,这事闹的!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(劝阻)", "local": "别价", "category": "particle", "ipa": "bie2 jie5", "example_sentence": "别价,您留下吃饭。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(确认)", "local": "得嘞", "category": "particle", "ipa": "de2 lei5", "example_sentence": "得嘞,就这么办!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(招呼)", "local": "哎", "category": "particle", "ipa": "ai1", "example_sentence": "哎,过来一下。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(感叹)", "local": "可了不得", "category": "particle", "ipa": "ke3 liao3 bu5 de2", "example_sentence": "可了不得了,出事了!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "哇", "local": "嚯", "category": "particle", "ipa": "huo4", "example_sentence": "嚯,您这身行头不便宜啊!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "您客气了", "local": "瞧您说的", "category": "particle", "ipa": "qiao2 nin2 shuo1 de5", "example_sentence": "瞧您说的,客气!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "是啊", "local": "可不是嘛", "category": "particle", "ipa": "ke3 bu2 shi4 ma5", "example_sentence": "可不是嘛,谁说不是呢!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "唉", "local": "嘿", "category": "particle", "ipa": "hei1", "example_sentence": "嘿,这事闹的!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "别这样", "local": "别价", "category": "particle", "ipa": "bie2 jie5", "example_sentence": "别价,您留下吃饭。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "好的", "local": "得嘞", "category": "particle", "ipa": "de2 lei5", "example_sentence": "得嘞,就这么办!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "喂", "local": "哎", "category": "particle", "ipa": "ai1", "example_sentence": "哎,过来一下。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "不得了", "local": "可了不得", "category": "particle", "ipa": "ke3 liao3 bu5 de2", "example_sentence": "可了不得了,出事了!", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "吧", "local": "吧", "category": "particle", "ipa": "ba5", "example_sentence": "走吧您呐。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
-{"variety": "beijing_mandarin", "mandarin": "(应答)", "local": "成", "category": "particle", "ipa": "cheng2", "example_sentence": "成,听您的。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
+{"variety": "beijing_mandarin", "mandarin": "行", "local": "成", "category": "particle", "ipa": "cheng2", "example_sentence": "成,听您的。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "做", "local": "整", "category": "verb", "ipa": "zheng3", "example_sentence": "您给整两个菜呗。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "看", "local": "瞧", "category": "verb", "ipa": "qiao2", "example_sentence": "您瞧瞧这个。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
 {"variety": "beijing_mandarin", "mandarin": "聊天", "local": "唠嗑", "category": "verb", "ipa": "lao2 ke5", "example_sentence": "咱俩唠会儿嗑。", "source": "https://en.wikipedia.org/wiki/Beijing_dialect"}
@@ -241,23 +241,23 @@
 {"variety": "dongbei_mandarin", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne5", "example_sentence": "你在干哈呢?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "吧", "local": "呗", "category": "particle", "ipa": "bei5", "example_sentence": "走呗。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "啊", "local": "哈", "category": "particle", "ipa": "ha5", "example_sentence": "你别忘了哈。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(语气)", "local": "嘎", "category": "particle", "ipa": "ga5", "example_sentence": "你说嘎?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(感叹)", "local": "哎呀妈呀", "category": "particle", "ipa": "ai1 ya5 ma1 ya5", "example_sentence": "哎呀妈呀,可吓死我了!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(确认)", "local": "可不咋的", "category": "particle", "ipa": "ke3 bu4 za3 de5", "example_sentence": "可不咋的,可不就是嘛!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(转折)", "local": "咋整", "category": "particle", "ipa": "za3 zheng3", "example_sentence": "这事儿咋整啊?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "对吧", "local": "嘎", "category": "particle", "ipa": "ga5", "example_sentence": "你说嘎?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "哎呀", "local": "哎呀妈呀", "category": "particle", "ipa": "ai1 ya5 ma1 ya5", "example_sentence": "哎呀妈呀,可吓死我了!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "可不是", "local": "可不咋的", "category": "particle", "ipa": "ke3 bu4 za3 de5", "example_sentence": "可不咋的,可不就是嘛!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "怎么办", "local": "咋整", "category": "particle", "ipa": "za3 zheng3", "example_sentence": "这事儿咋整啊?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "吗", "local": "么", "category": "particle", "ipa": "me5", "example_sentence": "你去么?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(应答)", "local": "唔", "category": "particle", "ipa": "wu5", "example_sentence": "唔,行。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(感叹)", "local": "我去", "category": "particle", "ipa": "wo3 qu4", "example_sentence": "我去,可真行!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(强调)", "local": "可", "category": "particle", "ipa": "ke3", "example_sentence": "我可没那意思。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(无语)", "local": "啥呀", "category": "particle", "ipa": "sha2 ya5", "example_sentence": "你说啥呀?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(劝)", "local": "哎", "category": "particle", "ipa": "ai1", "example_sentence": "哎,别这样!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(嗔怪)", "local": "你瞅你", "category": "particle", "ipa": "ni3 chou3 ni3", "example_sentence": "你瞅你那德行!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(强调状态)", "local": "...着呢", "category": "particle", "ipa": "zhe5 ne5", "example_sentence": "外面冷着呢。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(感叹)", "local": "瘪犊子玩意儿", "category": "particle", "ipa": "bie3 du2 zi5 wan2 yir4", "example_sentence": "你这瘪犊子玩意儿!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(顺势)", "local": "得嘞", "category": "particle", "ipa": "de2 lei5", "example_sentence": "得嘞,听你的!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "嗯", "local": "唔", "category": "particle", "ipa": "wu5", "example_sentence": "唔,行。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "天哪", "local": "我去", "category": "particle", "ipa": "wo3 qu4", "example_sentence": "我去,可真行!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "真", "local": "可", "category": "particle", "ipa": "ke3", "example_sentence": "我可没那意思。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "什么呀", "local": "啥呀", "category": "particle", "ipa": "sha2 ya5", "example_sentence": "你说啥呀?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "唉", "local": "哎", "category": "particle", "ipa": "ai1", "example_sentence": "哎,别这样!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "你看你", "local": "你瞅你", "category": "particle", "ipa": "ni3 chou3 ni3", "example_sentence": "你瞅你那德行!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "很", "local": "...着呢", "category": "particle", "ipa": "zhe5 ne5", "example_sentence": "外面冷着呢。", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "混蛋", "local": "瘪犊子玩意儿", "category": "particle", "ipa": "bie3 du2 zi5 wan2 yir4", "example_sentence": "你这瘪犊子玩意儿!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "好吧", "local": "得嘞", "category": "particle", "ipa": "de2 lei5", "example_sentence": "得嘞,听你的!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "呵", "local": "嚯", "category": "particle", "ipa": "huo4", "example_sentence": "嚯,够气派!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(招呼)", "local": "哎呀", "category": "particle", "ipa": "ai1 ya5", "example_sentence": "哎呀,你来啦!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
-{"variety": "dongbei_mandarin", "mandarin": "(强调)", "local": "老...了", "category": "particle", "ipa": "lao3 le5", "example_sentence": "今儿老冷了!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "哟", "local": "哎呀", "category": "particle", "ipa": "ai1 ya5", "example_sentence": "哎呀,你来啦!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
+{"variety": "dongbei_mandarin", "mandarin": "特别", "local": "老...了", "category": "particle", "ipa": "lao3 le5", "example_sentence": "今儿老冷了!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "做", "local": "整", "category": "verb", "ipa": "zheng3", "example_sentence": "你整啥呢?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "吃", "local": "造", "category": "verb", "ipa": "zao4", "example_sentence": "可劲儿造!", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
 {"variety": "dongbei_mandarin", "mandarin": "看", "local": "瞅", "category": "verb", "ipa": "chou3", "example_sentence": "你瞅啥?", "source": "https://en.wikipedia.org/wiki/Northeastern_Mandarin"}
@@ -362,22 +362,22 @@
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "呢", "local": "喃", "category": "particle", "ipa": "nan5", "example_sentence": "你切哪点喃?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "吧", "local": "噻", "category": "particle", "ipa": "sai5", "example_sentence": "走噻!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "啊", "local": "哈", "category": "particle", "ipa": "ha5", "example_sentence": "记到哈。", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(感叹)", "local": "哦豁", "category": "particle", "ipa": "o2 huo5", "example_sentence": "哦豁,完球!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(确认)", "local": "要得", "category": "particle", "ipa": "yao4 de5", "example_sentence": "要得,就这样办!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(询问确认)", "local": "要不?", "category": "particle", "ipa": "yao4 bu5", "example_sentence": "走嘛,要不?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(强调)", "local": "硬是", "category": "particle", "ipa": "ying4 shi4", "example_sentence": "硬是好吃!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(语气)", "local": "咧", "category": "particle", "ipa": "lie5", "example_sentence": "好得很咧!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(感叹)", "local": "勒个", "category": "particle", "ipa": "le4 ge5", "example_sentence": "勒个不存在嘛!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(嗔怪)", "local": "你咋个", "category": "particle", "ipa": "ni3 za3 ge5", "example_sentence": "你咋个嘛!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(感叹)", "local": "格老子", "category": "particle", "ipa": "ge2 lao3 zi5", "example_sentence": "格老子,气死我了!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(应答)", "local": "晓得了", "category": "particle", "ipa": "xiao3 de5 le5", "example_sentence": "晓得了,你不用说咯。", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(语气)", "local": "嗦", "category": "particle", "ipa": "suo5", "example_sentence": "怎么了嗦?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(语气)", "local": "咯", "category": "particle", "ipa": "luo5", "example_sentence": "好咯!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(感叹)", "local": "硬要得", "category": "particle", "ipa": "ying4 yao4 de5", "example_sentence": "硬要得!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(强调)", "local": "硬...咯", "category": "particle", "ipa": "ying4 luo5", "example_sentence": "硬好吃咯!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(惊讶)", "local": "啥子", "category": "particle", "ipa": "sha2 zi5", "example_sentence": "啥子?你说啥子?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(否定语气)", "local": "锤子", "category": "particle", "ipa": "chui2 zi5", "example_sentence": "锤子,根本莫得这个事!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
-{"variety": "sichuan_chongqing_mandarin", "mandarin": "(劝阻)", "local": "莫", "category": "particle", "ipa": "mo4", "example_sentence": "莫去!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "糟糕", "local": "哦豁", "category": "particle", "ipa": "o2 huo5", "example_sentence": "哦豁,完球!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "好的", "local": "要得", "category": "particle", "ipa": "yao4 de5", "example_sentence": "要得,就这样办!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "好不好", "local": "要不?", "category": "particle", "ipa": "yao4 bu5", "example_sentence": "走嘛,要不?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "确实", "local": "硬是", "category": "particle", "ipa": "ying4 shi4", "example_sentence": "硬是好吃!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "呢", "local": "咧", "category": "particle", "ipa": "lie5", "example_sentence": "好得很咧!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "这个", "local": "勒个", "category": "particle", "ipa": "le4 ge5", "example_sentence": "勒个不存在嘛!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "你怎么", "local": "你咋个", "category": "particle", "ipa": "ni3 za3 ge5", "example_sentence": "你咋个嘛!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "该死", "local": "格老子", "category": "particle", "ipa": "ge2 lao3 zi5", "example_sentence": "格老子,气死我了!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "知道了", "local": "晓得了", "category": "particle", "ipa": "xiao3 de5 le5", "example_sentence": "晓得了,你不用说咯。", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "啊", "local": "嗦", "category": "particle", "ipa": "suo5", "example_sentence": "怎么了嗦?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "啦", "local": "咯", "category": "particle", "ipa": "luo5", "example_sentence": "好咯!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "真不错", "local": "硬要得", "category": "particle", "ipa": "ying4 yao4 de5", "example_sentence": "硬要得!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "真", "local": "硬...咯", "category": "particle", "ipa": "ying4 luo5", "example_sentence": "硬好吃咯!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "什么", "local": "啥子", "category": "particle", "ipa": "sha2 zi5", "example_sentence": "啥子?你说啥子?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "胡说", "local": "锤子", "category": "particle", "ipa": "chui2 zi5", "example_sentence": "锤子,根本莫得这个事!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
+{"variety": "sichuan_chongqing_mandarin", "mandarin": "别", "local": "莫", "category": "particle", "ipa": "mo4", "example_sentence": "莫去!", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "做", "local": "整", "category": "verb", "ipa": "zheng3", "example_sentence": "你在整啥子?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "吃", "local": "吃", "category": "verb", "ipa": "ci2", "example_sentence": "饭吃了莫得?", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
 {"variety": "sichuan_chongqing_mandarin", "mandarin": "看", "local": "瞅", "category": "verb", "ipa": "chou3", "example_sentence": "你瞅哈这个。", "source": "https://en.wikipedia.org/wiki/Sichuanese_dialects"}
@@ -480,21 +480,21 @@
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "吧", "local": "唻", "category": "particle", "ipa": "lai5", "example_sentence": "走唻!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "吧", "local": "撒", "category": "particle", "ipa": "sa5", "example_sentence": "好撒!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "呢", "local": "唻", "category": "particle", "ipa": "lai5", "example_sentence": "你在做啥唻?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(感叹)", "local": "乖乖", "category": "particle", "ipa": "guai1 guai1", "example_sentence": "乖乖,这么厉害!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(强感叹)", "local": "乖乖隆地咚", "category": "particle", "ipa": "guai1 guai1 long2 di4 dong1", "example_sentence": "乖乖隆地咚,可不得了!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(感叹)", "local": "哎呀", "category": "particle", "ipa": "ai1 ya5", "example_sentence": "哎呀,真个不行!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(应答)", "local": "好的来", "category": "particle", "ipa": "hao3 de5 lai2", "example_sentence": "好的来,我晓得了!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(强调)", "local": "真个", "category": "particle", "ipa": "zhen1 ge5", "example_sentence": "真个不丑!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(询问)", "local": "阿好", "category": "particle", "ipa": "a5 hao3", "example_sentence": "阿好啊?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(询问)", "local": "阿要", "category": "particle", "ipa": "a5 yao4", "example_sentence": "阿要茶?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(询问)", "local": "阿能", "category": "particle", "ipa": "a5 neng2", "example_sentence": "阿能借我一下?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(确认)", "local": "可不咯", "category": "particle", "ipa": "ke3 bu4 luo5", "example_sentence": "可不咯!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(嗔怪)", "local": "我倒", "category": "particle", "ipa": "wo3 dao3", "example_sentence": "我倒,真个吓人!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(语气)", "local": "啦", "category": "particle", "ipa": "la5", "example_sentence": "晓得啦!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(语气)", "local": "咧", "category": "particle", "ipa": "lie5", "example_sentence": "好的咧!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(感叹)", "local": "哎哟喂", "category": "particle", "ipa": "ai1 yo1 wei4", "example_sentence": "哎哟喂,人多!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(劝)", "local": "莫", "category": "particle", "ipa": "mo4", "example_sentence": "莫这样!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
-{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "(让步)", "local": "罢嘞", "category": "particle", "ipa": "ba4 lei5", "example_sentence": "罢嘞,随便他唻!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "哇", "local": "乖乖", "category": "particle", "ipa": "guai1 guai1", "example_sentence": "乖乖,这么厉害!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "我的天", "local": "乖乖隆地咚", "category": "particle", "ipa": "guai1 guai1 long2 di4 dong1", "example_sentence": "乖乖隆地咚,可不得了!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "哎呀", "local": "哎呀", "category": "particle", "ipa": "ai1 ya5", "example_sentence": "哎呀,真个不行!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "好的", "local": "好的来", "category": "particle", "ipa": "hao3 de5 lai2", "example_sentence": "好的来,我晓得了!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "真的", "local": "真个", "category": "particle", "ipa": "zhen1 ge5", "example_sentence": "真个不丑!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "好不好", "local": "阿好", "category": "particle", "ipa": "a5 hao3", "example_sentence": "阿好啊?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "要不要", "local": "阿要", "category": "particle", "ipa": "a5 yao4", "example_sentence": "阿要茶?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "能不能", "local": "阿能", "category": "particle", "ipa": "a5 neng2", "example_sentence": "阿能借我一下?", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "可不是", "local": "可不咯", "category": "particle", "ipa": "ke3 bu4 luo5", "example_sentence": "可不咯!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "天哪", "local": "我倒", "category": "particle", "ipa": "wo3 dao3", "example_sentence": "我倒,真个吓人!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "了", "local": "啦", "category": "particle", "ipa": "la5", "example_sentence": "晓得啦!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "呢", "local": "咧", "category": "particle", "ipa": "lie5", "example_sentence": "好的咧!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "哎哟", "local": "哎哟喂", "category": "particle", "ipa": "ai1 yo1 wei4", "example_sentence": "哎哟喂,人多!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "别", "local": "莫", "category": "particle", "ipa": "mo4", "example_sentence": "莫这样!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
+{"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "算了", "local": "罢嘞", "category": "particle", "ipa": "ba4 lei5", "example_sentence": "罢嘞,随便他唻!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "做菜", "local": "烧", "category": "verb", "ipa": "shao1", "example_sentence": "我去烧饭。", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "吃", "local": "扒(饭)", "category": "verb", "ipa": "ba1", "example_sentence": "快点扒饭!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "说", "local": "韶", "category": "verb", "ipa": "shao2", "example_sentence": "他在那儿韶半天。", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
@@ -594,143 +594,106 @@
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "那个", "local": "那个", "category": "pronoun", "ipa": "nei4 ge5", "example_sentence": "那个不行!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "jianghuai_or_lower_yangtze_mandarin", "mandarin": "各位", "local": "各位", "category": "pronoun", "ipa": "ge4 wei4", "example_sentence": "各位好!", "source": "https://en.wikipedia.org/wiki/Nanjing_dialect"}
 {"variety": "guangdong_mandarin", "mandarin": "吗", "local": "啦", "category": "particle", "ipa": "la1", "example_sentence": "好啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "吗", "local": "咩", "category": "particle", "ipa": "me1", "example_sentence": "是咩?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "吗", "local": "咩", "category": "particle", "ipa": "mie1", "example_sentence": "是咩?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "吧", "local": "啦", "category": "particle", "ipa": "la1", "example_sentence": "走啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "吗", "local": "嘎", "category": "particle", "ipa": "ga3", "example_sentence": "是这样嘎?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne1", "example_sentence": "你在哪里呢?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(强调)", "local": "嘅", "category": "particle", "ipa": "ge3", "example_sentence": "我嘅啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "啊", "local": "啊", "category": "particle", "ipa": "a3", "example_sentence": "好啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(强调)", "local": "咯", "category": "particle", "ipa": "lo3", "example_sentence": "知道咯!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(感叹)", "local": "哎呀", "category": "particle", "ipa": "ai1 ya1", "example_sentence": "哎呀,真系!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(强调)", "local": "真系", "category": "particle", "ipa": "zhen1 hai6", "example_sentence": "真系好食!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(确认)", "local": "係噉嘅啦", "category": "particle", "ipa": "hai6 gam2 ge3 la3", "example_sentence": "係噉嘅啦,无办法!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(请求)", "local": "啦啦", "category": "particle", "ipa": "la1 la1", "example_sentence": "走啦啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(语气)", "local": "啰", "category": "particle", "ipa": "lo1", "example_sentence": "得啰!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(强烈)", "local": "係喎", "category": "particle", "ipa": "hai6 wo3", "example_sentence": "係喎,有道理!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(强调)", "local": "啊嘛", "category": "particle", "ipa": "a1 ma3", "example_sentence": "我话过啊嘛!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(疑问)", "local": "咩事", "category": "particle", "ipa": "me1 si6", "example_sentence": "咩事啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(语气)", "local": "哈", "category": "particle", "ipa": "ha5", "example_sentence": "记得哈!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(感叹)", "local": "顶你个肺", "category": "particle", "ipa": "ding2 nei5 go3 fai3", "example_sentence": "顶你个肺!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(感叹)", "local": "好嘢", "category": "particle", "ipa": "hou2 je5", "example_sentence": "好嘢!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "(确认)", "local": "係喇", "category": "particle", "ipa": "hai6 la3", "example_sentence": "係喇!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "吃", "local": "食", "category": "verb", "ipa": "shi6", "example_sentence": "你食咗饭未?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "看", "local": "睇", "category": "verb", "ipa": "ti2", "example_sentence": "我睇唔到。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "听", "local": "听", "category": "verb", "ipa": "ting1", "example_sentence": "听日来!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "说话", "local": "讲嘢", "category": "verb", "ipa": "gang2 ye5", "example_sentence": "你讲嘢小心点。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "回家", "local": "返屋企", "category": "verb", "ipa": "fan1 wu1 qi3", "example_sentence": "我返屋企了。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "回去", "local": "返", "category": "verb", "ipa": "fan1", "example_sentence": "返公司!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "去", "local": "去", "category": "verb", "ipa": "qu4", "example_sentence": "去边度?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "是", "local": "系", "category": "verb", "ipa": "hai6", "example_sentence": "我系学生。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "不是", "local": "唔系", "category": "verb", "ipa": "m2 hai6", "example_sentence": "我唔系本地人。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "不", "local": "唔", "category": "verb", "ipa": "m2", "example_sentence": "唔好咁!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "没有", "local": "无", "category": "verb", "ipa": "mou5", "example_sentence": "我无钱。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "了", "local": "咯", "category": "particle", "ipa": "lo3", "example_sentence": "知道咯!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "哎呀", "local": "哎呀", "category": "particle", "ipa": "ai1 ya1", "example_sentence": "哎呀,真系离谱!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "真的", "local": "真系", "category": "particle", "ipa": "zhen1 xi4", "example_sentence": "真系好食!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "吧", "local": "啰", "category": "particle", "ipa": "lo1", "example_sentence": "得啰!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "嘛", "local": "啊嘛", "category": "particle", "ipa": "a1 ma3", "example_sentence": "我讲过啊嘛!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "啊", "local": "哈", "category": "particle", "ipa": "ha5", "example_sentence": "记得哈!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "吃", "local": "食", "category": "verb", "ipa": "shi2", "example_sentence": "你食先啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "说", "local": "讲", "category": "verb", "ipa": "jiang3", "example_sentence": "你讲什么啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "回家", "local": "回屋企", "category": "verb", "ipa": "hui2 wu1 qi3", "example_sentence": "我先回屋企啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "回去", "local": "返", "category": "verb", "ipa": "fan3", "example_sentence": "我返公司啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "玩耍", "local": "玩", "category": "verb", "ipa": "wan2", "example_sentence": "去玩啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "做", "local": "搞", "category": "verb", "ipa": "gao2", "example_sentence": "你搞咩?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "做", "local": "搞", "category": "verb", "ipa": "gao3", "example_sentence": "你搞什么啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "等待", "local": "等", "category": "verb", "ipa": "deng2", "example_sentence": "等下我!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "看电影", "local": "睇戏", "category": "verb", "ipa": "ti2 xi4", "example_sentence": "我哋去睇戏!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "爬山", "local": "行山", "category": "verb", "ipa": "hang2 shan1", "example_sentence": "周末去行山!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "睡觉", "local": "瞓觉", "category": "verb", "ipa": "fen3 jiao4", "example_sentence": "我去瞓觉了。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "看电影", "local": "看戏", "category": "verb", "ipa": "kan4 xi4", "example_sentence": "今晚去看戏啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "爬山", "local": "行山", "category": "verb", "ipa": "xing2 shan1", "example_sentence": "周末去行山啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "乘车", "local": "搭车", "category": "verb", "ipa": "da1 che1", "example_sentence": "我搭巴士!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "坐", "local": "坐低", "category": "verb", "ipa": "co5 dai1", "example_sentence": "坐低先!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "坐", "local": "坐低", "category": "verb", "ipa": "zuo4 di1", "example_sentence": "坐低先啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "跌倒", "local": "跌亲", "category": "verb", "ipa": "die1 qin1", "example_sentence": "我跌亲!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "家", "local": "屋企", "category": "noun", "ipa": "wu1 qi3", "example_sentence": "返屋企!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "公交车", "local": "巴士", "category": "noun", "ipa": "ba1 si2", "example_sentence": "去搭巴士。", "source": "https://en.wiktionary.org/wiki/%E5%B7%B4%E5%A3%AB"}
-{"variety": "guangdong_mandarin", "mandarin": "出租车", "local": "的士", "category": "noun", "ipa": "dik1 si2", "example_sentence": "叫架的士啦!", "source": "https://en.wiktionary.org/wiki/%E7%9A%84%E5%A3%AB"}
-{"variety": "guangdong_mandarin", "mandarin": "地铁", "local": "地铁", "category": "noun", "ipa": "dei6 tit3", "example_sentence": "搭地铁去!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "出租车", "local": "的士", "category": "noun", "ipa": "di1 shi4", "example_sentence": "叫架的士啦!", "source": "https://en.wiktionary.org/wiki/%E7%9A%84%E5%A3%AB"}
+{"variety": "guangdong_mandarin", "mandarin": "地铁", "local": "地铁", "category": "noun", "ipa": "di4 tie3", "example_sentence": "搭地铁去啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "衣服", "local": "衫", "category": "noun", "ipa": "shan1", "example_sentence": "买件衫。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "guangdong_mandarin", "mandarin": "钱", "local": "钱", "category": "noun", "ipa": "qian2", "example_sentence": "无钱!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "一块钱", "local": "一蚊", "category": "noun", "ipa": "yi1 men1", "example_sentence": "一蚊都唔够!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "一百", "local": "一舊水", "category": "noun", "ipa": "yi1 gau6 sui2", "example_sentence": "畀我一舊水!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "爸爸", "local": "老豆", "category": "noun", "ipa": "lou5 dau6", "example_sentence": "我老豆好严。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "妈妈", "local": "老母", "category": "noun", "ipa": "lou5 mou5", "example_sentence": "我老母煮饭好食。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "男朋友", "local": "靓仔", "category": "noun", "ipa": "leng3 zai2", "example_sentence": "你个靓仔好叻!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "女朋友", "local": "靓女", "category": "noun", "ipa": "leng3 neoi2", "example_sentence": "靓女,请问点称呼?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "电影", "local": "戏", "category": "noun", "ipa": "xi4", "example_sentence": "去睇套戏!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "时间", "local": "时间", "category": "noun", "ipa": "si4 gaan3", "example_sentence": "无时间啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "地方", "local": "地方", "category": "noun", "ipa": "dei6 fong1", "example_sentence": "好地方!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "饭", "local": "饭", "category": "noun", "ipa": "faan6", "example_sentence": "食饭啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "水", "local": "水", "category": "noun", "ipa": "seui2", "example_sentence": "倒杯水。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "茶", "local": "茶", "category": "noun", "ipa": "chaa4", "example_sentence": "饮茶?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "点心", "local": "点心", "category": "noun", "ipa": "dim2 sam1", "example_sentence": "饮茶食点心!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "烧腊", "local": "烧腊", "category": "noun", "ipa": "siu1 lap6", "example_sentence": "去食烧腊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "早上好", "local": "早晨", "category": "greeting", "ipa": "zou2 san4", "example_sentence": "早晨!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "你好", "local": "你好", "category": "greeting", "ipa": "ni5 hou2", "example_sentence": "你好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "吃了吗", "local": "食咗饭未", "category": "greeting", "ipa": "shi6 zo2 faan6 mei6", "example_sentence": "食咗饭未?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "好久不见", "local": "好耐冇见", "category": "greeting", "ipa": "hou2 noi6 mou5 gin3", "example_sentence": "好耐冇见啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "再见", "local": "拜拜", "category": "greeting", "ipa": "baai1 baai3", "example_sentence": "拜拜啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "再见", "local": "再见", "category": "greeting", "ipa": "zoi3 gin3", "example_sentence": "再见!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "谢谢", "local": "唔该", "category": "greeting", "ipa": "m2 goi1", "example_sentence": "唔该哂!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "谢谢", "local": "多谢", "category": "greeting", "ipa": "do1 ze6", "example_sentence": "多谢晒!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "对不起", "local": "对唔住", "category": "greeting", "ipa": "deoi3 m2 zyu6", "example_sentence": "对唔住!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "不好意思", "local": "唔好意思", "category": "greeting", "ipa": "m2 hou2 ji3 si1", "example_sentence": "唔好意思啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "没关系", "local": "无所谓", "category": "greeting", "ipa": "mou5 so2 wai6", "example_sentence": "无所谓!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "叔叔", "local": "阿叔", "category": "greeting", "ipa": "a3 suk1", "example_sentence": "阿叔好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "阿姨", "local": "阿姨", "category": "greeting", "ipa": "a3 ji4", "example_sentence": "阿姨好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "大哥", "local": "大佬", "category": "greeting", "ipa": "daai6 lou2", "example_sentence": "大佬,帮个忙!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "姑娘", "local": "妹妹", "category": "greeting", "ipa": "mui4 mui2", "example_sentence": "妹妹,你叫咩名?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "您先请", "local": "你先请", "category": "greeting", "ipa": "nei5 sin1 cing2", "example_sentence": "你先请!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "辛苦", "local": "辛苦晒", "category": "greeting", "ipa": "san1 fu2 saai3", "example_sentence": "辛苦晒!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "欢迎", "local": "欢迎", "category": "greeting", "ipa": "fun1 jing4", "example_sentence": "欢迎!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "早点睡", "local": "早啲瞓", "category": "greeting", "ipa": "zou2 di1 fan3", "example_sentence": "早啲瞓啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "路上小心", "local": "路上小心", "category": "greeting", "ipa": "lou6 soeng6 siu2 sam1", "example_sentence": "路上小心啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "漂亮", "local": "靓", "category": "idiom", "ipa": "leng3", "example_sentence": "好靓啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "丑", "local": "样衰", "category": "idiom", "ipa": "joeng6 seoi1", "example_sentence": "你样衰啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "聪明", "local": "叻", "category": "idiom", "ipa": "lek1", "example_sentence": "佢好叻!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "非常", "local": "好", "category": "idiom", "ipa": "hou2", "example_sentence": "好好食!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "好吃", "local": "好食", "category": "idiom", "ipa": "hou2 sik6", "example_sentence": "呢个菜好食!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "好喝", "local": "好饮", "category": "idiom", "ipa": "hou2 jam2", "example_sentence": "杯茶好饮!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "一般般", "local": "麻麻地", "category": "idiom", "ipa": "maa4 maa2 dei2", "example_sentence": "我做菜麻麻地。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "受不了", "local": "顶唔顺", "category": "idiom", "ipa": "ding2 m2 seon6", "example_sentence": "热到顶唔顺!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "没办法", "local": "无办法", "category": "idiom", "ipa": "mou5 baan6 faat3", "example_sentence": "我都无办法!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "加油", "local": "加油", "category": "idiom", "ipa": "gaa1 jau4", "example_sentence": "考试加油!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "加油", "local": "畀心机", "category": "idiom", "ipa": "bei2 sam1 gei1", "example_sentence": "你畀心机啲!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "聊天", "local": "倾偈", "category": "idiom", "ipa": "king1 gai2", "example_sentence": "我哋倾下偈!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "怎么", "local": "点", "category": "idiom", "ipa": "dim2", "example_sentence": "点解?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "为什么", "local": "点解", "category": "idiom", "ipa": "dim2 gaai2", "example_sentence": "点解会咁?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "没事", "local": "无嘢", "category": "idiom", "ipa": "mou5 je5", "example_sentence": "我无嘢!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "做错事", "local": "做错嘢", "category": "idiom", "ipa": "zou6 co3 je5", "example_sentence": "你做错嘢啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "装样子", "local": "扮嘢", "category": "idiom", "ipa": "baan6 je5", "example_sentence": "你扮嘢啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "非常糟", "local": "好屎", "category": "idiom", "ipa": "hou2 si2", "example_sentence": "今日运气好屎!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "羡慕", "local": "啖", "category": "idiom", "ipa": "daam6", "example_sentence": "啖死你!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "便宜", "local": "平", "category": "idiom", "ipa": "peng4", "example_sentence": "呢个好平!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "我", "local": "我", "category": "pronoun", "ipa": "ngo5", "example_sentence": "我系学生。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "我们", "local": "我哋", "category": "pronoun", "ipa": "ngo5 dei6", "example_sentence": "我哋一齐去!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "你", "local": "你", "category": "pronoun", "ipa": "nei5", "example_sentence": "你系边个?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "你们", "local": "你哋", "category": "pronoun", "ipa": "nei5 dei6", "example_sentence": "你哋系边个?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "他/她", "local": "佢", "category": "pronoun", "ipa": "keoi5", "example_sentence": "佢系我朋友。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "他们", "local": "佢哋", "category": "pronoun", "ipa": "keoi5 dei6", "example_sentence": "佢哋都来啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "这", "local": "呢", "category": "pronoun", "ipa": "ni1", "example_sentence": "呢个唔错!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "那", "local": "嗰", "category": "pronoun", "ipa": "go2", "example_sentence": "嗰个我要!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "这个", "local": "呢个", "category": "pronoun", "ipa": "ni1 go3", "example_sentence": "呢个几好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "那个", "local": "嗰个", "category": "pronoun", "ipa": "go2 go3", "example_sentence": "嗰个唔行!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "哪个", "local": "边个", "category": "pronoun", "ipa": "bin1 go3", "example_sentence": "边个先?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "哪里", "local": "边度", "category": "pronoun", "ipa": "bin1 dou6", "example_sentence": "你去边度?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "什么", "local": "咩", "category": "pronoun", "ipa": "me1", "example_sentence": "你讲咩?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "什么", "local": "乜嘢", "category": "pronoun", "ipa": "mat1 je5", "example_sentence": "乜嘢事?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "自己", "local": "自己", "category": "pronoun", "ipa": "zi6 gei2", "example_sentence": "我自己嚟!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "大家", "local": "大家", "category": "pronoun", "ipa": "daai6 gaa1", "example_sentence": "大家好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "人家", "local": "人哋", "category": "pronoun", "ipa": "jan4 dei6", "example_sentence": "人哋唔做!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
-{"variety": "guangdong_mandarin", "mandarin": "各位", "local": "各位", "category": "pronoun", "ipa": "gok3 wai2", "example_sentence": "各位好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "爸爸", "local": "老豆", "category": "noun", "ipa": "lao3 dou4", "example_sentence": "我老豆好严。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "妈妈", "local": "妈咪", "category": "noun", "ipa": "ma1 mi5", "example_sentence": "我妈咪煮饭好好吃。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "帅哥", "local": "靓仔", "category": "noun", "ipa": "liang4 zai3", "example_sentence": "靓仔,麻烦让一让啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "美女", "local": "靓女", "category": "noun", "ipa": "liang4 nv3", "example_sentence": "靓女,你东西掉啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "电影", "local": "戏", "category": "noun", "ipa": "xi4", "example_sentence": "去看场戏啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "时间", "local": "时间", "category": "noun", "ipa": "shi2 jian1", "example_sentence": "没时间啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "地方", "local": "地方", "category": "noun", "ipa": "di4 fang1", "example_sentence": "好地方!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "饭", "local": "饭", "category": "noun", "ipa": "fan4", "example_sentence": "吃饭啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "水", "local": "水", "category": "noun", "ipa": "shui3", "example_sentence": "倒杯水。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "茶", "local": "茶", "category": "noun", "ipa": "cha2", "example_sentence": "得闲去饮茶啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "点心", "local": "点心", "category": "noun", "ipa": "dian3 xin1", "example_sentence": "饮茶吃点心啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "烧腊", "local": "烧腊", "category": "noun", "ipa": "shao1 la4", "example_sentence": "去吃烧腊啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "早上好", "local": "早晨", "category": "greeting", "ipa": "zao3 chen2", "example_sentence": "早晨!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "你好", "local": "你好", "category": "greeting", "ipa": "ni3 hao3", "example_sentence": "你好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "吃了吗", "local": "吃饭了没", "category": "greeting", "ipa": "chi1 fan4 le5 mei2", "example_sentence": "吃饭了没啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "好久不见", "local": "好耐没见", "category": "greeting", "ipa": "hao3 nai4 mei2 jian4", "example_sentence": "好耐没见啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "再见", "local": "拜拜", "category": "greeting", "ipa": "bai2 bai2", "example_sentence": "拜拜啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "再见", "local": "再见", "category": "greeting", "ipa": "zai4 jian4", "example_sentence": "再见!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "谢谢", "local": "多谢", "category": "greeting", "ipa": "duo1 xie4", "example_sentence": "多谢啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "对不起", "local": "对不住", "category": "greeting", "ipa": "dui4 bu5 zhu4", "example_sentence": "对不住啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "不好意思", "local": "不好意思", "category": "greeting", "ipa": "bu4 hao3 yi4 si5", "example_sentence": "不好意思啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "没关系", "local": "无所谓", "category": "greeting", "ipa": "wu2 suo3 wei4", "example_sentence": "无所谓啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "叔叔", "local": "阿叔", "category": "greeting", "ipa": "a1 shu1", "example_sentence": "阿叔好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "阿姨", "local": "阿姨", "category": "greeting", "ipa": "a1 yi2", "example_sentence": "阿姨好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "大哥", "local": "大佬", "category": "greeting", "ipa": "da4 lao3", "example_sentence": "大佬,帮个忙啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "姑娘", "local": "妹妹", "category": "greeting", "ipa": "mei4 mei5", "example_sentence": "妹妹,你叫什么名啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "您先请", "local": "你走先", "category": "greeting", "ipa": "ni3 zou3 xian1", "example_sentence": "你走先啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "辛苦", "local": "辛苦晒", "category": "greeting", "ipa": "xin1 ku3 shai4", "example_sentence": "辛苦晒!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "欢迎", "local": "欢迎", "category": "greeting", "ipa": "huan1 ying2", "example_sentence": "欢迎!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "早点睡", "local": "早点睡啦", "category": "greeting", "ipa": "zao3 dian3 shui4 la5", "example_sentence": "夜啦,早点睡啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "路上小心", "local": "路上小心", "category": "greeting", "ipa": "lu4 shang4 xiao3 xin1", "example_sentence": "路上小心啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "漂亮", "local": "靓", "category": "idiom", "ipa": "liang4", "example_sentence": "好靓啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "丑", "local": "样衰", "category": "idiom", "ipa": "yang4 shuai1", "example_sentence": "你这样好样衰啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "聪明", "local": "叻", "category": "idiom", "ipa": "le4", "example_sentence": "你好叻啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "非常", "local": "好", "category": "idiom", "ipa": "hao3", "example_sentence": "好好吃!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "好吃", "local": "好食", "category": "idiom", "ipa": "hao3 shi2", "example_sentence": "这个菜好食啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "好喝", "local": "好饮", "category": "idiom", "ipa": "hao3 yin3", "example_sentence": "这杯茶好饮啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "一般般", "local": "麻麻地", "category": "idiom", "ipa": "ma2 ma2 di4", "example_sentence": "我做菜麻麻地。", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "受不了", "local": "顶不顺", "category": "idiom", "ipa": "ding3 bu4 shun4", "example_sentence": "热到顶不顺啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "没办法", "local": "无办法", "category": "idiom", "ipa": "wu2 ban4 fa3", "example_sentence": "我都无办法啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "加油", "local": "加油", "category": "idiom", "ipa": "jia1 you2", "example_sentence": "考试加油!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "怎么", "local": "点", "category": "idiom", "ipa": "dian3", "example_sentence": "最近点啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "为什么", "local": "点解", "category": "idiom", "ipa": "dian3 jie3", "example_sentence": "点解会这样啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "非常糟", "local": "好屎", "category": "idiom", "ipa": "hao3 shi3", "example_sentence": "今日运气好屎!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "便宜", "local": "平", "category": "idiom", "ipa": "ping2", "example_sentence": "这个好平啊!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "我", "local": "我", "category": "pronoun", "ipa": "wo3", "example_sentence": "我先走啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "你", "local": "你", "category": "pronoun", "ipa": "ni3", "example_sentence": "你先讲啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "什么", "local": "咩", "category": "pronoun", "ipa": "mie1", "example_sentence": "做咩啊?", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "自己", "local": "自己", "category": "pronoun", "ipa": "zi4 ji3", "example_sentence": "我自己来啦!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "大家", "local": "大家", "category": "pronoun", "ipa": "da4 jia1", "example_sentence": "大家好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
+{"variety": "guangdong_mandarin", "mandarin": "各位", "local": "各位", "category": "pronoun", "ipa": "ge4 wei4", "example_sentence": "各位好!", "source": "https://en.wikipedia.org/wiki/Cantonese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "吗", "local": "伐", "category": "particle", "ipa": "va51", "example_sentence": "好伐?", "source": "https://en.wiktionary.org/wiki/%E4%BC%90"}
 {"variety": "shanghai_mandarin_style", "mandarin": "吗", "local": "嚜", "category": "particle", "ipa": "me5", "example_sentence": "侬要伐嚜?", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne5", "example_sentence": "侬在哪里呢?", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(的)", "local": "额", "category": "particle", "ipa": "ge5", "example_sentence": "我额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(强调)", "local": "老", "category": "particle", "ipa": "lao6", "example_sentence": "老好额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "的", "local": "额", "category": "particle", "ipa": "ge5", "example_sentence": "我额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "很", "local": "老", "category": "particle", "ipa": "lao6", "example_sentence": "老好额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "啊", "local": "啊", "category": "particle", "ipa": "a5", "example_sentence": "好啊!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(感叹)", "local": "哎呦喂", "category": "particle", "ipa": "ai1 yo1 wei4", "example_sentence": "哎呦喂,赞额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(强调)", "local": "邪气", "category": "particle", "ipa": "ya2 chi4", "example_sentence": "邪气好!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(强调)", "local": "顶", "category": "particle", "ipa": "ting3", "example_sentence": "顶好额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(感叹)", "local": "嗨", "category": "particle", "ipa": "hai1", "example_sentence": "嗨,真的好!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(语气)", "local": "呀", "category": "particle", "ipa": "ya5", "example_sentence": "走呀!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(应答)", "local": "哦", "category": "particle", "ipa": "o5", "example_sentence": "哦,晓得了。", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(感叹)", "local": "霍", "category": "particle", "ipa": "huo4", "example_sentence": "霍,真额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(嗔怪)", "local": "好伐啦", "category": "particle", "ipa": "hao3 va51 la5", "example_sentence": "好伐啦,听侬额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(应答)", "local": "得", "category": "particle", "ipa": "de2", "example_sentence": "得,就这样!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(确认)", "local": "对额", "category": "particle", "ipa": "dui4 ge5", "example_sentence": "对额,就是这个!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(强调)", "local": "勒", "category": "particle", "ipa": "le5", "example_sentence": "好勒,听侬额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(语气)", "local": "呐", "category": "particle", "ipa": "na5", "example_sentence": "拿好呐!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(感叹)", "local": "瞎七搭八", "category": "particle", "ipa": "xia1 ci1 da1 ba1", "example_sentence": "侬瞎七搭八!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
-{"variety": "shanghai_mandarin_style", "mandarin": "(强调)", "local": "煞", "category": "particle", "ipa": "sha1", "example_sentence": "热煞了!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "哎哟", "local": "哎呦喂", "category": "particle", "ipa": "ai1 yo1 wei4", "example_sentence": "哎呦喂,赞额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "非常", "local": "邪气", "category": "particle", "ipa": "ya2 chi4", "example_sentence": "邪气好!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "最", "local": "顶", "category": "particle", "ipa": "ting3", "example_sentence": "顶好额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "嘿", "local": "嗨", "category": "particle", "ipa": "hai1", "example_sentence": "嗨,真的好!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "吧", "local": "呀", "category": "particle", "ipa": "ya5", "example_sentence": "走呀!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "嗯", "local": "哦", "category": "particle", "ipa": "o5", "example_sentence": "哦,晓得了。", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "哇", "local": "霍", "category": "particle", "ipa": "huo4", "example_sentence": "霍,真额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "好了好了", "local": "好伐啦", "category": "particle", "ipa": "hao3 va51 la5", "example_sentence": "好伐啦,听侬额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "行", "local": "得", "category": "particle", "ipa": "de2", "example_sentence": "得,就这样!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "对的", "local": "对额", "category": "particle", "ipa": "dui4 ge5", "example_sentence": "对额,就是这个!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "嘞", "local": "勒", "category": "particle", "ipa": "le5", "example_sentence": "好勒,听侬额!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "啊", "local": "呐", "category": "particle", "ipa": "na5", "example_sentence": "拿好呐!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "胡说八道", "local": "瞎七搭八", "category": "particle", "ipa": "xia1 ci1 da1 ba1", "example_sentence": "侬瞎七搭八!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
+{"variety": "shanghai_mandarin_style", "mandarin": "死", "local": "煞", "category": "particle", "ipa": "sha1", "example_sentence": "热煞了!", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "说", "local": "讲", "category": "verb", "ipa": "gang2", "example_sentence": "侬讲啥?", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "是", "local": "是", "category": "verb", "ipa": "shi6", "example_sentence": "我是上海人。", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
 {"variety": "shanghai_mandarin_style", "mandarin": "不是", "local": "勿是", "category": "verb", "ipa": "ve3 shi6", "example_sentence": "我勿是本地人。", "source": "https://en.wikipedia.org/wiki/Shanghainese"}
@@ -836,21 +799,20 @@
 {"variety": "cantonese_written", "mandarin": "吗(选择)", "local": "咩", "category": "particle", "ipa": "me1", "example_sentence": "係咩?", "source": "https://words.hk/zidin/%E5%92%A9"}
 {"variety": "cantonese_written", "mandarin": "吧", "local": "啦", "category": "particle", "ipa": "laa1", "example_sentence": "走啦!", "source": "https://words.hk/zidin/%E5%95%A6"}
 {"variety": "cantonese_written", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne1", "example_sentence": "你喺邊度呢?", "source": "https://words.hk/zidin/%E5%91%A2"}
-{"variety": "cantonese_written", "mandarin": "(的)", "local": "嘅", "category": "particle", "ipa": "ge3", "example_sentence": "我嘅書!", "source": "https://words.hk/zidin/%E5%98%85"}
+{"variety": "cantonese_written", "mandarin": "的", "local": "嘅", "category": "particle", "ipa": "ge3", "example_sentence": "我嘅書!", "source": "https://words.hk/zidin/%E5%98%85"}
 {"variety": "cantonese_written", "mandarin": "啊", "local": "啊", "category": "particle", "ipa": "aa3", "example_sentence": "好啊!", "source": "https://words.hk/zidin/%E5%95%8A"}
-{"variety": "cantonese_written", "mandarin": "(强调)", "local": "喎", "category": "particle", "ipa": "wo3", "example_sentence": "係喎,有道理!", "source": "https://words.hk/zidin/%E5%96%8E"}
-{"variety": "cantonese_written", "mandarin": "(强调)", "local": "㗎", "category": "particle", "ipa": "gaa3", "example_sentence": "我係學生㗎!", "source": "https://words.hk/zidin/%E3%97%8E"}
-{"variety": "cantonese_written", "mandarin": "(完成)", "local": "咗", "category": "particle", "ipa": "zo2", "example_sentence": "我食咗飯。", "source": "https://words.hk/zidin/%E5%92%97"}
-{"variety": "cantonese_written", "mandarin": "(感叹)", "local": "哎吔", "category": "particle", "ipa": "ai1 jaa1", "example_sentence": "哎吔,真係!", "source": "https://words.hk/zidin/%E5%93%8E%E5%90%94"}
-{"variety": "cantonese_written", "mandarin": "(强调)", "local": "咯", "category": "particle", "ipa": "lo3", "example_sentence": "得咯!", "source": "https://words.hk/zidin/%E5%92%AF"}
-{"variety": "cantonese_written", "mandarin": "(感叹)", "local": "嘩", "category": "particle", "ipa": "waa1", "example_sentence": "嘩,好嘢!", "source": "https://words.hk/zidin/%E5%98%A9"}
-{"variety": "cantonese_written", "mandarin": "(确认)", "local": "係喎", "category": "particle", "ipa": "hai6 wo3", "example_sentence": "係喎!", "source": "https://en.wikipedia.org/wiki/Written_Cantonese"}
-{"variety": "cantonese_written", "mandarin": "(让步)", "local": "啦啦", "category": "particle", "ipa": "laa1 laa1", "example_sentence": "等等啦啦!", "source": "https://words.hk/zidin/%E5%95%A6%E5%95%A6"}
-{"variety": "cantonese_written", "mandarin": "(强调)", "local": "嘞", "category": "particle", "ipa": "laak3", "example_sentence": "得嘞!", "source": "https://words.hk/zidin/%E5%98%9E"}
-{"variety": "cantonese_written", "mandarin": "(进行)", "local": "緊", "category": "particle", "ipa": "gan2", "example_sentence": "我食緊飯。", "source": "https://words.hk/zidin/%E7%B7%8A"}
-{"variety": "cantonese_written", "mandarin": "(经历)", "local": "過", "category": "particle", "ipa": "gwo3", "example_sentence": "我去過北京。", "source": "https://words.hk/zidin/%E9%81%8E"}
-{"variety": "cantonese_written", "mandarin": "(语气)", "local": "吖", "category": "particle", "ipa": "aa1", "example_sentence": "好吖!", "source": "https://words.hk/zidin/%E5%90%96"}
-{"variety": "cantonese_written", "mandarin": "(感叹)", "local": "哎喲", "category": "particle", "ipa": "ai1 jo1", "example_sentence": "哎喲,痛!", "source": "https://words.hk/zidin/%E5%93%8E%E5%96%B2"}
+{"variety": "cantonese_written", "mandarin": "哦", "local": "喎", "category": "particle", "ipa": "wo3", "example_sentence": "係喎,有道理!", "source": "https://words.hk/zidin/%E5%96%8E"}
+{"variety": "cantonese_written", "mandarin": "啊", "local": "㗎", "category": "particle", "ipa": "gaa3", "example_sentence": "我係學生㗎!", "source": "https://words.hk/zidin/%E3%97%8E"}
+{"variety": "cantonese_written", "mandarin": "了", "local": "咗", "category": "particle", "ipa": "zo2", "example_sentence": "我食咗飯。", "source": "https://words.hk/zidin/%E5%92%97"}
+{"variety": "cantonese_written", "mandarin": "哎呀", "local": "哎吔", "category": "particle", "ipa": "ai1 jaa1", "example_sentence": "哎吔,真係!", "source": "https://words.hk/zidin/%E5%93%8E%E5%90%94"}
+{"variety": "cantonese_written", "mandarin": "啦", "local": "咯", "category": "particle", "ipa": "lo3", "example_sentence": "得咯!", "source": "https://words.hk/zidin/%E5%92%AF"}
+{"variety": "cantonese_written", "mandarin": "哇", "local": "嘩", "category": "particle", "ipa": "waa1", "example_sentence": "嘩,好嘢!", "source": "https://words.hk/zidin/%E5%98%A9"}
+{"variety": "cantonese_written", "mandarin": "是哦", "local": "係喎", "category": "particle", "ipa": "hai6 wo3", "example_sentence": "係喎!", "source": "https://en.wikipedia.org/wiki/Written_Cantonese"}
+{"variety": "cantonese_written", "mandarin": "喽", "local": "嘞", "category": "particle", "ipa": "laak3", "example_sentence": "得嘞!", "source": "https://words.hk/zidin/%E5%98%9E"}
+{"variety": "cantonese_written", "mandarin": "正在", "local": "緊", "category": "particle", "ipa": "gan2", "example_sentence": "我食緊飯。", "source": "https://words.hk/zidin/%E7%B7%8A"}
+{"variety": "cantonese_written", "mandarin": "过", "local": "過", "category": "particle", "ipa": "gwo3", "example_sentence": "我去過北京。", "source": "https://words.hk/zidin/%E9%81%8E"}
+{"variety": "cantonese_written", "mandarin": "呀", "local": "吖", "category": "particle", "ipa": "aa1", "example_sentence": "好吖!", "source": "https://words.hk/zidin/%E5%90%96"}
+{"variety": "cantonese_written", "mandarin": "哎哟", "local": "哎喲", "category": "particle", "ipa": "ai1 jo1", "example_sentence": "哎喲,痛!", "source": "https://words.hk/zidin/%E5%93%8E%E5%96%B2"}
 {"variety": "cantonese_written", "mandarin": "是", "local": "係", "category": "verb", "ipa": "hai6", "example_sentence": "我係香港人。", "source": "https://words.hk/zidin/%E4%BF%82"}
 {"variety": "cantonese_written", "mandarin": "不是", "local": "唔係", "category": "verb", "ipa": "m4 hai6", "example_sentence": "我唔係本地人。", "source": "https://words.hk/zidin/%E5%94%94"}
 {"variety": "cantonese_written", "mandarin": "不", "local": "唔", "category": "verb", "ipa": "m4", "example_sentence": "唔好咁啦!", "source": "https://words.hk/zidin/%E5%94%94"}
@@ -953,22 +915,22 @@
 {"variety": "hokkien_written", "mandarin": "吗", "local": "袂", "category": "particle", "ipa": "bē", "example_sentence": "你會曉袂?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
 {"variety": "hokkien_written", "mandarin": "呢", "local": "咧", "category": "particle", "ipa": "leh", "example_sentence": "佇遐做啥咧?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
 {"variety": "hokkien_written", "mandarin": "吧", "local": "啦", "category": "particle", "ipa": "lah", "example_sentence": "緊啦!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(的)", "local": "的", "category": "particle", "ipa": "ê", "example_sentence": "我的冊。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(强调)", "local": "啦", "category": "particle", "ipa": "lah", "example_sentence": "好啦!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(完成)", "local": "矣", "category": "particle", "ipa": "ah", "example_sentence": "食飽矣!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(感叹)", "local": "哎喲", "category": "particle", "ipa": "ai ioh", "example_sentence": "哎喲,真好食!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(感叹)", "local": "tsiâⁿ", "category": "particle", "ipa": "tsiâⁿ", "example_sentence": "tsiâⁿ古錐!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(强调)", "local": "真正", "category": "particle", "ipa": "tsin-tsiàⁿ", "example_sentence": "真正好!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(语气)", "local": "喔", "category": "particle", "ipa": "ooh", "example_sentence": "細膩喔!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(询问)", "local": "敢", "category": "particle", "ipa": "kám", "example_sentence": "你敢欲去?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(语气)", "local": "嘛", "category": "particle", "ipa": "mā", "example_sentence": "我嘛欲去!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(确认)", "local": "是無", "category": "particle", "ipa": "sī bô", "example_sentence": "對的是無?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(语气)", "local": "呢", "category": "particle", "ipa": "ne", "example_sentence": "好呢!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(请求)", "local": "好無", "category": "particle", "ipa": "hó-bô", "example_sentence": "好無?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(强调)", "local": "敢若", "category": "particle", "ipa": "kánn-ná", "example_sentence": "敢若無人欲去。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(感叹)", "local": "唉唷", "category": "particle", "ipa": "ài ioh", "example_sentence": "唉唷,慘矣!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(语气)", "local": "捏", "category": "particle", "ipa": "neh", "example_sentence": "緊去捏!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
-{"variety": "hokkien_written", "mandarin": "(进行)", "local": "leh", "category": "particle", "ipa": "leh", "example_sentence": "我leh食飯。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "的", "local": "的", "category": "particle", "ipa": "ê", "example_sentence": "我的冊。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "啦", "local": "啦", "category": "particle", "ipa": "lah", "example_sentence": "好啦!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "了", "local": "矣", "category": "particle", "ipa": "ah", "example_sentence": "食飽矣!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "哎哟", "local": "哎喲", "category": "particle", "ipa": "ai ioh", "example_sentence": "哎喲,真好食!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "真", "local": "tsiâⁿ", "category": "particle", "ipa": "tsiâⁿ", "example_sentence": "tsiâⁿ古錐!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "真的", "local": "真正", "category": "particle", "ipa": "tsin-tsiàⁿ", "example_sentence": "真正好!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "哦", "local": "喔", "category": "particle", "ipa": "ooh", "example_sentence": "細膩喔!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "吗", "local": "敢", "category": "particle", "ipa": "kám", "example_sentence": "你敢欲去?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "也", "local": "嘛", "category": "particle", "ipa": "mā", "example_sentence": "我嘛欲去!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "是不是", "local": "是無", "category": "particle", "ipa": "sī bô", "example_sentence": "對的是無?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne", "example_sentence": "好呢!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "好吗", "local": "好無", "category": "particle", "ipa": "hó-bô", "example_sentence": "好無?", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "好像", "local": "敢若", "category": "particle", "ipa": "kánn-ná", "example_sentence": "敢若無人欲去。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "哎哟", "local": "唉唷", "category": "particle", "ipa": "ài ioh", "example_sentence": "唉唷,慘矣!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "呐", "local": "捏", "category": "particle", "ipa": "neh", "example_sentence": "緊去捏!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
+{"variety": "hokkien_written", "mandarin": "正在", "local": "leh", "category": "particle", "ipa": "leh", "example_sentence": "我leh食飯。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
 {"variety": "hokkien_written", "mandarin": "是", "local": "是", "category": "verb", "ipa": "sī", "example_sentence": "我是台灣人。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
 {"variety": "hokkien_written", "mandarin": "不是", "local": "毋是", "category": "verb", "ipa": "m̄-sī", "example_sentence": "我毋是本地人。", "source": "https://sutian.moe.edu.tw/zh-hant/"}
 {"variety": "hokkien_written", "mandarin": "不", "local": "毋", "category": "verb", "ipa": "m̄", "example_sentence": "毋通按呢!", "source": "https://sutian.moe.edu.tw/zh-hant/"}
@@ -1071,23 +1033,23 @@
 {"variety": "minnan_written", "mandarin": "吗", "local": "无", "category": "particle", "ipa": "bô", "example_sentence": "好无?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
 {"variety": "minnan_written", "mandarin": "吗(选择)", "local": "袂", "category": "particle", "ipa": "bē", "example_sentence": "会袂?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
 {"variety": "minnan_written", "mandarin": "呢", "local": "咧", "category": "particle", "ipa": "leh", "example_sentence": "汝做啥咧?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(完成)", "local": "咯", "category": "particle", "ipa": "loh", "example_sentence": "食饱咯!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门口语「咯」多于「矣」"}
-{"variety": "minnan_written", "mandarin": "(完成)", "local": "矣", "category": "particle", "ipa": "ah", "example_sentence": "食饱矣!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(的)", "local": "个", "category": "particle", "ipa": "ê", "example_sentence": "我个册。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门书面「个」, 台教部统一「的」"}
+{"variety": "minnan_written", "mandarin": "了", "local": "咯", "category": "particle", "ipa": "loh", "example_sentence": "食饱咯!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门口语「咯」多于「矣」"}
+{"variety": "minnan_written", "mandarin": "了", "local": "矣", "category": "particle", "ipa": "ah", "example_sentence": "食饱矣!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "的", "local": "个", "category": "particle", "ipa": "ê", "example_sentence": "我个册。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门书面「个」, 台教部统一「的」"}
 {"variety": "minnan_written", "mandarin": "吧", "local": "啦", "category": "particle", "ipa": "lah", "example_sentence": "紧来啦!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(感叹)", "local": "哎哟", "category": "particle", "ipa": "ai-ioh", "example_sentence": "哎哟,啊!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(强调)", "local": "真正", "category": "particle", "ipa": "tsin-tsiànn", "example_sentence": "真正好!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(语气)", "local": "喔", "category": "particle", "ipa": "ooh", "example_sentence": "细膩喔!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(询问)", "local": "敢", "category": "particle", "ipa": "kám", "example_sentence": "汝敢欲?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(语气)", "local": "嘛", "category": "particle", "ipa": "mā", "example_sentence": "我嘛欲!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(确认)", "local": "是无", "category": "particle", "ipa": "sī bô", "example_sentence": "对个是无?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(请求)", "local": "好无", "category": "particle", "ipa": "hó-bô", "example_sentence": "好无啦?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(感叹)", "local": "唉唷喂", "category": "particle", "ipa": "ài-ioh-uê", "example_sentence": "唉唷喂,慘咯!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦多加「喂」,台少用"}
-{"variety": "minnan_written", "mandarin": "(进行)", "local": "leh", "category": "particle", "ipa": "leh", "example_sentence": "我leh食饭。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(语气)", "local": "捏", "category": "particle", "ipa": "neh", "example_sentence": "紧去捏!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(强调)", "local": "敢若", "category": "particle", "ipa": "kánn-ná", "example_sentence": "敢若无人欲!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(语气)", "local": "呢", "category": "particle", "ipa": "ne", "example_sentence": "好呢!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
-{"variety": "minnan_written", "mandarin": "(劝)", "local": "莫", "category": "particle", "ipa": "mài", "example_sentence": "莫紧张!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门常用「莫」, 台用「毋通」更多"}
+{"variety": "minnan_written", "mandarin": "哎呀", "local": "哎哟", "category": "particle", "ipa": "ai-ioh", "example_sentence": "哎哟,啊!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "真的", "local": "真正", "category": "particle", "ipa": "tsin-tsiànn", "example_sentence": "真正好!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "哦", "local": "喔", "category": "particle", "ipa": "ooh", "example_sentence": "细膩喔!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "吗", "local": "敢", "category": "particle", "ipa": "kám", "example_sentence": "汝敢欲?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "也", "local": "嘛", "category": "particle", "ipa": "mā", "example_sentence": "我嘛欲!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "是不是", "local": "是无", "category": "particle", "ipa": "sī bô", "example_sentence": "对个是无?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "好吗", "local": "好无", "category": "particle", "ipa": "hó-bô", "example_sentence": "好无啦?", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "哎哟", "local": "唉唷喂", "category": "particle", "ipa": "ài-ioh-uê", "example_sentence": "唉唷喂,慘咯!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦多加「喂」,台少用"}
+{"variety": "minnan_written", "mandarin": "正在", "local": "leh", "category": "particle", "ipa": "leh", "example_sentence": "我leh食饭。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "呐", "local": "捏", "category": "particle", "ipa": "neh", "example_sentence": "紧去捏!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "好像", "local": "敢若", "category": "particle", "ipa": "kánn-ná", "example_sentence": "敢若无人欲!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "呢", "local": "呢", "category": "particle", "ipa": "ne", "example_sentence": "好呢!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
+{"variety": "minnan_written", "mandarin": "别", "local": "莫", "category": "particle", "ipa": "mài", "example_sentence": "莫紧张!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "厦门常用「莫」, 台用「毋通」更多"}
 {"variety": "minnan_written", "mandarin": "是", "local": "是", "category": "verb", "ipa": "sī", "example_sentence": "我是厦门人。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
 {"variety": "minnan_written", "mandarin": "不是", "local": "毋是", "category": "verb", "ipa": "m̄-sī", "example_sentence": "我毋是本地人。", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
 {"variety": "minnan_written", "mandarin": "不", "local": "毋", "category": "verb", "ipa": "m̄", "example_sentence": "毋通按呢!", "source": "https://en.wikipedia.org/wiki/Amoy_dialect", "notes": "与台同"}
