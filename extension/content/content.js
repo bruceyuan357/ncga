@@ -31,8 +31,10 @@
   /**
    * ensureHost(anchorRect): create or reuse the overlay host.
    * - anchorRect=null: corner mode (right-bottom of viewport, big window).
-   * - anchorRect={top,left,bottom,right,width,height}: selection mode,
-   *   absolute-positioned just BELOW the selection bbox, narrower window.
+   * - anchorRect={pageBottom,pageLeft,width}: selection mode, ABSOLUTE page
+   *   coords captured at selection time, positioned just BELOW the selection
+   *   bbox, narrower window. Page coords (not viewport) so a scroll during the
+   *   LLM round-trip doesn't misplace the popover.
    */
   function ensureHost(anchorRect = null) {
     if (hostEl) {
@@ -161,6 +163,17 @@
         font-size: 12px;
         white-space: pre-wrap;
       }
+      .degraded {
+        display: inline-block;
+        margin: 0 0 0.5rem;
+        padding: 0.1em 0.6em;
+        border: 1px solid #EED9B8;
+        border-radius: 999px;
+        background: #FDF3E7;
+        color: #B5491D;
+        font-size: 10px;
+        font-weight: 600;
+      }
       .ftr {
         padding: 0.5rem 0.9rem;
         border-top: 1px solid #F0D9CF;
@@ -204,7 +217,7 @@
     panelEl.appendChild(body);
   }
 
-  function renderResult(varietyKey, sourceText, result, anchorRect = null) {
+  function renderResult(varietyKey, sourceText, result, anchorRect = null, degraded = false, warning = "") {
     ensureHost(anchorRect);
     panelEl.textContent = "";
     panelEl.appendChild(buildHeader(varietyKey, true));
@@ -224,6 +237,13 @@
         toggle.textContent = exp ? "收起原文" : "展开原文";
       });
       body.appendChild(toggle);
+    }
+    if (degraded) {
+      // Server fell back to a degraded rewrite — badge it (textContent only).
+      const chip = document.createElement("span");
+      chip.className = "degraded";
+      chip.textContent = warning ? "降级输出 · " + warning : "降级输出";
+      body.appendChild(chip);
     }
     const out = document.createElement("pre");
     out.className = "result";
@@ -306,21 +326,22 @@
   }
 
   /**
-   * Position the overlay host. If anchorRect supplied, attach absolutely
-   * below the selection; otherwise float at bottom-right of viewport.
+   * Position the overlay host. If anchorRect supplied
+   * ({pageBottom,pageLeft,width} in ABSOLUTE page coords, captured at
+   * selection time), attach absolutely below the selection; otherwise float
+   * at bottom-right of viewport. Page coords are baked in by the caller so
+   * scrolling between capture and render can't shift the popover.
    */
   function applyHostPosition(anchorRect) {
     if (!hostEl) return;
     overlayMode = anchorRect ? "anchor" : "corner";
     if (anchorRect) {
-      // Below-selection anchor; account for page scroll because we use
-      // absolute (not fixed) so the popover scrolls with the text.
-      const scrollX = window.pageXOffset || 0;
-      const scrollY = window.pageYOffset || 0;
-      const top = scrollY + anchorRect.bottom + 6;       // 6px gap
-      let left = scrollX + anchorRect.left;
+      const top = anchorRect.pageBottom + 6;             // 6px gap
+      let left = anchorRect.pageLeft;
       const popWidth = Math.min(420, Math.max(280, anchorRect.width + 80));
-      // Keep popover within viewport horizontally
+      // Keep popover within the viewport horizontally (clamp against the
+      // current horizontal scroll — usually 0).
+      const scrollX = window.pageXOffset || 0;
       const maxLeft = scrollX + window.innerWidth - popWidth - 16;
       if (left > maxLeft) left = Math.max(scrollX + 12, maxLeft);
       hostEl.style.cssText = [
@@ -380,6 +401,9 @@
   // ask SW to rewrite using the default variety, anchor popover under selection.
   let selectionDebounceTimer = null;
   let lastTriggeredText = "";
+  // Monotonic request id: a newer selection (or a destroyed overlay) makes any
+  // in-flight response stale, so its render is skipped instead of clobbering.
+  let rewriteRequestSeq = 0;
 
   function onSelectionChange() {
     if (selectionDebounceTimer) clearTimeout(selectionDebounceTimer);
@@ -387,14 +411,18 @@
   }
 
   async function handleSelectionMaybeRewrite() {
-    let cfg;
+    // User prefs live under "ncga.prefs.v1" (split from ncga.config.v1 so an
+    // options.js save can't clobber them). Fallback to the old location for
+    // configs written before the split.
+    let prefs;
     try {
-      cfg = (await chrome.storage.local.get("ncga.config.v1"))["ncga.config.v1"] || {};
+      const s = await chrome.storage.local.get(["ncga.prefs.v1", "ncga.config.v1"]);
+      prefs = s["ncga.prefs.v1"] || s["ncga.config.v1"] || {};
     } catch (_e) { return; }
     // Instant mode only. on_demand (default) never auto-fires on selection —
     // that's the right-click menu's job, and auto-firing here is what collided
     // with it. Back-compat: legacy boolean autoRewriteOnSelection === instant.
-    const mode = cfg.mode || (cfg.autoRewriteOnSelection ? "instant" : "on_demand");
+    const mode = prefs.mode || (prefs.autoRewriteOnSelection ? "instant" : "on_demand");
     if (mode !== "instant") return;
 
     const sel = window.getSelection();
@@ -408,10 +436,19 @@
     const range = sel.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) return;
+    // Capture the anchor in ABSOLUTE page coords NOW — getBoundingClientRect
+    // is viewport-relative, so converting at render time (after the LLM
+    // round-trip) would misplace the popover if the user scrolled meanwhile.
+    const anchor = {
+      pageBottom: (window.pageYOffset || 0) + rect.bottom,
+      pageLeft: (window.pageXOffset || 0) + rect.left,
+      width: rect.width,
+    };
 
-    const variety = cfg.defaultVariety || "shanghai_mandarin_style";
+    const variety = prefs.defaultVariety || "shanghai_mandarin_style";
+    const requestId = ++rewriteRequestSeq;
     // Render loading immediately at anchor
-    renderLoading(variety, text, rect);
+    renderLoading(variety, text, anchor);
 
     try {
       const res = await chrome.runtime.sendMessage({
@@ -419,13 +456,17 @@
         varietyKey: variety,
         text,
       });
+      // Stale guard: a newer selection fired, or the user closed the overlay
+      // (Esc / outside click / ×) while this request was in flight.
+      if (requestId !== rewriteRequestSeq || !hostEl) return;
       if (res && res.ok) {
-        renderResult(variety, text, res.result || "", rect);
+        renderResult(variety, text, res.result || "", anchor, !!res.degraded, res.warning || "");
       } else {
-        renderError((res && res.error) || "未知错误", rect);
+        renderError((res && res.error) || "未知错误", anchor);
       }
     } catch (e) {
-      renderError(String(e && e.message || e), rect);
+      if (requestId !== rewriteRequestSeq || !hostEl) return;
+      renderError(String(e && e.message || e), anchor);
     }
   }
 
@@ -437,7 +478,7 @@
     if (msg.type === "ncga:overlay-loading") {
       renderLoading(msg.varietyKey, msg.text || "");
     } else if (msg.type === "ncga:overlay-result") {
-      renderResult(msg.varietyKey, msg.text || "", msg.result || "");
+      renderResult(msg.varietyKey, msg.text || "", msg.result || "", null, !!msg.degraded, msg.warning || "");
     } else if (msg.type === "ncga:overlay-error") {
       renderError(msg.error || "未知错误");
     }

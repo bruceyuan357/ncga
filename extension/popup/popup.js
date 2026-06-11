@@ -19,7 +19,31 @@ const lockBtn = $("#lock-btn");
 const modeOpts = document.querySelectorAll(".mode-opt");
 const modeHint = $("#mode-hint");
 
-const CONFIG_KEY = "ncga.config.v1";
+const CONFIG_KEY = "ncga.config.v1";  // {serverUrl, encryptedToken, savedAt} — owned by options.js
+const PREFS_KEY = "ncga.prefs.v1";    // {mode, defaultVariety} — owned by popup; read by content.js
+
+// Read user prefs. One-time migration: prefs used to live inside CONFIG_KEY,
+// which let an options.js save clobber them — they now have their own key.
+async function loadPrefs() {
+  const s = await chrome.storage.local.get([PREFS_KEY, CONFIG_KEY]);
+  if (s[PREFS_KEY]) return s[PREFS_KEY];
+  const old = s[CONFIG_KEY] || {};
+  const prefs = {};
+  if (old.mode) prefs.mode = old.mode;
+  if (old.defaultVariety) prefs.defaultVariety = old.defaultVariety;
+  if (old.autoRewriteOnSelection) prefs.autoRewriteOnSelection = old.autoRewriteOnSelection;
+  if (Object.keys(prefs).length) {
+    await chrome.storage.local.set({ [PREFS_KEY]: prefs });
+  }
+  return prefs;
+}
+
+async function savePrefs(patch) {
+  const cur = await loadPrefs();
+  const next = { ...cur, ...patch };
+  if (patch.mode) delete next.autoRewriteOnSelection; // drop the legacy flag
+  await chrome.storage.local.set({ [PREFS_KEY]: next });
+}
 
 // Two mutually-exclusive on-page modes (replaces the old auto-rewrite checkbox,
 // which collided with the right-click menu by layering on top of it):
@@ -32,10 +56,10 @@ const MODE_HINTS = {
   instant: "即时:选中文字(≥2 字)→ 立刻在选区下方弹出改写,用下面选的默认方言。",
 };
 
-function _migrateMode(cfg) {
+function _migrateMode(prefs) {
   // Back-compat: old config used a boolean autoRewriteOnSelection.
-  if (cfg.mode === "on_demand" || cfg.mode === "instant") return cfg.mode;
-  if (cfg.autoRewriteOnSelection) return "instant";
+  if (prefs.mode === "on_demand" || prefs.mode === "instant") return prefs.mode;
+  if (prefs.autoRewriteOnSelection) return "instant";
   return "on_demand";
 }
 
@@ -60,11 +84,10 @@ async function ensureInjectedFor(mode) {
 
 async function loadModeSwitch() {
   try {
-    const s = await chrome.storage.local.get(CONFIG_KEY);
-    const cfg = s[CONFIG_KEY] || {};
-    const mode = _migrateMode(cfg);
+    const prefs = await loadPrefs();
+    const mode = _migrateMode(prefs);
     _paintMode(mode);
-    if (cfg.defaultVariety) varietySel.value = cfg.defaultVariety;
+    if (prefs.defaultVariety) varietySel.value = prefs.defaultVariety;
     await ensureInjectedFor(mode);
   } catch (_e) {
     _paintMode("on_demand");
@@ -75,11 +98,7 @@ modeOpts.forEach((btn) => {
   btn.addEventListener("click", async () => {
     const mode = btn.dataset.mode;
     _paintMode(mode);
-    const s = await chrome.storage.local.get(CONFIG_KEY);
-    const cfg = s[CONFIG_KEY] || {};
-    cfg.mode = mode;
-    delete cfg.autoRewriteOnSelection; // drop the legacy flag
-    await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+    await savePrefs({ mode });
     // Switching to 即时 right now: inject into the current tab so it works
     // immediately, without making the user reload the page.
     await ensureInjectedFor(mode);
@@ -88,11 +107,8 @@ modeOpts.forEach((btn) => {
 
 varietySel.addEventListener("change", async () => {
   // When user changes variety in popup, persist as defaultVariety for
-  // selection auto-rewrite path. No-op if config not yet saved (just stores it).
-  const s = await chrome.storage.local.get(CONFIG_KEY);
-  const cfg = s[CONFIG_KEY] || {};
-  cfg.defaultVariety = varietySel.value;
-  await chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+  // selection auto-rewrite path.
+  await savePrefs({ defaultVariety: varietySel.value });
 });
 
 function showStatus(text, kind) {
@@ -160,7 +176,15 @@ rewriteBtn.addEventListener("click", async () => {
       text,
     });
     if (res && res.ok) {
-      resultEl.textContent = res.result || "(空)";
+      resultEl.textContent = "";
+      if (res.degraded) {
+        // textContent only — no innerHTML.
+        const chip = document.createElement("span");
+        chip.className = "degraded-chip";
+        chip.textContent = res.warning ? "降级输出 · " + res.warning : "降级输出";
+        resultEl.appendChild(chip);
+      }
+      resultEl.appendChild(document.createTextNode(res.result || "(空)"));
     } else {
       resultEl.textContent = "✗ " + (res && res.error || "未知错误");
     }

@@ -4,15 +4,16 @@ Right-click any text on any page → 改写为「上海话 / 广州普通话 / �
 
 ## Status
 
-**v0.1.0** — scaffold complete, awaiting user install + live debug session (per Cycle 22 Stage B plan, see `~/.claude/projects/-Users-bruce-NCGA/memory/cycle_20_21_redo_log.md`).
+**v0.1.0** — debugged; live install on Bruce's Chrome done (Cycle 22 Stage B).
 
 ## Architecture
 
 ```
 extension/
-├── manifest.json          Manifest V3, contextMenus + storage + scripting perms,
-│                          host-permissions limited to localhost:8000/127.0.0.1:8000
-├── icons/                 16/32/48/128 PNG placeholders (replace before publish)
+├── manifest.json          Manifest V3, contextMenus + storage + scripting +
+│                          activeTab perms, host-permissions limited to
+│                          localhost:8000/127.0.0.1:8000
+├── icons/                 16/32/48/128 PNG, 5-petal cherry blossom
 ├── background/
 │   └── service-worker.js  Context menu setup + message router + auth header builder
 ├── content/
@@ -58,21 +59,36 @@ Default `host_permissions` only allow `http://localhost:8000/*` and `http://127.
 3. Overlay appears with the rewrite (Shadow DOM, no style bleed)
 4. ESC to dismiss
 
+## Selection-popover mode (即时)
+
+The popup has a two-position mode switch:
+
+- **点选 / On-Demand** (default) — selection never auto-fires; you pick a
+  variety from the right-click menu and the result shows in a corner overlay.
+- **即时 / Instant** — selecting ≥2 characters auto-rewrites with the default
+  variety and shows a popover anchored just below the selection. The anchor is
+  captured in absolute page coords at selection time, so scrolling during the
+  LLM round-trip doesn't misplace it; a request-generation guard drops stale
+  responses if you select something else (or close the popover) mid-flight.
+
+Results the server marks `degraded` get a small 「降级输出」 badge in both the
+popup and the overlay.
+
+## Storage layout
+
+Two separate `chrome.storage.local` keys, so writers never clobber each other:
+
+- `ncga.config.v1` — `{serverUrl, encryptedToken, savedAt}`, written only by
+  the Options page.
+- `ncga.prefs.v1` — `{mode, defaultVariety}`, written only by the popup, read
+  by the content script (with a fallback read of the old in-config location
+  for pre-split installs).
+
+The decrypted token lives in `chrome.storage.session` (`ncga.session.v1`) and
+clears when the browser session ends.
+
 ## Develop
 
 - Edit any file → Chrome → `chrome://extensions` → click reload icon under NCGA card
 - Service worker logs: `chrome://extensions` → "Service worker" link under NCGA
 - Content script logs: open devtools on any page, console will show overlay logs
-
-## Build progression (per Cycle 22 Stage B plan)
-
-| Step | What | Commit |
-|---|---|---|
-| E1 | manifest + folder skeleton + icons | this commit |
-| E2 | background service worker | next |
-| E3 | popup UI | … |
-| E4 | content script + overlay | … |
-| E5 | AES-GCM token storage | … |
-| E6 | install verification doc | … |
-
-After E6, awaiting user time for live install + debug session.

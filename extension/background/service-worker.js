@@ -11,7 +11,7 @@
 // Auth model:
 //   - chrome.storage.local stores { serverUrl, encryptedToken }
 //   - We DO NOT cache the decrypted token here. The decrypted token lives in
-//     a session memory cache that auto-clears after IDLE_CLEAR_MS of inactivity.
+//     chrome.storage.session, which the browser clears when the session ends.
 //   - Decryption requires a passphrase the user enters in Options. If the
 //     passphrase isn't cached yet, the service worker prompts via the popup.
 
@@ -23,7 +23,7 @@ const SESSION_KEY = "ncga.session.v1";  // chrome.storage.session
 // 改为"实际不过期"(永远远期):chrome.storage.session 本身
 // 在浏览器关掉后会自动清空,所以这里设无穷大也是安全的——
 // 一次浏览器 session 内只需要解锁一次,关浏览器再开还是要重输 passphrase。
-const IDLE_CLEAR_MS = Number.MAX_SAFE_INTEGER;
+const SESSION_EXPIRES_AT = Number.MAX_SAFE_INTEGER;
 
 // 10 varieties hard-coded for context menu titles. Sourced from
 // native_chinese_assistant/presets.py; kept in sync manually for now.
@@ -66,7 +66,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const varietyKey = info.menuItemId.slice("ncga-variety-".length);
   const text = (info.selectionText || "").trim();
   if (!text || !tab || !tab.id) return;
-  await handleRewriteRequest(tab.id, varietyKey, text);
+  // notifyError throws by design (the popup path surfaces it); here the overlay
+  // already shows the error, so swallow to avoid unhandled-rejection noise.
+  await handleRewriteRequest(tab.id, varietyKey, text).catch(() => {});
 });
 
 // ============ message handlers ============
@@ -79,7 +81,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       msg.varietyKey,
       msg.text,
     ).then(
-      (result) => sendResponse({ ok: true, result }),
+      (r) => sendResponse({ ok: true, result: r.text, degraded: r.degraded, warning: r.warning }),
       (err) => sendResponse({ ok: false, error: String(err && err.message || err) }),
     );
     return true; // async response
@@ -96,8 +98,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!cfg.serverUrl) throw new Error("请先在 Options 填服务器 URL");
         const token = await getCachedToken();
         if (!token) throw new Error("Token 未解锁,点扩展图标输 passphrase");
-        const result = await callRewriteAPI(cfg.serverUrl, token, msg.varietyKey, msg.text);
-        sendResponse({ ok: true, result });
+        const r = await callRewriteAPI(cfg.serverUrl, token, msg.varietyKey, msg.text);
+        sendResponse({ ok: true, result: r.text, degraded: r.degraded, warning: r.warning });
       } catch (e) {
         sendResponse({ ok: false, error: String(e && e.message || e) });
       }
@@ -180,11 +182,18 @@ async function handleRewriteRequest(tabId, varietyKey, text) {
     await sendToTab(tabId, { type: "ncga:overlay-loading", varietyKey, text });
   }
   try {
-    const result = await callRewriteAPI(cfg.serverUrl, token, varietyKey, text);
+    const r = await callRewriteAPI(cfg.serverUrl, token, varietyKey, text);
     if (tabId) {
-      await sendToTab(tabId, { type: "ncga:overlay-result", varietyKey, text, result });
+      await sendToTab(tabId, {
+        type: "ncga:overlay-result",
+        varietyKey,
+        text,
+        result: r.text,
+        degraded: r.degraded,
+        warning: r.warning,
+      });
     }
-    return result;
+    return r;
   } catch (e) {
     const msg = (e && e.message) || String(e);
     if (tabId) await sendToTab(tabId, { type: "ncga:overlay-error", error: msg });
@@ -209,10 +218,15 @@ async function callRewriteAPI(serverUrl, token, varietyKey, text) {
   }
   const data = await res.json();
   // /api/rewrite returns {"rewritten_text": "...", "target_variety": "...",
-  // "script": "...", "degraded": bool, "effective_scenario": "..."}.
+  // "script": "...", "degraded": bool, "warning": "...", "effective_scenario": "..."}.
   // Bug 修正:之前硬编 data.text / data.result 都不对,导致永远返回空字符串
   // → popup 和 overlay 都显空白("无输出"报告)。
-  return data.rewritten_text || data.text || data.result || "";
+  // Degraded results (fallback output) are surfaced so the UI can badge them.
+  return {
+    text: data.rewritten_text || data.text || data.result || "",
+    degraded: !!data.degraded,
+    warning: data.warning || "",
+  };
 }
 
 async function sendToTab(tabId, msg) {
@@ -267,9 +281,6 @@ async function getCachedToken() {
   const s = await chrome.storage.session.get(SESSION_KEY);
   const ses = s[SESSION_KEY];
   if (!ses || !ses.token || ses.expiresAt < Date.now()) return null;
-  // Refresh idle timer on every read
-  ses.expiresAt = Date.now() + IDLE_CLEAR_MS;
-  await chrome.storage.session.set({ [SESSION_KEY]: ses });
   return ses.token;
 }
 
@@ -277,9 +288,15 @@ async function unlockTokenWithPassphrase(passphrase) {
   if (!passphrase) throw new Error("passphrase required");
   const cfg = await getConfig();
   if (!cfg.encryptedToken) throw new Error("no encrypted token in storage");
-  const token = await decrypt(cfg.encryptedToken, passphrase);
+  let token;
+  try {
+    token = await decrypt(cfg.encryptedToken, passphrase);
+  } catch (_e) {
+    // Web Crypto throws an opaque DOMException on bad key/ciphertext — translate.
+    throw new Error("passphrase 错误或保存的数据已损坏");
+  }
   if (!token) throw new Error("decryption returned empty");
   await chrome.storage.session.set({
-    [SESSION_KEY]: { token, expiresAt: Date.now() + IDLE_CLEAR_MS },
+    [SESSION_KEY]: { token, expiresAt: SESSION_EXPIRES_AT },
   });
 }

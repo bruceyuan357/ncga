@@ -52,8 +52,12 @@ saveBtn.addEventListener("click", async () => {
   saveBtn.disabled = true;
   try {
     const encryptedToken = await encrypt(token, pw);
+    // Merge instead of replace: user prefs now live under "ncga.prefs.v1",
+    // but merge-write anyway so a save can never clobber stray legacy fields.
+    const store = await chrome.storage.local.get(STORAGE_KEY);
+    const cur = store[STORAGE_KEY] || {};
     await chrome.storage.local.set({
-      [STORAGE_KEY]: { serverUrl, encryptedToken, savedAt: Date.now() },
+      [STORAGE_KEY]: { ...cur, serverUrl, encryptedToken, savedAt: Date.now() },
     });
     // 立刻锁掉旧 session(强制按新 token 重解锁)
     await chrome.storage.session.remove("ncga.session.v1");

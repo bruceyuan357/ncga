@@ -21,7 +21,7 @@
 2. 右上角 **开发者模式** 切到开
 3. 左上角点 **加载已解压的扩展程序**
 4. 选择 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf/extension` 文件夹
-5. 应该看到一张卡:**地道中文 · NCGA  v0.1.0**(带粉色方块图标)
+5. 应该看到一张卡:**地道中文 · NCGA  v0.1.0**(带粉色樱花图标)
 
 ✅ **预期:** 卡片底色白,**没有红色错误提示**
 
@@ -39,14 +39,14 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 
 1. Chrome 右上角拼图按钮(扩展图标)
 2. 找到「地道中文」一行,点旁边的图钉
-3. 现在工具栏上应该有一个粉色小方块
+3. 现在工具栏上应该有一朵粉色小樱花
 
 ---
 
 ## 3. 设置 — 填服务器和 token
 
-1. 工具栏粉色方块 → 弹窗 → 底部点 **设置**
-2. 新标签页打开 Options
+1. 工具栏樱花图标 → 弹窗 → 底部点 **设置**
+2. Options 以内嵌对话框形式在 `chrome://extensions` 页面里打开(`open_in_tab: false`,不是新标签页)
 3. 填:
    - **服务器 URL:** `http://localhost:8000`(已默认)
    - **Token:** 把 `.env` 里 `NCGA_AUTH_TOKEN=` 后面的字符串粘进来
@@ -68,8 +68,8 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 
 ## 4. 解锁
 
-1. 工具栏粉色方块 → 弹窗
-2. 顶上一行:**Token 已锁定 — 输 passphrase 解锁(30 分钟自动锁)**
+1. 工具栏樱花图标 → 弹窗
+2. 顶上一行:**Token 已锁定 — 输 passphrase 解锁(关浏览器才会锁)**
 3. 输你刚才设的 passphrase → **解锁**
 4. 弹窗变成:**已就绪 · http://localhost:8000**(绿色)
 
@@ -111,16 +111,16 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 1. 改写出结果后 → 点 **复制改写** → 按钮变 **已复制 ✓**(1.5s 后还原)
 2. 在任何地方 ⌘V 粘贴 → 验证复制内容是改写结果
 3. ESC 关浮窗
-4. 工具栏粉块 → 弹窗 → 底部 **锁回去** → 立刻锁
+4. 工具栏樱花图标 → 弹窗 → 底部 **锁回去** → 立刻锁
 
 ✅ **预期:** 锁回去后再点弹窗,又显「Token 已锁定」面板
 
 ---
 
-## 8. 30 分钟自动锁
+## 8. 锁定机制(关浏览器才会锁)
 
-- token 在 `chrome.storage.session` 缓存,30 分钟无活动自动失效
-- 浏览器关掉所有窗口也自动清(session storage 设计)
+- 解锁后 token 缓存在 `chrome.storage.session`,**整个浏览器 session 内有效**——不会因为放置不用而自动锁(以前的 30 分钟自动锁已去掉,反复输 passphrase 太烦)
+- 关掉所有浏览器窗口 → session storage 自动清空 → 下次打开要重输 passphrase
 - 想立刻锁:扩展弹窗底部「锁回去」
 
 ---
@@ -131,9 +131,8 @@ cd /Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf && ls extension/icons/
 |---|---|---|
 | 右键没有「改写为」 | 没选中文字 → contextMenus 仅在 selection contexts 显示 | 先选中文字再右键 |
 | 浮窗显 ✗ HTTP 401 | token 错或被服务器换了 | 重新打开 Options 填新 token |
-| 浮窗显 ✗ HTTP 403 | 服务器 IP-rate-limited(默认每 IP 每分钟 30 次) | 等 1 分钟 |
 | 浮窗显 ✗ Failed to fetch | 服务器没在跑 / URL 写错 | `python3 app.py` 跑起来,检查 Options URL |
-| 浮窗显 ✗ HTTP 429 | 同上,limiter 命中 | 等 |
+| 浮窗显 ✗ HTTP 429 | 服务器 IP-rate-limit 命中(默认每 IP 每分钟 30 次) | 等 1 分钟 |
 | popup 显「未配置」但 Options 已存 | Options 没真存盘 | 重开 Options,确认 **当前状态** 框有数据,没数据再点 **加密并保存** 一次 |
 | 改写一直转圈 | 服务器卡了 / LLM 慢 | 看 service worker 日志:`chrome://extensions` → 找 NCGA → 点 **Service worker** → console 看错误 |
 | 完全没反应 | 扩展崩了 | `chrome://extensions` → NCGA 卡片 → 圆形刷新箭头点一下 |

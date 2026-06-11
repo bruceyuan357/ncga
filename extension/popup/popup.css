@@ -85,6 +85,21 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 }
 .result:empty { display: none; }
 
+.degraded-chip {
+  display: block;
+  width: fit-content;
+  margin: 0 0 0.4rem;
+  padding: 0.1em 0.6em;
+  border: 1px solid #EED9B8;
+  border-radius: 999px;
+  background: #FDF3E7;
+  color: #B5491D;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: normal;
+}
+
 .err {
   margin: 0.4rem 0 0;
   color: var(--err);
