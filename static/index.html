@@ -174,7 +174,7 @@
             <span id="bg-mode-label">轮播</span>
           </button>
           <button type="button" class="cmd-btn primary" id="cmdbar-rewrite">
-            <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> 立即重写
+            <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> <span id="cmdbar-rewrite-label">立即重写</span>
             <kbd class="kbd-hint">⌘↵</kbd>
           </button>
         </div>
@@ -251,6 +251,17 @@
                 </span>
               </div>
             </header>
+
+            <!-- Cycle 23: 工作模式切换。方言改写是默认（原有行为不变）；
+                 润色 / 中英互译 / 总结 / 白话解释 走 /api/transform-stream。
+                 chips populated by JS（硬编码兜底 + /api/transform-modes 静默刷新）。 -->
+            <div class="mode-row" aria-label="工作模式">
+              <span class="mode-label">
+                <i class="fas fa-layer-group" aria-hidden="true"></i>
+                模式
+              </span>
+              <div class="mode-chips" id="mode-chips" role="radiogroup" aria-label="工作模式"></div>
+            </div>
 
             <div class="example-chips" aria-label="示例文本（点一下填入原文）">
               <span class="chip-label"><i class="fas fa-lightbulb" aria-hidden="true"></i> 参考例句（填入原文框）</span>
@@ -341,6 +352,11 @@
                 <span class="degraded-tag" id="degraded-tag" hidden title="此次回退到本地启发式重写">
                   <i class="fas fa-triangle-exclamation" aria-hidden="true"></i> 已降级
                 </span>
+                <!-- Cycle 23: 白话解释走更强模型（按模式路由），用这个 chip 让用户看到本次用的是哪个模型 -->
+                <span class="model-tag" id="model-tag" hidden title="本次结果由哪个模型生成">
+                  <i class="fas fa-microchip" aria-hidden="true"></i>
+                  <span id="model-name">—</span>
+                </span>
               </div>
               <div class="card-head-tools">
                 <button type="button" class="icon-btn" id="compare-toggle" title="并排对照原文" aria-pressed="false">
@@ -404,6 +420,11 @@
               <button type="button" class="ghost-btn" id="compare-other-button" disabled title="挑几个其他方言对比同一句话">
                 <i class="fas fa-shuffle" aria-hidden="true"></i> 对比其它方言
               </button>
+              <!-- Cycle 23: 单条结果质量评分。方言结果走 /api/rate，模式结果走 /api/rate-transform -->
+              <button type="button" class="ghost-btn" id="rate-button" disabled title="让 AI 给当前结果打个质量分">
+                <i class="fas fa-star-half-stroke" aria-hidden="true"></i> <span id="rate-label">质量评分</span>
+              </button>
+              <span class="rate-score" id="rate-score" hidden></span>
             </div>
 
             <!-- AI Explain drawer -->

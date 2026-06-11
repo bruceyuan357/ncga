@@ -110,6 +110,12 @@
   const landmarkTag = $("#landmark-tag");
   const landmarkName = $("#landmark-name");
   const degradedTag = $("#degraded-tag");
+  const modelTag = $("#model-tag");
+  const modelName = $("#model-name");
+
+  const modeChipsContainer = $("#mode-chips");
+  const rateButton = $("#rate-button");
+  const rateScoreEl = $("#rate-score");
 
   const toast = $("#toast");
   const toastText = $("#toast-text");
@@ -187,6 +193,12 @@
     notSelected: '<i class="fas fa-hand-pointer" aria-hidden="true"></i> 还没挑方言呢，选一个再来～',
     trialNotice: (label) =>
       `<i class="fas fa-flask" aria-hidden="true"></i> ${escapeHtml(label)} 是试用版，输出可能不够稳定`,
+    // Cycle 23: transform-mode variants（方言文案不适用于润色/翻译等任务）
+    transformIdle: (label) =>
+      `<i class="fas fa-info-circle" aria-hidden="true"></i> 已切换到「${escapeHtml(label)}」，贴上文本点击按钮`,
+    transformLoading: '<i class="fas fa-circle-notch" aria-hidden="true"></i> 正在处理…',
+    transformSuccess: (label) =>
+      `<i class="fas fa-check-circle" aria-hidden="true"></i> ${escapeHtml(label)}完成！`,
   };
 
   // ---------------- state ----------------
@@ -201,6 +213,22 @@
   const SCENARIOS = {};
   let scenarioOrder = [];
   const DEFAULT_SCENARIO = "friends_casual";
+
+  // Cycle 23: transform modes (polish/translate/summarize/explain).
+  // Hardcoded to the server's MODE_METADATA as a boot-time fallback;
+  // refreshTransformModes() silently re-syncs from GET /api/transform-modes.
+  // "dialect" is the pseudo-mode for the original rewrite flow.
+  const DIALECT_MODE = "dialect";
+  let activeMode = DIALECT_MODE;
+  let TRANSFORM_MODE_ORDER = ["polish", "translate", "summarize", "explain"];
+  const TRANSFORM_MODES = {
+    polish: { label: "润色", description: "改通顺、改得体,保持原意" },
+    translate: { label: "中英互译", description: "中文→英文,英文→中文,自动判向" },
+    summarize: { label: "总结", description: "压缩成一句话或要点列表" },
+    explain: { label: "白话解释", description: "术语/法条/难句,用大白话讲明白" },
+  };
+  // quality-stats 桶里 scenario 固定为 "transform"（见 web.py handle_rate_transform）
+  const TRANSFORM_SCENARIO_LABEL = { transform: "文本处理" };
 
   let lastResult = null;
   let compareMode = false;
@@ -300,10 +328,20 @@
     statusEl.innerHTML = html;
   }
 
+  // Cycle 23: submit button label follows the active mode（方言="立即重写"，模式=模式名）
+  function currentSubmitLabel() {
+    if (activeMode === DIALECT_MODE) return "立即重写";
+    return TRANSFORM_MODES[activeMode]?.label || "立即处理";
+  }
+
   function setBusy(isBusy) {
     submitButton.disabled = isBusy;
     cmdbarRewrite.disabled = isBusy;
-    if (submitLabel) submitLabel.textContent = isBusy ? "正在重写" : "立即重写";
+    if (submitLabel) {
+      submitLabel.textContent = isBusy
+        ? (activeMode === DIALECT_MODE ? "正在重写" : "正在处理")
+        : currentSubmitLabel();
+    }
     submitButton.classList.toggle("loading", isBusy);
   }
 
@@ -1244,6 +1282,8 @@
     closeExplain();
     resultStats.hidden = true;
     if (degradedTag) degradedTag.hidden = true;
+    updateModelTag("");
+    resetRateUI();
     lastResult = null;
     if (compareMode) toggleCompare();
     updateCharCount();
@@ -1273,7 +1313,9 @@
   function downloadResult() {
     const text = resultEl.textContent;
     if (!text) return;
-    const v = targetSelect.value || "rewritten";
+    // Transform results: stamp the mode, not the hidden (irrelevant) dialect pick.
+    const v =
+      lastResult && lastResult._transform ? lastResult.mode : targetSelect.value || "rewritten";
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1374,13 +1416,15 @@
 
   let rewriteAbortController = null; // module-level in-flight guard
 
-  // Cycle 11: Stream consumer for /api/rewrite-stream. Returns a final-result object
-  // {rewritten_text, target_variety, ...} on success, OR null on any error (caller
-  // should fall back to /api/rewrite).
-  async function tryStreamRewrite(body, varietyKey, signal) {
+  // Cycle 11 (generalized Cycle 23): shared SSE pump for /api/rewrite-stream and
+  // /api/transform-stream — both speak the same chunk/done/error framing. POSTs
+  // the body, calls onPartial(partial) for progressive render, and returns
+  // {finalResult, lastPartial} on a clean done event, OR null on any error
+  // (caller decides the non-streaming fallback).
+  async function pumpSseStream(url, body, signal, onPartial) {
     let res;
     try {
-      res = await fetch("/api/rewrite-stream", {
+      res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
         body: JSON.stringify(body),
@@ -1424,7 +1468,7 @@
             if (partial && partial !== lastPartial) {
               lastPartial = partial;
               // Progressive render
-              renderResult(partial, varietyKey);
+              onPartial(partial);
             }
           } else if (evt.event === "done") {
             finalResult = evt.data;
@@ -1442,6 +1486,17 @@
     resultEl.classList.remove("is-streaming");
     if (streamError) return null;  // server-side error mid-stream — caller falls back
     if (!finalResult) return null;
+    return { finalResult, lastPartial };
+  }
+
+  // Cycle 11: Stream consumer for /api/rewrite-stream. Returns a final-result object
+  // {rewritten_text, target_variety, ...} on success, OR null on any error (caller
+  // should fall back to /api/rewrite).
+  async function tryStreamRewrite(body, varietyKey, signal) {
+    const pumped = await pumpSseStream("/api/rewrite-stream", body, signal,
+      (partial) => renderResult(partial, varietyKey));
+    if (!pumped) return null;
+    const { finalResult, lastPartial } = pumped;
     // Normalize to the same shape as /api/rewrite returns. The stream's done event
     // carries rewritten_text / target_variety / effective_scenario, and (review
     // fix P3) degraded + warning — previously hardcoded degraded:false here,
@@ -1451,6 +1506,23 @@
       target_variety: finalResult.target_variety || varietyKey,
       effective_scenario: finalResult.effective_scenario,
       script: VARIETIES[varietyKey]?.script,
+      degraded: !!finalResult.degraded,
+      warning: finalResult.warning || "",
+      _from_stream: true,
+    };
+  }
+
+  // Cycle 23: stream consumer for /api/transform-stream（同一 chunk/done/error 框架）。
+  // done event 额外带 model —— explain 路由到更强模型，要让用户看得见。
+  async function tryStreamTransform(body, signal) {
+    const pumped = await pumpSseStream("/api/transform-stream", body, signal,
+      (partial) => renderResult(partial, null));
+    if (!pumped) return null;
+    const { finalResult, lastPartial } = pumped;
+    return {
+      transformed_text: finalResult.transformed_text || lastPartial,
+      mode: finalResult.mode || body.mode,
+      model: finalResult.model || "",
       degraded: !!finalResult.degraded,
       warning: finalResult.warning || "",
       _from_stream: true,
@@ -1500,6 +1572,8 @@
     favoriteBtn.disabled = true;
     resultStats.hidden = true;
     if (degradedTag) degradedTag.hidden = true;
+    updateModelTag("");   // Cycle 23: model chip belongs to transform results only
+    resetRateUI();
     setBusy(true);
 
     const startedAt = performance.now();
@@ -1590,6 +1664,7 @@
       favoriteBtn.disabled = false;
       if (explainButton) explainButton.disabled = false;
       if (compareOtherButton) compareOtherButton.disabled = false;
+      if (rateButton) rateButton.disabled = false;   // Cycle 23: 单条评分
       // TTS gating respects per-variety tts_lang.
       const ttsAvailable = !!v.tts_lang && ("speechSynthesis" in window);
       speakButton.disabled = !ttsAvailable;
@@ -1627,6 +1702,257 @@
         setBusy(false);
         rewriteAbortController = null;
       }
+    }
+  }
+
+  // ---------------- transform modes (Cycle 23) ----------------
+  // 工作台的「润色/中英互译/总结/白话解释」流程。与方言改写共用结果区、
+  // SSE pump、abort 守卫和 stale-binding 守卫；不写历史（记录缺 target_variety，
+  // 「放回重写台」会坏掉），收藏/解释/对比按钮在 transform 模式下隐藏。
+  function updateModelTag(model) {
+    if (!modelTag) return;
+    if (!model) { modelTag.hidden = true; return; }
+    modelTag.hidden = false;
+    if (modelName) modelName.textContent = model;
+  }
+
+  function renderModeChips() {
+    if (!modeChipsContainer) return;
+    const entries = [[DIALECT_MODE, { label: "方言改写", description: "把原文揉成选定方言的乡音（原有流程）" }]]
+      .concat(TRANSFORM_MODE_ORDER.map((k) => [k, TRANSFORM_MODES[k]]).filter(([, m]) => m));
+    modeChipsContainer.innerHTML = entries.map(([key, m]) => {
+      const active = key === activeMode;
+      return `<button type="button"
+                      class="mode-chip${active ? " is-active" : ""}"
+                      role="radio"
+                      aria-checked="${active ? "true" : "false"}"
+                      data-mode="${escapeHtml(key)}"
+                      title="${escapeHtml(m.description || "")}">${escapeHtml(m.label)}</button>`;
+    }).join("");
+    $$(".mode-chip", modeChipsContainer).forEach((btn) => {
+      btn.addEventListener("click", () => setMode(btn.dataset.mode));
+    });
+  }
+
+  function setMode(mode) {
+    if (mode !== DIALECT_MODE && !TRANSFORM_MODES[mode]) return;
+    if (mode === activeMode) return;
+    activeMode = mode;
+    $$(".mode-chip", modeChipsContainer).forEach((b) => {
+      const a = b.dataset.mode === mode;
+      b.classList.toggle("is-active", a);
+      b.setAttribute("aria-checked", a ? "true" : "false");
+    });
+    // CSS hook: hides 方言/场景控件 and the dialect-only result buttons.
+    document.body.classList.toggle("transform-mode", mode !== DIALECT_MODE);
+    if (submitLabel && !submitButton.classList.contains("loading")) {
+      submitLabel.textContent = currentSubmitLabel();
+    }
+    // The cmdbar primary button dispatches through runWorkbench too — keep its
+    // label honest in transform modes (was stuck on 立即重写).
+    const cmdbarLabel = $("#cmdbar-rewrite-label");
+    if (cmdbarLabel) cmdbarLabel.textContent = currentSubmitLabel();
+    if (mode === DIALECT_MODE) {
+      const meta = VARIETIES[targetSelect.value];
+      setStatus(meta && meta.trial ? STATUS_TEXT.trialNotice(meta.label) : STATUS_TEXT.idle);
+    } else {
+      setStatus(STATUS_TEXT.transformIdle(TRANSFORM_MODES[mode].label));
+    }
+  }
+
+  // Boot-time silent refresh: server is the source of truth for labels/order.
+  // 失败就保持硬编码兜底，不打扰用户。
+  async function refreshTransformModes() {
+    try {
+      const res = await fetch("/api/transform-modes");
+      if (!res.ok) return;
+      const data = await res.json();
+      const modes = (Array.isArray(data.modes) ? data.modes : []).filter((m) => m && m.key);
+      if (!modes.length) return;
+      TRANSFORM_MODE_ORDER = modes.map((m) => m.key);
+      modes.forEach((m) => {
+        TRANSFORM_MODES[m.key] = { label: m.label || m.key, description: m.description || "" };
+      });
+      renderModeChips();
+    } catch (_) { /* silent — hardcoded fallback stays */ }
+  }
+
+  // Cycle 23: transform 流程。结构刻意对齐 rewriteText —— 同一个 abort 控制器、
+  // 同样的 streaming→非 streaming 兜底、同样的 degraded/warning 展示。
+  async function transformText(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    if (!textInput.value.trim()) { setStatus(STATUS_TEXT.empty, "error"); textInput.focus(); return; }
+
+    if (rewriteAbortController) rewriteAbortController.abort();
+    rewriteAbortController = new AbortController();
+    const myController = rewriteAbortController;
+
+    // Snapshot mode at start — mid-flight chip clicks must not rebind the response.
+    const frozenMode = activeMode;
+    const modeMeta = TRANSFORM_MODES[frozenMode] || {};
+    const modeLabel = modeMeta.label || frozenMode;
+
+    setStatus(STATUS_TEXT.transformLoading);
+    warningEl.textContent = "";
+    resultEl.textContent = "";
+    copyButton.disabled = true;
+    speakButton.disabled = true;
+    downloadButton.disabled = true;
+    favoriteBtn.disabled = true;
+    resultStats.hidden = true;
+    if (degradedTag) degradedTag.hidden = true;
+    updateModelTag("");
+    resetRateUI();
+    setBusy(true);
+
+    const startedAt = performance.now();
+    const originalText = textInput.value;
+
+    try {
+      let data;
+      const streamResult = await tryStreamTransform(
+        { text: originalText, mode: frozenMode },
+        myController.signal,
+      );
+      if (streamResult) {
+        data = streamResult;
+      } else {
+        // Fallback to the non-streaming endpoint（没有启发式降级：失败就是 4xx/503）
+        const res = await fetch("/api/transform", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: originalText, mode: frozenMode }),
+          signal: myController.signal,
+        });
+        if (res.status === 429) {
+          setStatus(STATUS_TEXT.rateLimited, "error");
+          return;
+        }
+        try { data = await res.json(); } catch (_) { data = {}; }
+        if (!res.ok) throw new Error(data.error || `处理失败 (HTTP ${res.status})`);
+      }
+
+      // Stale-binding guard（同 rewriteText）：期间用户又点了一次，放弃 UI 更新。
+      if (rewriteAbortController !== myController) return;
+
+      const elapsed = Math.round(performance.now() - startedAt);
+      const recordId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      lastResult = {
+        ...data,
+        id: recordId,
+        original: originalText,
+        label: modeLabel,
+        elapsed,
+        _transform: true,
+      };
+
+      renderResult(data.transformed_text, null);
+
+      // degraded/warning chip 逻辑与方言结果一致（transform 今天恒为 false，契约保留）。
+      const isDegraded = !!data.degraded;
+      if (isDegraded) {
+        setStatus(STATUS_TEXT.degraded(modeLabel), "error");
+        if (degradedTag) degradedTag.hidden = false;
+      } else {
+        setStatus(STATUS_TEXT.transformSuccess(modeLabel), "success");
+      }
+      warningEl.textContent = data.warning || "";
+
+      // 模型路由可见性：explain 走更强模型，结果区挂上 model chip。
+      updateModelTag(frozenMode === "explain" ? (data.model || "") : "");
+
+      resultStats.hidden = false;
+      resultCharCount.textContent = countChars(data.transformed_text);
+      resultScript.textContent = "—";
+      resultElapsed.textContent = formatElapsed(elapsed);
+      if (resultKeywords) resultKeywords.textContent = "—";
+
+      copyButton.disabled = false;
+      downloadButton.disabled = false;
+      if (rateButton) rateButton.disabled = false;
+      // favorite/explain/compare/speak 仍 disabled —— 它们是方言流程的概念。
+
+      showToast(`${modeLabel}完成`, "fa-check-circle");
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setStatus(STATUS_TEXT.error(err.message), "error");
+      }
+    } finally {
+      if (rewriteAbortController === myController) {
+        setBusy(false);
+        rewriteAbortController = null;
+      }
+    }
+  }
+
+  // 提交分发：方言模式走原 rewriteText，transform 模式走 transformText。
+  function runWorkbench(event) {
+    if (activeMode === DIALECT_MODE) return rewriteText(event);
+    return transformText(event);
+  }
+
+  // ---------------- single-result quality rating (Cycle 23) ----------------
+  // 方言结果 → POST /api/rate（0-5 分，同批量工作台）；
+  // transform 结果 → POST /api/rate-transform（0-100 分，桶记到 mode:<key>::transform）。
+  function resetRateUI() {
+    if (rateButton) rateButton.disabled = true;
+    if (rateScoreEl) { rateScoreEl.hidden = true; rateScoreEl.textContent = ""; rateScoreEl.title = ""; }
+  }
+
+  function showRateScore(score, reason, isTransform) {
+    if (!rateScoreEl) return;
+    const num = isTransform ? String(Math.round(score)) : Number(score).toFixed(1);
+    const denom = isTransform ? "100" : "5";
+    rateScoreEl.textContent = `${num}/${denom}${reason ? ` · ${reason}` : ""}`;
+    rateScoreEl.title = reason || "";
+    rateScoreEl.hidden = false;
+  }
+
+  async function rateCurrentResult() {
+    if (!lastResult || !rateButton) return;
+    // Snapshot: if a newer result lands while the rate call is in flight, the
+    // response belongs to the OLD result — rendering it against the new one
+    // mixes the 0-100 and 0-5 scales (e.g. "95.0/5").
+    const rated = lastResult;
+    rateButton.disabled = true;
+    const labelEl = $("#rate-label");
+    const oldLabel = labelEl ? labelEl.textContent : "";
+    if (labelEl) labelEl.textContent = "评分中…";
+    try {
+      let res;
+      if (rated._transform) {
+        res = await fetch("/api/rate-transform", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transformed: rated.transformed_text,
+            mode: rated.mode,
+            original: rated.original || "",
+          }),
+        });
+      } else {
+        res = await fetch("/api/rate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rewritten: rated.rewritten_text,
+            target_variety: rated.target_variety,
+            scenario: rated.effective_scenario || SETTINGS.scenario || DEFAULT_SCENARIO,
+            original: rated.original || "",
+          }),
+        });
+      }
+      if (res.status === 429) { showToast("评分限流，请稍后再试", "fa-gauge-high"); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (lastResult !== rated) return; // stale — a newer result owns the footer now
+      showRateScore(data.score, data.reason, !!rated._transform);
+    } catch (err) {
+      showToast(`评分失败：${err.message}`, "fa-triangle-exclamation");
+    } finally {
+      if (labelEl) labelEl.textContent = oldLabel || "质量评分";
+      if (lastResult) rateButton.disabled = false;
     }
   }
 
@@ -2615,8 +2941,11 @@
         panel.innerHTML = '<p class="settings-hint">还没有评分数据。在批量工作台开启「质量评分」并跑一次，数据会出现在这里。</p>';
         return;
       }
-      // Sort by mean ascending — worst first (most likely to need attention)
-      buckets.sort((a, b) => (a.stats?.mean ?? 5) - (b.stats?.mean ?? 5));
+      // Sort by mean ascending — worst first (most likely to need attention).
+      // Normalize: dialect buckets score 0-5, mode buckets 0-100 — raw means
+      // would sort a terrible transform bucket below a perfect dialect one.
+      const normMean = (b) => (b.stats?.mean ?? 5) / (isModeBucket(b) ? 100 : 5);
+      buckets.sort((a, b) => normMean(a) - normMean(b));
       panel.innerHTML = buckets.map(renderQualityBucket).join("");
       // Cycle 20: bar width is dynamic per bucket; setting via DOM API after
       // insertion keeps the HTML CSP-clean (no inline style=).
@@ -2641,11 +2970,29 @@
     }
   }
 
+  // Cycle 23: transform 评分桶的 variety 形如 "mode:polish"、scenario 固定 "transform"。
+  // 映射成可读标签；未知 key 一律原样回显（不 crash，向前兼容未来桶类型）。
+  function isModeBucket(b) {
+    return typeof b.variety === "string" && b.variety.startsWith("mode:");
+  }
+  function bucketVarietyLabel(b) {
+    if (isModeBucket(b)) {
+      const key = b.variety.slice(5);
+      return `${TRANSFORM_MODES[key]?.label || key}(模式)`;
+    }
+    return (VARIETIES[b.variety] || {}).label || b.variety;
+  }
+  function bucketScenarioLabel(b) {
+    return (SCENARIOS[b.scenario] || {}).label
+      || TRANSFORM_SCENARIO_LABEL[b.scenario]
+      || b.scenario;
+  }
+
   function renderQualityBucket(b) {
-    const v = VARIETIES[b.variety] || {};
-    const s = SCENARIOS[b.scenario] || {};
     const stats = b.stats || {};
-    const meanPct = Math.max(0, Math.min(100, (stats.mean / 5) * 100));
+    // 方言桶 0-5 分，transform 桶 0-100 分（/api/rate-transform 契约）。
+    const denom = isModeBucket(b) ? 100 : 5;
+    const meanPct = Math.max(0, Math.min(100, (stats.mean / denom) * 100));
     const classes = ["quality-bucket"];
     if (b.has_override) classes.push("has-override");
     if (b.has_draft) classes.push("has-draft");
@@ -2680,25 +3027,9 @@
       </div>`;
     }
 
-    return `
-      <div class="${classes.join(" ")}">
-        <div class="quality-bucket-head">
-          <span>${escapeHtml(v.label || b.variety)}</span>
-          <span class="scenario-tag">${escapeHtml(s.label || b.scenario)}</span>
-        </div>
-        <div class="quality-bucket-stats">
-          <span class="stat"><span class="lbl">μ</span><span class="num">${(stats.mean ?? 0).toFixed(2)}</span></span>
-          <span class="stat"><span class="lbl">σ</span><span class="num">${(stats.stddev ?? 0).toFixed(2)}</span></span>
-          <span class="stat"><span class="lbl">n</span><span class="num">${stats.count}</span></span>
-          <span class="stat"><span class="lbl">min/max</span><span class="num">${stats.min ?? "—"}/${stats.max ?? "—"}</span></span>
-        </div>
-        <div class="quality-bucket-distribution" title="平均分 ${(stats.mean ?? 0).toFixed(2)}/5">
-          <div class="fill" data-width="${meanPct}"></div>
-          <div class="marker" title="阈值 3.5"></div>
-        </div>
-        ${abBlock}
-        ${draftBlock}
-        ${b.has_override ? `<div class="quality-bucket-override"><strong>已激活自定义指引</strong>（基线 μ=${(b.override_baseline_mean ?? 0).toFixed(2)}）：${escapeHtml(b.override_reason || "")}</div>` : ""}
+    // Cycle 23: transform 桶没有 Reflexion（v1 只测量）—— 自反馈/还原按钮不渲染，
+    // 点了也只会被服务端 400（parse_variety 不认识 "mode:*"）。
+    const actionsBlock = isModeBucket(b) ? "" : `
         <div class="quality-bucket-actions">
           <button class="ghost-btn" data-act="refine" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}"
                   ${b.needs_reflection || b.has_draft ? "" : 'title="需要 ≥8 样本且 μ<3.5；或直接强制触发"'}>
@@ -2707,7 +3038,28 @@
           ${b.has_override ? `<button class="ghost-btn danger" data-act="clear-override" data-variety="${escapeHtml(b.variety)}" data-scenario="${escapeHtml(b.scenario)}">
             <i class="fas fa-rotate-left" aria-hidden="true"></i> 还原默认
           </button>` : ""}
+        </div>`;
+
+    return `
+      <div class="${classes.join(" ")}">
+        <div class="quality-bucket-head">
+          <span>${escapeHtml(bucketVarietyLabel(b))}</span>
+          <span class="scenario-tag">${escapeHtml(bucketScenarioLabel(b))}</span>
         </div>
+        <div class="quality-bucket-stats">
+          <span class="stat"><span class="lbl">μ</span><span class="num">${(stats.mean ?? 0).toFixed(2)}</span></span>
+          <span class="stat"><span class="lbl">σ</span><span class="num">${(stats.stddev ?? 0).toFixed(2)}</span></span>
+          <span class="stat"><span class="lbl">n</span><span class="num">${stats.count}</span></span>
+          <span class="stat"><span class="lbl">min/max</span><span class="num">${stats.min ?? "—"}/${stats.max ?? "—"}</span></span>
+        </div>
+        <div class="quality-bucket-distribution" title="平均分 ${(stats.mean ?? 0).toFixed(2)}/${denom}">
+          <div class="fill" data-width="${meanPct}"></div>
+          ${isModeBucket(b) ? "" : '<div class="marker" title="阈值 3.5"></div>'}
+        </div>
+        ${abBlock}
+        ${draftBlock}
+        ${b.has_override ? `<div class="quality-bucket-override"><strong>已激活自定义指引</strong>（基线 μ=${(b.override_baseline_mean ?? 0).toFixed(2)}）：${escapeHtml(b.override_reason || "")}</div>` : ""}
+        ${actionsBlock}
       </div>`;
   }
 
@@ -3309,7 +3661,7 @@
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        rewriteText();
+        runWorkbench();
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
@@ -3348,11 +3700,13 @@
     textInput.addEventListener("input", updateCharCount);
     clearButton.addEventListener("click", clearAll);
     speakButton.addEventListener("click", speakResult);
-    form.addEventListener("submit", rewriteText);
-    cmdbarRewrite.addEventListener("click", rewriteText);
+    // Cycle 23: submit 走模式分发（方言 → rewriteText，transform → transformText）
+    form.addEventListener("submit", runWorkbench);
+    cmdbarRewrite.addEventListener("click", runWorkbench);
     copyButton.addEventListener("click", copyResult);
     downloadButton.addEventListener("click", downloadResult);
     compareToggle.addEventListener("click", toggleCompare);
+    if (rateButton) rateButton.addEventListener("click", rateCurrentResult);
 
     favoriteBtn.addEventListener("click", () => {
       if (!lastResult) return;
@@ -3405,6 +3759,8 @@
   bindRouter();
   bindSidebar();
   bindShortcuts();
+  renderModeChips();        // Cycle 23: 硬编码兜底先渲染……
+  refreshTransformModes();  // ……再从 /api/transform-modes 静默刷新（失败保持兜底）
   bindExampleChips();
   bindSettings();
   bindHistoryTools();

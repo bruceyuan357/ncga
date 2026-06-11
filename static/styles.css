@@ -4281,3 +4281,109 @@ body[data-v3="on"] .version-switch .version-btn.is-active {
   color: #FFFFFF;
   box-shadow: 0 2px 6px rgba(232, 155, 176, 0.35);
 }
+
+/* ============================================================
+   Transform modes (Cycle 23 — 润色/中英互译/总结/白话解释)
+============================================================ */
+/* 模式选择行：结构与 .scenario-row 对齐，chips 沿用 scenario-chip 的胶囊语言 */
+.mode-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+}
+.mode-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  padding-top: 0.25rem;
+}
+.mode-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 1;
+}
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.32rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+}
+.mode-chip:hover {
+  color: var(--ink);
+  border-color: var(--gold-soft);
+  background: rgba(184, 152, 101, 0.08);
+}
+.mode-chip.is-active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+body[data-version="v1"] .mode-chip.is-active { color: #fff; }
+@media (max-width: 720px) {
+  .mode-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .mode-label { padding-top: 0; }
+}
+
+/* transform 模式下隐藏方言流程专属控件（场景/方言选择/方言卡 + 方言结果按钮） */
+body.transform-mode .scenario-row,
+body.transform-mode .form-row .select-wrap,
+body.transform-mode #variety-card,
+body.transform-mode #favorite-button,
+body.transform-mode #explain-button,
+body.transform-mode #compare-other-button,
+body.transform-mode #speak-button {
+  display: none;
+}
+
+/* 结果头部的模型 chip（explain 走更强模型时显示）—— 同 degraded-tag 的胶囊，配色更素 */
+.model-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  margin-left: 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-muted);
+  border: 1px solid var(--line);
+}
+body[data-version="v1"] .model-tag { background: rgba(0, 0, 0, 0.04); }
+
+/* 单条评分结果（result-foot 内的小 chip） */
+.rate-score {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  background: rgba(184, 152, 101, 0.1);
+  border: 1px solid var(--gold-soft);
+  max-width: 100%;
+}
