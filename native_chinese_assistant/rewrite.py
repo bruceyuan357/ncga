@@ -15,7 +15,7 @@ import os
 import re
 import ssl
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 from urllib import error, request
@@ -50,6 +50,9 @@ class LLMConfig:
     ca_bundle: str | None
     skip_ssl_verify: bool
     timeout_seconds: float
+    # Cycle 23: per-transform-mode model routing (mode-key -> model name),
+    # built from LLM_MODEL_<MODE> env vars in load_llm_config.
+    model_overrides: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -363,6 +366,17 @@ def load_llm_config() -> LLMConfig | None:
             "This is dangerous; only use locally behind a corporate proxy."
         )
 
+    # Cycle 23: any LLM_MODEL_<MODE>=name env becomes a transform-mode override
+    # keyed by lowercased <MODE>. EXPLAIN defaults to the pro tier on deepseek —
+    # explanation draws on world knowledge, where flash-tier models confidently
+    # err (user decision; the other three modes stay on the global model).
+    model_overrides: dict[str, str] = {}
+    for env_key, env_value in os.environ.items():
+        if env_key.startswith("LLM_MODEL_") and env_value.strip():
+            model_overrides[env_key[len("LLM_MODEL_") :].lower()] = env_value.strip()
+    if "explain" not in model_overrides and provider == "deepseek":
+        model_overrides["explain"] = "deepseek-v4-pro"
+
     return LLMConfig(
         provider=provider,
         api_key=api_key,
@@ -372,6 +386,7 @@ def load_llm_config() -> LLMConfig | None:
         ca_bundle=default_ca_bundle(),
         skip_ssl_verify=skip_ssl_verify,
         timeout_seconds=timeout_seconds,
+        model_overrides=model_overrides,
     )
 
 
@@ -805,8 +820,12 @@ class ChatCompletionsClient:
         response_format_json: bool = True,
         retries_on_5xx: int = 1,
         retry_on_empty: bool = True,
+        model: str | None = None,
     ) -> str:
         """Generic chat-completions wrapper with HTTPError-aware retry on 5xx.
+
+        Cycle 23: optional `model` overrides config.model for this one call —
+        transform-mode routing (explain → pro tier) rides on this.
 
         Cycle 14: this replaces direct `_transport.post` access from rate_quality and
         meta_refine. Centralizes:
@@ -831,7 +850,7 @@ class ChatCompletionsClient:
 
         def _post(tokens: int) -> str:
             payload: dict[str, Any] = {
-                "model": self.config.model,
+                "model": model or self.config.model,
                 "messages": messages,
                 "stream": False,
                 "temperature": temperature,
@@ -903,6 +922,45 @@ class ChatCompletionsClient:
                 # Transport already wrapped in RewriteError — propagate without retry
                 raise
         raise RewriteError(f"general_chat exhausted retries: {last_exc}")
+
+    def chat_stream(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        model: str | None = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.5,
+    ):
+        """Stream raw content deltas for an arbitrary chat call (no JSON envelope).
+
+        Cycle 23: transform modes stream plain prose, so unlike rewrite_stream
+        there is no partial-JSON extraction — callers accumulate deltas as-is.
+        No retry: streaming calls fail loudly and the caller maps to an SSE
+        error event (same policy as rewrite_stream).
+        """
+        payload = {
+            "model": model or self.config.model,
+            "messages": messages,
+            "stream": True,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "top_p": 0.9,
+        }
+        body = json.dumps(payload).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        url = f"{self.config.base_url}/chat/completions"
+        with self._transport.post(
+            url, body, headers, timeout=self.config.timeout_seconds, ssl_context=self.ssl_context
+        ) as response:
+            for delta, done in iter_streamed_deltas(response):
+                if done:
+                    return
+                if delta:
+                    yield delta
 
     def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
         """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
@@ -1103,6 +1161,12 @@ class RewriteService:
             self._client = ChatCompletionsClient(self._config) if self._config else None
         self._fallback = HeuristicRewriter()
         self.quality_store = quality_store  # if None, no self-improvement; otherwise lookup overrides
+
+    @property
+    def client(self) -> ChatCompletionsClient | None:
+        """Underlying LLM client, shared with sibling services (transform) so the
+        whole app keeps one transport / SSL context / config."""
+        return self._client
 
     def rewrite(
         self,

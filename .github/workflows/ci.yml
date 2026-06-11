@@ -23,4 +23,5 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m unittest discover tests
-      - run: python -m pytest -q tests/test_app.py
+      # browser/ needs Playwright + a live server — excluded here, run locally.
+      - run: python -m pytest -q tests --ignore=tests/browser

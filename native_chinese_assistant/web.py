@@ -23,6 +23,7 @@ from native_chinese_assistant.rewrite import (
     load_dotenv,
     parse_variety,
 )
+from native_chinese_assistant.transform import MODE_METADATA, TransformService, parse_mode
 
 logger = logging.getLogger("ncga.web")
 
@@ -544,6 +545,10 @@ class App:
         elif rewrite_service.quality_store is None:
             rewrite_service.quality_store = quality_store
         self.rewrite_service = rewrite_service
+        # Cycle 23: transform modes share the rewrite client — one transport, one
+        # SSL context, one config (incl. model_overrides). Client may be None
+        # (no API key); transform handlers map that to 503 instead of degrading.
+        self.transform_service = TransformService(client=rewrite_service.client)
         rl = (
             rate_limit_per_min
             if rate_limit_per_min is not None
@@ -631,6 +636,19 @@ class App:
             ("GET", "/api/healthz"): lambda env, sr: json_response(sr, "200 OK", {"status": "ok"}),
             ("GET", "/api/quality-stats"): self.handle_quality_stats,
             ("GET", "/api/phrase-of-the-day"): self.handle_phrase_of_the_day,
+            ("GET", "/api/transform-modes"): lambda env, sr: json_response(
+                sr,
+                "200 OK",
+                {
+                    "modes": [
+                        {"key": mode.value, "label": meta.label, "description": meta.description}
+                        for mode, meta in MODE_METADATA.items()
+                    ]
+                },
+            ),
+            ("POST", "/api/transform"): self.handle_transform,
+            ("POST", "/api/transform-stream"): self.handle_transform_stream,
+            ("POST", "/api/rate-transform"): self.handle_rate_transform,
             ("POST", "/api/rewrite"): self.handle_rewrite,
             ("POST", "/api/rewrite-stream"): self.handle_rewrite_stream,
             ("POST", "/api/rewrite-batch"): self.handle_rewrite_batch,
@@ -989,6 +1007,137 @@ class App:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
         # Surface whether reflection is now warranted, so the UI can prompt user
         data = {**data, "needs_reflection": self.quality_store.needs_reflection(target.value, scenario.value)}
+        return json_response(start_response, "200 OK", data)
+
+    def handle_transform(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Cycle 23: non-streaming transform (polish/translate/summarize/explain).
+
+        Mirrors handle_rewrite's guard order. Unlike rewrite there is no
+        heuristic fallback — an unreachable LLM is a 503, not a degraded 200.
+        """
+        ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "transform")
+        if cap_err is not None:
+            return cap_err
+        if not self.rate_limiter.allow(ip):
+            logger.info("rate_limited ip=%s endpoint=transform", ip)
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
+        try:
+            text = payload["text"]
+            mode = parse_mode(payload["mode"])
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        if not isinstance(text, str):
+            return json_response(start_response, "400 Bad Request", {"error": "`text` must be a string."})
+        if len(text) > MAX_INPUT_CHARS * 4:  # before normalize, hard cap on raw payload size
+            return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
+        try:
+            result = self.transform_service.transform(text, mode)
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        except RewriteError as exc:
+            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
+        return json_response(start_response, "200 OK", result.as_dict())
+
+    def handle_transform_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
+        """SSE endpoint for transforms. Same event shape as /api/rewrite-stream."""
+        ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "transform-stream")
+        if cap_err is not None:
+            return cap_err
+        if not self.rate_limiter.allow(ip):
+            logger.info("rate_limited ip=%s endpoint=transform-stream", ip)
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
+        try:
+            text = payload["text"]
+            mode = parse_mode(payload["mode"])
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        if not isinstance(text, str):
+            return json_response(start_response, "400 Bad Request", {"error": "`text` must be a string."})
+        start_response(
+            "200 OK",
+            _security_headers(
+                [
+                    ("Content-Type", "text/event-stream; charset=utf-8"),
+                    ("Cache-Control", "no-cache, no-transform"),
+                    ("X-Accel-Buffering", "no"),  # tell nginx not to buffer if proxied
+                ]
+            ),
+        )
+        return _sse_iter_transform_stream(self.transform_service, text, mode)
+
+    def handle_rate_transform(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """LLM-judge a transform result; records into the quality store under
+        bucket (mode:<key>, "transform") so the stats page gets the same Welford
+        treatment as dialect buckets. No Reflexion for modes (v1: measure only)."""
+        ip = client_ip(environ)
+        cap_err = self._check_daily_cap(ip, start_response, "rate-transform")
+        if cap_err is not None:
+            return cap_err
+        if not self.rate_limiter.allow(ip):
+            logger.info("rate_limited ip=%s endpoint=rate-transform", ip)
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        payload, err = self._read_json_body(environ, start_response)
+        if err is not None:
+            return err
+        try:
+            transformed = payload["transformed"]
+            mode = parse_mode(payload["mode"])
+            original = str(payload.get("original", "") or "")
+        except KeyError as exc:
+            field = exc.args[0] if exc.args else "<unknown>"
+            return json_response(
+                start_response, "400 Bad Request", {"error": f"Missing required field: {field!r}."}
+            )
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        if not isinstance(transformed, str) or not transformed.strip():
+            return json_response(
+                start_response, "400 Bad Request", {"error": "`transformed` must be a non-empty string."}
+            )
+        try:
+            data = self.transform_service.rate(transformed, mode, original=original)
+        except ValueError as exc:
+            return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        except RewriteError as exc:
+            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
+        self.quality_store.record(
+            f"mode:{mode.value}",
+            "transform",
+            float(data["score"]),
+            original,
+            transformed,
+            data.get("reason", ""),
+        )
         return json_response(start_response, "200 OK", data)
 
     def handle_rewrite_batch(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -1456,6 +1605,36 @@ def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=Non
                 last_partial = partial
     except Exception as exc:  # noqa: BLE001
         logger.warning("rewrite-stream error: %s", exc)
+        yield _sse_event("error", {"error": str(exc)})
+
+
+def _sse_iter_transform_stream(service, text, mode):
+    """Generator yielding SSE bytes for a single streamed transform (Cycle 23).
+
+    `model` rides on the done event so clients can see the routing decision
+    (explain → pro tier) actually took effect — the whole point of the feature.
+    """
+    try:
+        last_partial = ""
+        for delta, partial, done, meta in service.transform_stream(text, mode):
+            if done:
+                meta = meta or {}
+                yield _sse_event(
+                    "done",
+                    {
+                        "transformed_text": partial,
+                        "mode": mode.value,
+                        "model": meta.get("model") or "",
+                        "degraded": bool(meta.get("degraded", False)),
+                        "warning": meta.get("warning") or "",
+                    },
+                )
+                return
+            if partial != last_partial:
+                yield _sse_event("chunk", {"partial": partial, "delta": delta})
+                last_partial = partial
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("transform-stream error: %s", exc)
         yield _sse_event("error", {"error": str(exc)})
 
 
