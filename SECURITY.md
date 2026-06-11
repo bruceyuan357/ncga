@@ -39,7 +39,7 @@ NCGA is a single-user / small-team Chinese rewriting tool. The threat model is:
 | **X-Forwarded-For** | Default: **NOT trusted** (prevents per-IP rate-limit spoofing). Set `NCGA_TRUST_FORWARDED_FOR=true` only when behind a trusted proxy. |
 | **CSP** | `script-src 'self' 'nonce-...'` — no `unsafe-inline`. Per-response nonce attached to inline boot script. |
 | **HSTS** | `Strict-Transport-Security: max-age=31536000; includeSubDomains` always sent. Take effect when proxy serves over HTTPS. |
-| **Rate limit** | 30 `POST /api/rewrite` per IP per minute (default), 6 batches per IP per minute. Override via `NCGA_RATE_LIMIT_PER_MIN` / `NCGA_BATCH_RATE_LIMIT_PER_MIN`. |
+| **Rate limit** | 30 requests per IP per minute (default) on the main bucket shared by `POST /api/rewrite` and the Cycle 23 transform endpoints (`POST /api/transform`, `POST /api/transform-stream`, `POST /api/rate-transform` — all behind the same dual-track auth above); 6 batches per IP per minute. These LLM-spending endpoints also count against the per-IP daily cap (`NCGA_DAILY_LLM_CAP_PER_IP`, default 300). Override via `NCGA_RATE_LIMIT_PER_MIN` / `NCGA_BATCH_RATE_LIMIT_PER_MIN`. |
 | **Body cap** | 64 KB per request. Override via `NCGA_MAX_BODY_BYTES`. |
 | **Path traversal** | `Special:FilePath`-style escapes (`..`, `..%2F`, `%2e%2e/`) all return 404. Static handler resolves and validates `relative_to(STATIC_DIR)`. |
 | **Secrets in repo** | `.env` is `.gitignore`d. Quality store is by default in `~/.local/share/ncga/quality.json`, **not** in the repo. |

@@ -20,10 +20,16 @@
 > - **页面 max-width 1100px** + workbench 双栏 + 输出卡 3px 季节色竖条
 > - **settings 加「随四时」切换器** — 古朴 / 墨韵 / 随四时 三选
 > - 切回 v2/v1:右下角 sidebar 底部 version-switch 点其他选项
+>
+> **Cycle 23 · 四种文本变换**(详见 [文本变换 API](#cycle-23--文本变换-api)):
+> - **润色** (`polish`) — 改通顺、改得体,保持原意
+> - **中英互译** (`translate`) — 中文→英文,英文→中文,自动判向
+> - **总结** (`summarize`) — 压缩成一句话或要点列表
+> - **白话解释** (`explain`) — 术语/法条/难句,用大白话讲明白;deepseek 下默认走更强的 `deepseek-v4-pro` 模型(其他 provider 跟随全局 `LLM_MODEL`)
 
 - 后端：Python 3.10+。运行时依赖仅 `certifi` + `cryptography`（见 `requirements.txt`）。WSGI。
 - 前端：原生 JS / CSS / HTML，无构建步骤。
-- LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时回退到本地启发式重写并明示降级。
+- LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时**方言改写**回退到本地启发式重写并明示降级；**文本变换**（Cycle 23）无启发式回退，直接返回 503。
 
 ## 运行
 
@@ -42,15 +48,16 @@ python app.py                          # http://127.0.0.1:8000
 | `LLM_PROVIDER` | `deepseek` | `deepseek` 或 `openai` |
 | `LLM_API_KEY` 或 `DEEPSEEK_API_KEY` | — | LLM API key（缺省走启发式 fallback） |
 | `LLM_MODEL` | `deepseek-chat` / `gpt-4.1-mini` | 模型名 |
+| `LLM_MODEL_<MODE>` | 仅 `explain` 在 deepseek 下默认 `deepseek-v4-pro` | Cycle 23: 按变换模式覆盖模型，见 [模型路由](#模型路由) |
 | `LLM_BASE_URL` | provider 默认 | OpenAI 兼容 base URL |
 | `LLM_STREAM` | `true` | 是否使用 SSE 流式 |
 | `LLM_TIMEOUT_SECONDS` | `60` | 整个请求的超时上限（秒） |
 | `LLM_CA_BUNDLE` | `certifi.where()` | 自定义 CA 文件路径 |
 | `LLM_SKIP_SSL_VERIFY` | `false` | **危险**：跳过 SSL 校验，仅供调试 |
-| `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟可调 `/api/rewrite` 的次数（0 = 关闭） |
+| `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟的主限流桶（`/api/rewrite` 与三个 transform POST 端点等共享；`GET /api/transform-modes` 不限流；0 = 关闭） |
 | `NCGA_MAX_BODY_BYTES` | `65536` | 请求体字节上限（64 KB，容纳 batch 输入） |
 | `NCGA_BATCH_RATE_LIMIT_PER_MIN` | `6` | 每个 IP 每分钟可调 `/api/rewrite/batch` 的次数 |
-| `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限（rewrite/batch/rate/explain/characterize/phrase 共享） |
+| `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限（rewrite/batch/rate/transform/rate-transform/explain/characterize/phrase 共享） |
 | `NCGA_QUALITY_STORE` | `~/.local/share/ncga/quality.json` | 质量存储路径（用户数据目录不可写时回退到源码目录 `.ncga-quality.json`） |
 | `NCGA_FEEDBACK_RATE_LIMIT_PER_MIN` | `5` | Cycle 20: 每个 IP 每分钟可提交 `/api/feedback` 的次数 |
 | `NCGA_FEEDBACK_MAX_BODY_BYTES` | `8192` | Cycle 20: 反馈表单请求体上限 |
@@ -140,7 +147,7 @@ tools/smoke.sh                           # 默认 http://127.0.0.1:8000
 BASE=https://ncga.example.com tools/smoke.sh
 ```
 
-`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 14 项：所有 GET、auth gating、3 个 LLM 走通、Cycle 16 的 4xx 诊断。建议挂 cron 每日跑一次。
+`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 18 项：公开 GET（healthz / presets / scenarios / quality-stats / transform-modes / SPA / 静态 + 两个路径穿越探针；不含会扣 10 个每日额度的 phrase-of-the-day）、rewrite 与 transform 的 auth gating、4 个 LLM 走通、Cycle 16 的 4xx 诊断。建议挂 cron 每日跑一次。
 
 ## 生产部署
 
@@ -201,6 +208,7 @@ app.py
 └── native_chinese_assistant/
     ├── web.py           # WSGI 路由 / 限流 / 安全头 / 双轨认证 / 反馈表单
     ├── rewrite.py       # LLM 客户端 + 启发式 fallback + RewriteService
+    ├── transform.py     # Cycle 23: 四种文本变换模式，复用 rewrite 的 LLM 客户端，无启发式回退
     ├── presets.py       # 所有方言元数据（label / register / style / landmarks / keywords / letter）
     ├── corpus.py        # 句子级方言语料 + 纯 stdlib BM25 检索（few-shot 注入）
     ├── lexicon.py       # 词级「普通话 → 方言」对应表 + BM25 检索（词音 hint 注入）
@@ -277,6 +285,58 @@ curl -X POST http://127.0.0.1:8000/api/logout \
 # → {"ok": true, "revoked": true}
 # Set-Cookie: ncga_sess=; Max-Age=0 让浏览器丢 cookie
 ```
+
+## Cycle 23 · 文本变换 API
+
+与「方言改写」平行的概念:对一段文本执行一个**任务**,而不是换一种方言。四种模式:
+
+| mode | label | 行为 |
+|---|---|---|
+| `polish` | 润色 | 改通顺、改得体,保持原意 |
+| `translate` | 中英互译 | 中文→英文,英文→中文,自动判向 |
+| `summarize` | 总结 | 压缩成一句话或要点列表 |
+| `explain` | 白话解释 | 术语/法条/难句,用大白话讲明白 |
+
+架构([`transform.py`](native_chinese_assistant/transform.py)):变换与改写**共用同一个 LLM 客户端**(`web.py` 里 `TransformService(client=rewrite_service.client)` — 一条传输通道,一套 503 语义),但**没有启发式回退** — 「翻译这段」不存在诚实的离线近似,所以 LLM 未配置或不可达时直接 503,而不是降级 200。
+
+端点(POST 走与 `/api/rewrite` 相同的双轨认证;与 rewrite 共享同一个 30/min 限流桶和每日 LLM 上限):
+
+| 端点 | 请求体 | 成功响应 (200) |
+|---|---|---|
+| `GET /api/transform-modes`(无需认证) | — | `{"modes": [{"key", "label", "description"} × 4]}`,顺序 polish → translate → summarize → explain |
+| `POST /api/transform` | `{"text": str, "mode": "polish" \| "translate" \| "summarize" \| "explain"}` | `{"transformed_text", "mode", "model", "degraded"}` + 可选 `"warning"`(输出超 4000 字被截断时);`degraded` 恒为 `false`,字段保留以与 rewrite 的 UI 契约一致 |
+| `POST /api/transform-stream` | 同 `/api/transform` | SSE,与 `/api/rewrite-stream` 同帧格式:`event: chunk` → `{"partial", "delta"}`;`event: done` → `{"transformed_text", "mode", "model", "degraded", "warning"}`;`event: error` → `{"error"}` |
+| `POST /api/rate-transform` | `{"transformed": str, "mode": ..., "original"?: str}` | `{"score": 0-100 整数, "reason"}`;同时记入质量存储 bucket `("mode:<key>", "transform")` |
+
+错误响应(均为 `{"error": "..."}`):
+- `400` — 缺字段 / `text` 不是字符串(`rate-transform`:`transformed` 不是非空字符串)/ 未知 mode / 文本过长(`text` 原始 >4800 字符或规范化后 >1200 字符;`rate-transform` 不查长度,仅受全局请求体上限约束)
+- `401` — 设了 `NCGA_AUTH_TOKEN` 且 cookie / Bearer 两轨都没过
+- `429` — 每分钟限流或每日 LLM 上限
+- `503` — LLM 未配置或不可达(见上,无回退)
+
+`/api/transform-stream` 在响应头发出之后才发现的错误(如规范化后超长、LLM 中途失败)无法再改状态码,以 `event: error` 给出 — 与 `/api/rewrite-stream` 一致。
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/transform \
+  -H "Authorization: Bearer $NCGA_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"本合同自双方签字盖章之日起生效","mode":"explain"}'
+```
+
+### 模型路由
+
+每个模式可以路由到不同的模型:
+
+- 环境变量约定 `LLM_MODEL_<MODE>`(MODE 大写),如 `LLM_MODEL_POLISH=...`;
+- 没有覆盖的模式跟随全局 `LLM_MODEL`;
+- 唯一的内置默认:`explain` 在 `LLM_PROVIDER=deepseek` 下默认用更强的 `deepseek-v4-pro` — 解释类任务依赖世界知识,flash 档模型容易一本正经地答错(Cycle 23 用户决策)。
+
+```bash
+# .env
+LLM_MODEL_EXPLAIN=deepseek-v4-pro
+```
+
+响应和 SSE `done` 事件都带 `"model"` 字段 — 客户端能看到这次请求实际由哪个模型回答(路由是否生效是可观测的)。
 
 ## 许可
 

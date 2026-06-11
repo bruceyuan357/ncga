@@ -42,6 +42,7 @@ run "GET /api/healthz"      200 "$BASE/api/healthz"
 run "GET /api/presets"      200 "$BASE/api/presets"
 run "GET /api/scenarios"    200 "$BASE/api/scenarios"
 run "GET /api/quality-stats" 200 "$BASE/api/quality-stats"
+run "GET /api/transform-modes" 200 "$BASE/api/transform-modes"
 run "GET / (SPA)"           200 "$BASE/"
 run "GET /static/app.js"    200 "$BASE/static/app.js"
 # --path-as-is stops curl from squashing /static/../app.py to /app.py client-side,
@@ -52,6 +53,8 @@ run "GET /static/%2e%2e%2fapp.py (encoded traversal denied)" 404 --path-as-is "$
 # --- auth gating ---
 run "POST /api/rewrite (no auth → 401)" 401 -X POST -H 'Content-Type: application/json' \
     -d '{"text":"hi","target_variety":"beijing_mandarin"}' "$BASE/api/rewrite"
+run "POST /api/transform (no auth → 401)" 401 -X POST -H 'Content-Type: application/json' \
+    -d '{"text":"hi","mode":"polish"}' "$BASE/api/transform"
 
 # --- POST endpoints (real LLM — costs a few cents per smoke run) ---
 H=(-H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json')
@@ -59,6 +62,8 @@ run "POST /api/rewrite (real LLM)"    200 -X POST "${H[@]}" \
     -d '{"text":"今天我不想去","target_variety":"beijing_mandarin","scenario":"friends_casual"}' "$BASE/api/rewrite"
 run "POST /api/rate (real LLM, fixed Cycle 17)" 200 -X POST "${H[@]}" \
     -d '{"original":"今天我不想去","rewritten":"今儿个我还真不怎么想去嘿","target_variety":"beijing_mandarin","scenario":"friends_casual"}' "$BASE/api/rate"
+run "POST /api/transform polish (real LLM, Cycle 23)" 200 -X POST "${H[@]}" \
+    -d '{"text":"这个句子写得有一点点不太通顺吧","mode":"polish"}' "$BASE/api/transform"
 run "POST /api/explain (real LLM)"    200 -X POST "${H[@]}" \
     -d '{"original":"今天我不想去","rewritten":"今儿个我还真不怎么想去嘿","target_variety":"beijing_mandarin"}' "$BASE/api/explain"
 

@@ -324,6 +324,19 @@ class TransformEndpointTests(unittest.TestCase):
         self.assertEqual(len(bucket.samples), 1)
         self.assertEqual(bucket.stats.n, 1)
 
+    def test_stream_endpoint_rejects_overlong_raw_text_with_400(self):
+        # Review follow-up: the raw cap must reject BEFORE the SSE stream starts,
+        # not surface as an event:error after a 200.
+        app = _make_app(_build_client(_llm_json_raw("x"))[0])
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/transform-stream",
+            json.dumps({"text": "长" * 5000, "mode": "polish"}).encode(),
+        )
+        self.assertEqual(status, "400 Bad Request")
+        self.assertIn("Text too long", json.loads(body)["error"])
+
     def test_rate_transform_missing_field_is_400(self):
         app = _make_app(_build_client(_llm_json_raw("x"))[0])
         status, _, body = call_app(

@@ -947,6 +947,10 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         if not isinstance(text, str):
             return json_response(start_response, "400 Bad Request", {"error": "`text` must be a string."})
+        if (
+            len(text) > MAX_INPUT_CHARS * 4
+        ):  # parity with /api/rewrite — reject pre-stream instead of erroring mid-stream
+            return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
         start_response(
             "200 OK",
@@ -1079,6 +1083,10 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         if not isinstance(text, str):
             return json_response(start_response, "400 Bad Request", {"error": "`text` must be a string."})
+        if (
+            len(text) > MAX_INPUT_CHARS * 4
+        ):  # same raw cap as non-streaming — 400 now, not a mid-stream error event
+            return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
         start_response(
             "200 OK",
             _security_headers(
