@@ -2693,9 +2693,7 @@ class SecurityCycle13Tests(unittest.TestCase):
     def test_login_rejects_wrong_token(self) -> None:
         os.environ["NCGA_AUTH_TOKEN"] = "login-secret"
         app = App(rewrite_service=RewriteService(config=None))
-        s, headers, _ = call_app(
-            app, "POST", "/api/login", body=json.dumps({"token": "wrong"}).encode()
-        )
+        s, headers, _ = call_app(app, "POST", "/api/login", body=json.dumps({"token": "wrong"}).encode())
         self.assertEqual(s, "401 Unauthorized")
         self.assertNotIn("Set-Cookie", headers)
 

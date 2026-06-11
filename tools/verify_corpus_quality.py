@@ -101,11 +101,7 @@ def variety_breakdown(rows: list[dict]) -> None:
 
 def verified_without_source(rows: list[dict]) -> list[dict]:
     """Check 2 from the docstring: verified rows must carry a real source."""
-    return [
-        r
-        for r in rows
-        if r.get("quality_tier") == "verified" and not str(r.get("source", "")).strip()
-    ]
+    return [r for r in rows if r.get("quality_tier") == "verified" and not str(r.get("source", "")).strip()]
 
 
 def report_verified_without_source(rows: list[dict], label: str) -> int:

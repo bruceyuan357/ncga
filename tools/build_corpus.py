@@ -65,6 +65,7 @@ def chat_request_kwargs(prompt: str) -> dict:
         "max_tokens": 400,
     }
 
+
 # Topic seeds to vary the "original" text so we don't get 30 nearly-identical samples
 TOPIC_SEEDS = [
     "天气 / 出行 / 早晨上班",
