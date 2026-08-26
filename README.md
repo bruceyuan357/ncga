@@ -11,13 +11,13 @@
 >
 > **Cycle 22 v3「随四时」(已默认 · v1/v2 仍可切回):**
 > - **整站浅色** — 暖白偏粉底色,告别 v2 黑底窄卡
-> - **60vh 季节大图 hero**(非 daily 页)+ daily 自带 slideshow 直接 v3 化
+> - **紧凑季节情境头图**(非 daily 页)+ daily 自带 slideshow,核心工具首屏可达
 > - **4 季调色板** — 春樱粉 #E89BB0 / 夏林绿 #4A8A5A / 秋枫橙 #D26A2F / 冬松青 #4A7B98(各带 -deep 强调 + -2 次 accent)
-> - **18 朵樱花瓣全 viewport 飘落**(春日,fixed 层,所有页面都能看到)
+> - **克制的四季材质与色彩** — 保留节气、古诗和地标,移除全屏持续粒子干扰
 > - **节气小章 caption** — 24 节气自动按月日定 → 立夏 / 谷雨 / 大寒…
 > - **16 首古诗每日轮换** — 春夏秋冬各 4 首
-> - **sidebar → 右滑抽屉** + ☰ 浮按钮
-> - **页面 max-width 1100px** + workbench 双栏 + 输出卡 3px 季节色竖条
+> - **桌面常驻 glass sidebar** + 移动端同源左侧抽屉,导航位置稳定可预测
+> - **页面 max-width 1380px** + workbench 双栏 + 统一卡片/按钮/状态层级
 > - **settings 加「随四时」切换器** — 古朴 / 墨韵 / 随四时 三选
 > - 切回 v2/v1:右下角 sidebar 底部 version-switch 点其他选项
 >
@@ -56,7 +56,7 @@ python app.py                          # http://127.0.0.1:8000
 | `LLM_SKIP_SSL_VERIFY` | `false` | **危险**：跳过 SSL 校验，仅供调试 |
 | `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟的主限流桶（`/api/rewrite` 与三个 transform POST 端点等共享；`GET /api/transform-modes` 不限流；0 = 关闭） |
 | `NCGA_MAX_BODY_BYTES` | `65536` | 请求体字节上限（64 KB，容纳 batch 输入） |
-| `NCGA_BATCH_RATE_LIMIT_PER_MIN` | `6` | 每个 IP 每分钟可调 `/api/rewrite/batch` 的次数 |
+| `NCGA_BATCH_RATE_LIMIT_PER_MIN` | `6` | 每个 IP 每分钟可调 `/api/rewrite-batch` 的次数 |
 | `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限（rewrite/batch/rate/transform/rate-transform/explain/characterize/phrase 共享） |
 | `NCGA_QUALITY_STORE` | `~/.local/share/ncga/quality.json` | 质量存储路径（用户数据目录不可写时回退到源码目录 `.ncga-quality.json`） |
 | `NCGA_FEEDBACK_RATE_LIMIT_PER_MIN` | `5` | Cycle 20: 每个 IP 每分钟可提交 `/api/feedback` 的次数 |
