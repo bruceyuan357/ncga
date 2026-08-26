@@ -16,7 +16,7 @@
         try {
           var raw = localStorage.getItem("ncga.settings.v2");
           var s = raw ? JSON.parse(raw) : null;
-          var v = (s && s.version) || "v2";
+          var v = (s && s.version) || "v3";
           var fs = (s && s.fontScale) || "1";
           document.documentElement.setAttribute("data-version", v);
           document.documentElement.style.setProperty("--font-scale", fs);
@@ -39,7 +39,7 @@
       })();
     </script>
 
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=29">
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -47,8 +47,6 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     >
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=Noto+Serif+SC:wght@400;500;600;700;900&family=Ma+Shan+Zheng&family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   </head>
   <body data-route="daily">
     <div class="boot-screen" id="boot-screen">
@@ -70,7 +68,7 @@
          由 app.js injectGlobalSeasonDeco() 填充,只在 v3 mode 显 -->
     <div class="v3-global-deco" id="v3-global-deco" aria-hidden="true"></div>
 
-    <aside class="sidebar" role="navigation" aria-label="主导航">
+    <aside class="sidebar" id="sidebar-as-drawer" role="navigation" aria-label="主导航">
       <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="收起 / 展开侧栏">
         <i class="fas fa-bars" aria-hidden="true"></i>
       </button>
@@ -79,7 +77,7 @@
         <span class="brand-seal" aria-hidden="true">语</span>
         <div class="brand-text">
           <strong>地道中文</strong>
-          <span class="brand-sub">Native Chinese · v2</span>
+          <span class="brand-sub">Native Chinese · Studio</span>
         </div>
       </a>
 
@@ -156,19 +154,29 @@
             <span id="v3-hero-meta-place">上海</span>
           </p>
           <h2 class="v3-hero-place" id="v3-hero-headline">外滩</h2>
+          <p class="round2-hero-date" id="round2-hero-date">2026-07-21 · 盛夏时节</p>
           <p class="v3-hero-verse" id="v3-hero-verse">「随四时,听乡音」</p>
         </div>
       </header>
 
       <header class="cmdbar">
         <div class="cmdbar-left">
-          <button type="button" class="cmd-btn ghost" id="mobile-menu-btn" aria-label="打开菜单">
+          <button type="button" class="cmd-btn ghost" id="mobile-menu-btn" aria-label="打开菜单" aria-controls="sidebar-as-drawer" aria-expanded="false">
             <i class="fas fa-bars" aria-hidden="true"></i>
           </button>
           <h1 class="cmdbar-title" id="page-title">重写台</h1>
           <span class="cmdbar-subtitle" id="page-subtitle">把任意中文揉成你想要的乡音</span>
         </div>
         <div class="cmdbar-right">
+          <button type="button" class="round2-command-search" id="round2-command-search" aria-label="聚焦原文输入">
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <span>搜索指令 / 快速操作…</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <button type="button" class="cmd-btn round2-save-draft" id="round2-save-draft">
+            <i class="far fa-bookmark" aria-hidden="true"></i>
+            <span>存草稿</span>
+          </button>
           <button type="button" class="bg-mode-pill" id="bg-mode-pill" title="背景模式（点击循环切换）">
             <i class="fas fa-image" aria-hidden="true"></i>
             <span id="bg-mode-label">轮播</span>
@@ -453,7 +461,33 @@
               <div class="compare-grid" id="compare-grid"></div>
             </section>
           </div>
+
+          <aside class="round2-compare-rail" aria-label="原文对照">
+            <header>
+              <span>对照</span>
+              <small>原文对照</small>
+            </header>
+            <div class="round2-compare-copy" id="round2-compare-copy">
+              <p>把原文贴进左侧，这里会保持一份安静的逐句对照。</p>
+            </div>
+            <p class="round2-compare-note">逐句校对 · 随写随看</p>
+          </aside>
         </div>
+
+        <section class="round2-version-tray" aria-label="历史版本与快速对照">
+          <header class="round2-version-head">
+            <div>
+              <strong>历史版本</strong>
+              <span>快速对照</span>
+            </div>
+            <a href="#history">查看全部</a>
+          </header>
+          <div class="round2-version-list" id="round2-version-list"></div>
+          <button type="button" class="round2-new-version" id="round2-new-version">
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>新建版本</span>
+          </button>
+        </section>
       </section>
 
       <!-- ==================== 页面：批量工作台 ==================== -->
@@ -867,6 +901,6 @@ deadline → 截止日期
       </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=29"></script>
   </body>
 </html>

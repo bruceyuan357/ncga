@@ -91,6 +91,12 @@
   const favoriteBtn = $("#favorite-button");
   const favoriteLabel = $("#favorite-label");
   const cmdbarRewrite = $("#cmdbar-rewrite");
+  const round2CommandSearch = $("#round2-command-search");
+  const round2SaveDraft = $("#round2-save-draft");
+  const round2HeroDate = $("#round2-hero-date");
+  const round2CompareCopy = $("#round2-compare-copy");
+  const round2VersionList = $("#round2-version-list");
+  const round2NewVersion = $("#round2-new-version");
 
   const varietyCard = $("#variety-card");
   const varietyTitle = $("#variety-title");
@@ -280,6 +286,7 @@
   function saveHistory(list) {
     try { localStorage.setItem("ncga.history.v2", JSON.stringify(list.slice(0, HISTORY_MAX))); }
     catch (_) { /* ignore */ }
+    renderRound2Versions(lastResult && lastResult.id);
   }
 
   // History dedup key: target + normalized original. Identical re-rewrites refresh ts/result rather than pile up.
@@ -767,6 +774,33 @@
     const t = titles[route] || titles.workbench;
     pageTitle.textContent = t[0];
     pageSubtitle.textContent = t[1];
+    const cmdbarRewriteLabel = $("#cmdbar-rewrite-label");
+    if (cmdbarRewriteLabel) {
+      cmdbarRewriteLabel.textContent = route === "workbench" ? currentSubmitLabel() : "开始改写";
+    }
+    cmdbarRewrite.setAttribute(
+      "aria-label",
+      route === "workbench" ? currentSubmitLabel() : "前往重写台",
+    );
+
+    // v3 reform: route changes materialize from the current presentation state.
+    // The Web Animations API keeps this transition cancellable, while reduced-
+    // motion users get an immediate state change.
+    if (page && document.body.getAttribute("data-v3") === "on") {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduceMotion && typeof page.animate === "function") {
+        if (typeof page.getAnimations === "function") {
+          page.getAnimations().forEach((animation) => animation.cancel());
+        }
+        page.animate(
+          [
+            { opacity: 0, transform: "translate3d(0, 8px, 0) scale(0.995)" },
+            { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+          ],
+          { duration: 320, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "both" },
+        );
+      }
+    }
 
     if (route === "history") renderHistory();
     if (route === "atlas") renderAtlas();
@@ -774,6 +808,7 @@
     if (route === "settings") loadQualityStats();
 
     document.body.classList.remove("sidebar-open");
+    mobileMenuBtn.setAttribute("aria-expanded", "false");
   }
 
   function bindRouter() {
@@ -1200,6 +1235,93 @@
     showToast("已固定为该地标", "fa-thumbtack");
   });
 
+  // ---------------- round 2 lacquer workbench ----------------
+  function updateRound2SeasonDate() {
+    if (!round2HeroDate) return;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const seasonLabel = {
+      spring: "春日时节",
+      summer: "盛夏时节",
+      autumn: "清秋时节",
+      winter: "岁寒时节",
+    }[currentSeason()] || "随四时";
+    round2HeroDate.textContent = `${y}-${m}-${d} · ${seasonLabel}`;
+  }
+
+  function syncRound2Compare() {
+    if (!round2CompareCopy) return;
+    const raw = (textInput.value || "").trim();
+    if (!raw) {
+      round2CompareCopy.innerHTML = "<p>把原文贴进左侧，这里会保持一份安静的逐句对照。</p>";
+      return;
+    }
+    const sentences = raw
+      .replace(/([。！？；])/g, "$1\n")
+      .split(/\n+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    round2CompareCopy.innerHTML = sentences.map((part) => `<p>${escapeHtml(part)}</p>`).join("");
+  }
+
+  function renderRound2Versions(currentId) {
+    if (!round2VersionList) return;
+    const items = loadHistory().slice(0, 6);
+    if (!items.length) {
+      round2VersionList.innerHTML = '<div class="round2-version-empty">第一次重写后，版本会留在这里</div>';
+      return;
+    }
+    round2VersionList.innerHTML = items.map((item, index) => {
+      const active = item.id === currentId;
+      const title = active ? "当前版本" : `版本 ${index + 1}`;
+      return `<button type="button" class="round2-version-card${active ? " is-current" : ""}" data-id="${escapeHtml(item.id)}">
+        <strong>${title} · ${escapeHtml(item.label || "方言改写")}</strong>
+        <p>${escapeHtml(item.rewritten || item.original || "—")}</p>
+        <small>${escapeHtml(formatTime(item.ts || Date.now()))}</small>
+      </button>`;
+    }).join("");
+    $$(".round2-version-card", round2VersionList).forEach((button) => {
+      button.addEventListener("click", () => {
+        const item = loadHistory().find((record) => record.id === button.dataset.id);
+        if (!item) return;
+        textInput.value = item.original || "";
+        if (item.target_variety && targetSelect.querySelector(`option[value="${CSS.escape(item.target_variety)}"]`)) {
+          targetSelect.value = item.target_variety;
+        }
+        lastResult = { ...item, rewritten_text: item.rewritten || "" };
+        renderResult(item.rewritten || "", item.target_variety);
+        updateCharCount();
+        updateVarietyCard();
+        syncRound2Compare();
+        setStatus(STATUS_TEXT.success(item.label || "历史版本", item.script || "—"), "success");
+        copyButton.disabled = false;
+        downloadButton.disabled = false;
+        favoriteBtn.disabled = false;
+        if (explainButton) explainButton.disabled = false;
+        if (compareOtherButton) compareOtherButton.disabled = false;
+        renderRound2Versions(item.id);
+        showToast("已切换到这个版本", "fa-clock-rotate-left");
+      });
+    });
+  }
+
+  function saveRound2Draft() {
+    const draft = {
+      text: textInput.value || "",
+      target_variety: targetSelect.value || "",
+      scenario: SETTINGS.scenario || DEFAULT_SCENARIO,
+      ts: Date.now(),
+    };
+    try {
+      localStorage.setItem("ncga.draft.v1", JSON.stringify(draft));
+      showToast("草稿已留在这台设备", "fa-bookmark");
+    } catch (_) {
+      showToast("草稿暂时存不下来", "fa-triangle-exclamation");
+    }
+  }
+
   // ---------------- workbench ----------------
   function updateCharCount() {
     const length = textInput.value.length;
@@ -1207,6 +1329,7 @@
     if (length > 1000) charCountEl.style.color = "var(--warning)";
     else if (length > 800) charCountEl.style.color = "#d18b2a";
     else charCountEl.style.color = "";
+    syncRound2Compare();
   }
 
   function updateVarietyCard() {
@@ -1287,6 +1410,7 @@
     lastResult = null;
     if (compareMode) toggleCompare();
     updateCharCount();
+    renderRound2Versions();
   }
 
   function speakResult() {
@@ -1752,6 +1876,7 @@
     // label honest in transform modes (was stuck on 立即重写).
     const cmdbarLabel = $("#cmdbar-rewrite-label");
     if (cmdbarLabel) cmdbarLabel.textContent = currentSubmitLabel();
+    cmdbarRewrite.setAttribute("aria-label", currentSubmitLabel());
     if (mode === DIALECT_MODE) {
       const meta = VARIETIES[targetSelect.value];
       setStatus(meta && meta.trial ? STATUS_TEXT.trialNotice(meta.label) : STATUS_TEXT.idle);
@@ -3445,8 +3570,8 @@
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        clearAll();
         textInput.focus();
+        textInput.select();
       }
     });
   }
@@ -3457,21 +3582,27 @@
     });
     mobileMenuBtn.addEventListener("click", () => {
       document.body.classList.add("sidebar-open");
+      mobileMenuBtn.setAttribute("aria-expanded", "true");
     });
     sidebarBackdrop.addEventListener("click", () => {
       document.body.classList.remove("sidebar-open");
+      mobileMenuBtn.setAttribute("aria-expanded", "false");
+      mobileMenuBtn.focus({ preventScroll: true });
     });
     // Stage A5: v3 trigger opens sidebar as right-drawer (same .sidebar-open class).
     const v3MenuBtn = $("#v3-menu-btn");
     if (v3MenuBtn) {
       v3MenuBtn.addEventListener("click", () => {
         document.body.classList.add("sidebar-open");
+        mobileMenuBtn.setAttribute("aria-expanded", "true");
       });
     }
     // Esc closes the drawer (also useful for the mobile drawer).
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && document.body.classList.contains("sidebar-open")) {
         document.body.classList.remove("sidebar-open");
+        mobileMenuBtn.setAttribute("aria-expanded", "false");
+        mobileMenuBtn.focus({ preventScroll: true });
       }
     });
   }
@@ -3482,7 +3613,14 @@
     speakButton.addEventListener("click", speakResult);
     // Cycle 23: submit 走模式分发（方言 → rewriteText，transform → transformText）
     form.addEventListener("submit", runWorkbench);
-    cmdbarRewrite.addEventListener("click", runWorkbench);
+    cmdbarRewrite.addEventListener("click", (event) => {
+      if (document.body.getAttribute("data-route") !== "workbench") {
+        location.hash = "workbench";
+        requestAnimationFrame(() => textInput.focus({ preventScroll: true }));
+        return;
+      }
+      runWorkbench(event);
+    });
     copyButton.addEventListener("click", copyResult);
     downloadButton.addEventListener("click", downloadResult);
     compareToggle.addEventListener("click", toggleCompare);
@@ -3524,12 +3662,31 @@
         setStatus(STATUS_TEXT.idle);
       }
     });
+
+    if (round2CommandSearch) {
+      round2CommandSearch.addEventListener("click", () => {
+        if (document.body.getAttribute("data-route") !== "workbench") location.hash = "workbench";
+        requestAnimationFrame(() => textInput.focus({ preventScroll: true }));
+      });
+    }
+    if (round2SaveDraft) round2SaveDraft.addEventListener("click", saveRound2Draft);
+    if (round2NewVersion) {
+      round2NewVersion.addEventListener("click", (event) => {
+        if (!textInput.value.trim()) {
+          textInput.focus();
+          showToast("先写一句想说的话", "fa-pen-nib");
+          return;
+        }
+        runWorkbench(event);
+      });
+    }
   }
 
   // ---------------- init ----------------
   syncSettingsUI();
   applyVersion(SETTINGS.version);
   applySeason(currentSeason());  // v3「随四时」: set [data-season] from month
+  updateRound2SeasonDate();
   detectV3Mode();                 // v3 preview flag from URL / localStorage
   // Stage A1: kick off lazy load (non-blocking — falls back to preset landmarks).
   if (document.body.getAttribute("data-v3") === "on") loadSeasonalLandmarks();
@@ -3550,6 +3707,8 @@
   bindVoiceInput();
   bindContextWizard();   // Cycle 18 — Function 1
   bindDailyPhrase();     // Cycle 18 — Function 2
+  syncRound2Compare();
+  renderRound2Versions();
 
   Promise.all([loadPresets(), loadScenarios()])
     .then(() => {
