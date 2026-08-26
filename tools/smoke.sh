@@ -67,6 +67,21 @@ run "POST /api/transform polish (real LLM, Cycle 23)" 200 -X POST "${H[@]}" \
 run "POST /api/explain (real LLM)"    200 -X POST "${H[@]}" \
     -d '{"original":"今天我不想去","rewritten":"今儿个我还真不怎么想去嘿","target_variety":"beijing_mandarin"}' "$BASE/api/explain"
 
+# --- regression: 2026-08 reasoning-eats-max_tokens empty-content bug ---
+# deepseek-v4-flash thinking used to consume the whole token budget on hard
+# dialects (hokkien was the worst) → zero content → silent heuristic degrade.
+# HTTP stays 200 in that case, so assert the body says degraded=false.
+BODY=$(curl -sS -X POST "${H[@]}" \
+    -d '{"text":"当局者迷，旁观者清。","target_variety":"hokkien_written"}' "$BASE/api/rewrite")
+if printf '%s' "$BODY" | grep -q '"degraded": false'; then
+    printf '  \033[32m✓\033[0m %-45s HTTP 200\n' "POST /api/rewrite hokkien (degraded=false)"
+    PASS=$((PASS+1))
+else
+    printf '  \033[31m✗\033[0m %-45s\n' "POST /api/rewrite hokkien (degraded=false)"
+    printf '      body: %s\n' "$(printf '%s' "$BODY" | head -c 200)"
+    FAIL=$((FAIL+1))
+fi
+
 # --- validation diagnostics (Cycle 16) ---
 run "POST /api/rewrite missing field → 400" 400 -X POST "${H[@]}" \
     -d '{"target_variety":"beijing_mandarin"}' "$BASE/api/rewrite"

@@ -346,5 +346,42 @@ class TransformEndpointTests(unittest.TestCase):
         self.assertIn("'transformed'", json.loads(body)["error"])
 
 
+# ---------------- per-mode thinking (reasoning) routing ----------------
+
+
+class ThinkingRoutingTests(unittest.TestCase):
+    """2026-08: stylistic modes run with reasoning off (fast, immune to the
+    budget-eating empty-content bug); explain keeps light reasoning."""
+
+    @staticmethod
+    def _last_payload(transport) -> dict:
+        return json.loads(transport.calls[-1]["body"].decode("utf-8"))
+
+    def _transform_payload(self, mode: TransformMode) -> dict:
+        client, transport = _client_with_overrides(_llm_json_raw("处理后的文本"), {})
+        TransformService(client=client).transform("原文文本", mode)
+        return self._last_payload(transport)
+
+    def test_polish_translate_summarize_disable_thinking(self):
+        for mode in (TransformMode.POLISH, TransformMode.TRANSLATE, TransformMode.SUMMARIZE):
+            payload = self._transform_payload(mode)
+            self.assertEqual(payload.get("thinking"), {"type": "disabled"}, mode)
+            self.assertNotIn("reasoning_effort", payload, mode)
+
+    def test_explain_keeps_light_reasoning(self):
+        payload = self._transform_payload(TransformMode.EXPLAIN)
+        self.assertEqual(payload.get("reasoning_effort"), "low")
+        self.assertNotIn("thinking", payload)
+
+    def test_stream_path_carries_mode_thinking(self):
+        client, transport = _client_with_overrides(
+            _sse_stream_body("润色后"), {}, streaming=True
+        )
+        service = TransformService(client=client)
+        list(service.transform_stream("原文文本", TransformMode.POLISH))
+        payload = self._last_payload(transport)
+        self.assertEqual(payload.get("thinking"), {"type": "disabled"})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -528,6 +528,32 @@ def _parse_llm_json(content: str) -> dict[str, Any]:
 # ---------- HTTP transport (wrappable for tests) ----------
 
 
+def _apply_thinking(payload: dict[str, Any], provider: str, thinking: str | None) -> None:
+    """DeepSeek-V4 reasoning control for one payload.
+
+    deepseek-v4-flash/pro are reasoning models: with thinking left on, the
+    chain-of-thought can eat the whole max_tokens budget and return
+    finish_reason=length with ZERO content — the root cause of the 2026-08
+    "empty stream / empty content" degradations.
+
+      None       → provider default (thinking on) — for tasks that want CoT
+      "disabled" → thinking={type:disabled} — stylistic/generative tasks that
+                   need no CoT; ~10x faster and immune to budget-eating
+      "low"      → reasoning_effort=low — light reasoning at bounded cost
+
+    DeepSeek-only fields (OpenAI 400s on unknown params), so other providers
+    are left untouched.
+    """
+    if thinking is None or provider != "deepseek":
+        return
+    if thinking == "disabled":
+        payload["thinking"] = {"type": "disabled"}
+    elif thinking == "low":
+        payload["reasoning_effort"] = "low"
+    else:
+        raise ValueError(f"unknown thinking mode: {thinking!r}")
+
+
 class HTTPTransport(Protocol):
     def post(
         self,
@@ -644,14 +670,10 @@ class ChatCompletionsClient:
             "top_p": 0.9,
         }
         if self.config.provider == "deepseek":
-            # deepseek-v4-flash is a reasoning model: with thinking left on,
-            # hard prompts (low-resource dialects) let the chain-of-thought
-            # eat the whole max_tokens budget and return finish_reason=length
-            # with ZERO content — the "empty stream" flake that kept
-            # degrading rewrites to the heuristic. Dialect rewriting needs no
-            # CoT, and disabling it cuts latency ~10x (19s → ~2s) and cost.
-            # DeepSeek-only param — OpenAI 400s on unknown fields.
-            payload["thinking"] = {"type": "disabled"}
+            # Dialect rewriting needs no CoT — disabling thinking kills the
+            # reasoning-eats-max_tokens empty-content failure and cuts latency
+            # ~10x (19s → ~2s). See _apply_thinking.
+            _apply_thinking(payload, self.config.provider, "disabled")
         return payload
 
     def _call_once(
@@ -849,11 +871,16 @@ class ChatCompletionsClient:
         retries_on_5xx: int = 1,
         retry_on_empty: bool = True,
         model: str | None = None,
+        thinking: str | None = None,
     ) -> str:
         """Generic chat-completions wrapper with HTTPError-aware retry on 5xx.
 
         Cycle 23: optional `model` overrides config.model for this one call —
         transform-mode routing (explain → pro tier) rides on this.
+
+        2026-08: optional `thinking` ("disabled" | "low") rides on
+        _apply_thinking — per-call DeepSeek reasoning control. None keeps the
+        provider default (thinking on).
 
         Cycle 14: this replaces direct `_transport.post` access from rate_quality.
         Centralizes:
@@ -887,6 +914,7 @@ class ChatCompletionsClient:
             }
             if response_format_json:
                 payload["response_format"] = {"type": "json_object"}
+            _apply_thinking(payload, self.config.provider, thinking)
             body_inner = json.dumps(payload).encode("utf-8")
             with self._transport.post(
                 url, body_inner, headers, timeout=self.config.timeout_seconds, ssl_context=self.ssl_context
@@ -958,6 +986,7 @@ class ChatCompletionsClient:
         model: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.5,
+        thinking: str | None = None,
     ):
         """Stream raw content deltas for an arbitrary chat call (no JSON envelope).
 
@@ -965,6 +994,7 @@ class ChatCompletionsClient:
         there is no partial-JSON extraction — callers accumulate deltas as-is.
         No retry: streaming calls fail loudly and the caller maps to an SSE
         error event (same policy as rewrite_stream).
+        `thinking` rides on _apply_thinking (None = provider default).
         """
         payload = {
             "model": model or self.config.model,
@@ -974,6 +1004,7 @@ class ChatCompletionsClient:
             "max_tokens": max_tokens,
             "top_p": 0.9,
         }
+        _apply_thinking(payload, self.config.provider, thinking)
         body = json.dumps(payload).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -1010,6 +1041,7 @@ class ChatCompletionsClient:
             ],
             max_tokens=800,
             temperature=0.2,
+            thinking="low",  # judging nativeness wants light reasoning, bounded
         )
         if not content or not content.strip():
             raise RewriteError("LLM returned empty content for rate.")
@@ -1051,6 +1083,10 @@ class ChatCompletionsClient:
             "max_tokens": 600,
             "top_p": 0.9,
         }
+        # Same 2026-08 bug class as rewrite(): full reasoning on a 600-token
+        # budget → zero content → 503 (caught live by smoke). Explanation
+        # wants light CoT, bounded.
+        _apply_thinking(payload, self.config.provider, "low")
         body = json.dumps(payload).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -1349,6 +1385,7 @@ class RewriteService:
             ],
             max_tokens=500,  # Cycle 17 lesson: V4 needs reasoning headroom
             temperature=0.3,
+            thinking="disabled",  # classification + glossary lookup — no CoT needed
         )
         if not content or not content.strip():
             raise RewriteError("LLM returned empty content for characterize.")

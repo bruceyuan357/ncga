@@ -230,6 +230,8 @@ def _generate_fresh_pool(service: RewriteService) -> list[WisdomSeed]:
             ],
             max_tokens=3000,  # 30 phrases × ~80 chars each + JSON overhead
             temperature=0.7,
+            thinking="disabled",  # phrase generation needs no CoT; thinking ate
+            # the whole 3000 budget once (2026-08) → empty content → seed fallback
         )
         if not content or not content.strip():
             raise ValueError("empty content")
@@ -370,17 +372,27 @@ def get_phrase_of_the_day(service: RewriteService) -> dict[str, Any]:
         # Use friends_casual scenario by default — wisdom phrases land best as
         # something a friend would say. Errors per-variety are recorded inline
         # so a single failure doesn't kill the whole landing card.
-        for variety in VarietyPreset:
+        # 2026-08: capped parallel (3, matching the batch endpoint's proven
+        # default). Was sequential: 10 × ~2s LLM calls = 13.5s+ first-hit
+        # latency every morning. Capped at 3 to stay polite to the provider
+        # and inside the per-IP rate buckets.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _rewrite_one(variety: VarietyPreset) -> tuple[str, str]:
             try:
                 result = service.rewrite(
                     seed.original,
                     variety,
                     scenario=Scenario.FRIENDS_CASUAL,
                 )
-                translations[variety.value] = result.rewritten_text
+                return variety.value, result.rewritten_text
             except Exception as exc:  # noqa: BLE001
                 logger.warning("daily-phrase rewrite failed for %s: %s", variety.value, exc)
-                translations[variety.value] = f"__error__:{type(exc).__name__}"
+                return variety.value, f"__error__:{type(exc).__name__}"
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            for value, text in pool.map(_rewrite_one, VarietyPreset):
+                translations[value] = text
 
         images = [{"url": url, "caption": caption} for url, caption in TOP_12_LANDMARKS]
         payload = {

@@ -51,6 +51,7 @@ class TransformModeMetadata:
     max_tokens: int
     temperature: float
     rate_goal: str  # one-line task goal injected into the quality-rater rubric
+    thinking: str | None  # DeepSeek reasoning control (None = provider default)
 
 
 MODE_METADATA: dict[TransformMode, TransformModeMetadata] = {
@@ -67,6 +68,7 @@ MODE_METADATA: dict[TransformMode, TransformModeMetadata] = {
         max_tokens=2048,
         temperature=0.5,
         rate_goal="润色:更通顺得体且不改变原意、不增删信息",
+        thinking="disabled",  # stylistic task — no CoT, ~10x faster
     ),
     TransformMode.TRANSLATE: TransformModeMetadata(
         label="中英互译",
@@ -80,6 +82,7 @@ MODE_METADATA: dict[TransformMode, TransformModeMetadata] = {
         max_tokens=2048,
         temperature=0.3,
         rate_goal="翻译:方向正确、忠实流畅、术语准确",
+        thinking="disabled",  # translation is a stylistic mapping, not reasoning
     ),
     TransformMode.SUMMARIZE: TransformModeMetadata(
         label="总结",
@@ -94,6 +97,7 @@ MODE_METADATA: dict[TransformMode, TransformModeMetadata] = {
         max_tokens=800,
         temperature=0.3,
         rate_goal="总结:覆盖关键信息、无捏造、足够精炼",
+        thinking="disabled",  # extraction/compression — no CoT needed
     ),
     TransformMode.EXPLAIN: TransformModeMetadata(
         label="白话解释",
@@ -108,6 +112,7 @@ MODE_METADATA: dict[TransformMode, TransformModeMetadata] = {
         max_tokens=2048,
         temperature=0.5,
         rate_goal="解释:准确、无捏造、外行能看懂",
+        thinking="low",  # explanation draws on world knowledge — keep light CoT
     ),
 }
 
@@ -199,6 +204,7 @@ class TransformService:
             temperature=meta.temperature,
             response_format_json=False,
             model=model,
+            thinking=meta.thinking,
         )
         cleaned, warning = self._finalize(content)
         return TransformResult(cleaned, mode, model, warning=warning)
@@ -234,6 +240,7 @@ class TransformService:
             model=model,
             max_tokens=meta.max_tokens,
             temperature=meta.temperature,
+            thinking=meta.thinking,
         ):
             partial += delta
             yield delta, partial, False, None
@@ -259,6 +266,7 @@ class TransformService:
             max_tokens=400,
             temperature=0.2,
             response_format_json=True,
+            thinking="low",  # judging faithfulness wants light reasoning, bounded
         )
         try:
             parsed = _json.loads(content)

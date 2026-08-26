@@ -414,6 +414,60 @@ class ChatCompletionsClientTests(unittest.TestCase):
             client.rewrite("你好", VarietyPreset.BEIJING_MANDARIN)
         self.assertEqual(len(transport.calls), 3)
 
+
+# ---------------- DeepSeek thinking (reasoning) control ----------------
+
+
+class ThinkingControlTests(unittest.TestCase):
+    """2026-08 root-cause fix: deepseek-v4-flash reasoning ate the max_tokens
+    budget and returned zero content. Per-call thinking control is the fix —
+    these tests pin the payload shape per provider."""
+
+    @staticmethod
+    def _last_payload(transport) -> dict:
+        return json.loads(transport.calls[-1]["body"].decode("utf-8"))
+
+    def test_rewrite_payload_disables_thinking_on_deepseek(self) -> None:
+        client, transport = _build_client(_llm_json("ok"))
+        client.rewrite("文", VarietyPreset.BEIJING_MANDARIN)
+        payload = self._last_payload(transport)
+        self.assertEqual(payload.get("thinking"), {"type": "disabled"})
+
+    def test_general_chat_thinking_disabled(self) -> None:
+        client, transport = _build_client(_llm_json_raw('{"ok": true}'))
+        client.general_chat([{"role": "user", "content": "hi"}], thinking="disabled")
+        payload = self._last_payload(transport)
+        self.assertEqual(payload.get("thinking"), {"type": "disabled"})
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_general_chat_thinking_low(self) -> None:
+        client, transport = _build_client(_llm_json_raw('{"ok": true}'))
+        client.general_chat([{"role": "user", "content": "hi"}], thinking="low")
+        payload = self._last_payload(transport)
+        self.assertEqual(payload.get("reasoning_effort"), "low")
+        self.assertNotIn("thinking", payload)
+
+    def test_general_chat_thinking_default_sends_nothing(self) -> None:
+        client, transport = _build_client(_llm_json_raw('{"ok": true}'))
+        client.general_chat([{"role": "user", "content": "hi"}])
+        payload = self._last_payload(transport)
+        self.assertNotIn("thinking", payload)
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_thinking_never_sent_to_openai(self) -> None:
+        client, transport = _build_client(_llm_json_raw('{"ok": true}'))
+        client.config = client.config.__class__(**{**client.config.__dict__, "provider": "openai"})
+        client.general_chat([{"role": "user", "content": "hi"}], thinking="disabled")
+        payload = self._last_payload(transport)
+        self.assertNotIn("thinking", payload)
+        self.assertNotIn("reasoning_effort", payload)
+
+    def test_unknown_thinking_mode_rejected(self) -> None:
+        from native_chinese_assistant.rewrite import _apply_thinking
+
+        with self.assertRaises(ValueError):
+            _apply_thinking({}, "deepseek", "maximum")
+
     @staticmethod
     def _system_content(transport):
         body = json.loads(transport.calls[0]["body"].decode("utf-8"))
