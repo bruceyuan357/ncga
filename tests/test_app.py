@@ -54,6 +54,12 @@ from native_chinese_assistant.web import (
 # `_check_auth` treats empty string as auth-disabled.
 os.environ["NCGA_AUTH_TOKEN"] = ""
 os.environ["NCGA_DATA_KEY"] = ""  # tests use plaintext store; no leftover crypto state
+# Dev machines may have an encrypted quality store at the default path
+# (~/.local/share/ncga/quality.json, encrypted with the .env NCGA_DATA_KEY).
+# Tests blank NCGA_DATA_KEY, so touching that store raises KeyMismatchError and
+# fails the whole suite. Point XDG_DATA_HOME at a throwaway dir so the default
+# store/keyfile paths stay hermetic. Individual tests still override as needed.
+os.environ.setdefault("XDG_DATA_HOME", tempfile.mkdtemp(prefix="ncga-test-xdg-"))
 
 
 def setUpModule():
@@ -373,6 +379,40 @@ class ChatCompletionsClientTests(unittest.TestCase):
         client, _ = _build_client(bad)
         with self.assertRaises(RewriteError):
             client.rewrite("文", VarietyPreset.DONGBEI_MANDARIN)
+
+    def test_empty_stream_retries_non_streaming(self) -> None:
+        """Transient empty SSE streams (observed on deepseek-v4-flash under
+        parallel load) must fall back to a plain non-streaming request instead
+        of repeating the identical flaky streaming call."""
+        empty_sse = b"data: [DONE]\n\n"
+        ok = _llm_json("非流式兜底成功")
+        client, transport = _build_client(ok, streaming=True)
+        original_post = transport.post
+
+        def flaky_post(url, body, headers, *, timeout, ssl_context):
+            payload = json.loads(body.decode("utf-8"))
+            if payload.get("stream"):
+                transport.calls.append(
+                    {"url": url, "body": body, "headers": headers, "timeout": timeout}
+                )
+                return FakeStreamResponse(empty_sse)
+            return original_post(url, body, headers, timeout=timeout, ssl_context=ssl_context)
+
+        transport.post = flaky_post
+        result = client.rewrite("你好", VarietyPreset.BEIJING_MANDARIN)
+        self.assertEqual(result.rewritten_text, "非流式兜底成功")
+        self.assertFalse(result.degraded)
+        streams = [json.loads(c["body"].decode("utf-8"))["stream"] for c in transport.calls]
+        self.assertEqual(streams, [True, False])
+
+    def test_persistent_empty_stream_still_raises_after_bonus_retry(self) -> None:
+        """If the non-streaming fallback also fails, the error propagates after
+        one bonus attempt (3 calls total) — heuristic degradation takes over."""
+        empty_sse = b"data: [DONE]\n\n"
+        client, transport = _build_client(empty_sse, streaming=True)
+        with self.assertRaises(RewriteError):
+            client.rewrite("你好", VarietyPreset.BEIJING_MANDARIN)
+        self.assertEqual(len(transport.calls), 3)
 
     @staticmethod
     def _system_content(transport):
@@ -1222,6 +1262,7 @@ class PhraseOfTheDayTests(unittest.TestCase):
     def setUp(self) -> None:
         # Override the cache path env var so tests don't pollute ~/.local/share
         self._tmpdir = Path(tempfile.mkdtemp(prefix="ncga-phrase-"))
+        self._prev_xdg = os.environ.get("XDG_DATA_HOME")
         os.environ["XDG_DATA_HOME"] = str(self._tmpdir)
         # Pin the clock so phrase tests are deterministic regardless of wall-clock.
         # These tests assume pool generation 0 (the free in-code seed pool, no LLM
@@ -1248,7 +1289,10 @@ class PhraseOfTheDayTests(unittest.TestCase):
         import shutil
 
         shutil.rmtree(self._tmpdir, ignore_errors=True)
-        os.environ.pop("XDG_DATA_HOME", None)
+        if self._prev_xdg is None:
+            os.environ.pop("XDG_DATA_HOME", None)
+        else:
+            os.environ["XDG_DATA_HOME"] = self._prev_xdg
         self._dp.date = self._real_date
 
     def test_phrase_endpoint_returns_all_10_varieties(self) -> None:

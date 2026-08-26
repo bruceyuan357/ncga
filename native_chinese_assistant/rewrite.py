@@ -40,6 +40,17 @@ class RewriteError(Exception):
     """Raised when rewrite generation fails."""
 
 
+class EmptyStreamError(RewriteError):
+    """The SSE stream completed with zero content deltas.
+
+    Distinct from a JSON parse failure: this is transient upstream flakiness
+    (observed on deepseek-v4-flash under parallel load — the stream opens,
+    then closes with no tokens). The retry loop uses this marker to fall back
+    to a plain non-streaming request instead of repeating the same flaky
+    streaming call.
+    """
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     provider: str
@@ -425,7 +436,7 @@ def extract_streamed_content(response: Any) -> str:
         if content:
             chunks.append(content)
     if not chunks:
-        raise RewriteError("LLM stream returned no content.")
+        raise EmptyStreamError("LLM stream returned no content.")
     return "".join(chunks)
 
 
@@ -610,7 +621,7 @@ class ChatCompletionsClient:
                     lexicon_lines = format_lexicon_for_prompt(lex_hits)
         except Exception:
             lexicon_lines = None
-        return {
+        payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": [
                 {
@@ -632,6 +643,16 @@ class ChatCompletionsClient:
             "max_tokens": 2048,
             "top_p": 0.9,
         }
+        if self.config.provider == "deepseek":
+            # deepseek-v4-flash is a reasoning model: with thinking left on,
+            # hard prompts (low-resource dialects) let the chain-of-thought
+            # eat the whole max_tokens budget and return finish_reason=length
+            # with ZERO content — the "empty stream" flake that kept
+            # degrading rewrites to the heuristic. Dialect rewriting needs no
+            # CoT, and disabling it cuts latency ~10x (19s → ~2s) and cost.
+            # DeepSeek-only param — OpenAI 400s on unknown fields.
+            payload["thinking"] = {"type": "disabled"}
+        return payload
 
     def _call_once(
         self,
@@ -641,6 +662,7 @@ class ChatCompletionsClient:
         scenario: Scenario,
         strict_json: bool,
         glossary_lines: list[str] | None = None,
+        stream: bool | None = None,
     ) -> str:
         payload = self._build_payload(
             text,
@@ -649,17 +671,21 @@ class ChatCompletionsClient:
             strict_json=strict_json,
             glossary_lines=glossary_lines,
         )
+        # `stream=None` → follow config; explicit bool overrides for one call
+        # (the empty-stream retry path drops to plain non-streaming HTTP).
+        use_stream = self.config.streaming if stream is None else stream
+        payload["stream"] = use_stream
         body = json.dumps(payload).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
-            "Accept": "text/event-stream" if self.config.streaming else "application/json",
+            "Accept": "text/event-stream" if use_stream else "application/json",
         }
         url = f"{self.config.base_url}/chat/completions"
         with self._transport.post(
             url, body, headers, timeout=self.config.timeout_seconds, ssl_context=self.ssl_context
         ) as response:
-            if self.config.streaming:
+            if use_stream:
                 return extract_streamed_content(response)
             raw = json.loads(response.read().decode("utf-8"))
             return extract_message_content(raw)
@@ -762,8 +788,18 @@ class ChatCompletionsClient:
     ) -> RewriteResult:
         metadata = PRESET_METADATA[target]
         last_exc: Exception | None = None
-        for attempt in range(LLM_RETRIES + 1):
+        max_attempts = LLM_RETRIES + 1
+        empty_stream_retried = False
+        attempt = 0
+        while attempt < max_attempts:
             strict = attempt > 0
+            # An empty SSE stream is transient upstream flakiness specific to
+            # streaming delivery (observed on deepseek-v4-flash under parallel
+            # load). Repeating the identical streaming call just hits it again,
+            # so retry over plain non-streaming HTTP — and grant one bonus
+            # attempt, since transport flakiness shouldn't burn the
+            # JSON-repair retry budget.
+            stream_override: bool | None = False if isinstance(last_exc, EmptyStreamError) else None
             try:
                 content = self._call_once(
                     text,
@@ -771,6 +807,7 @@ class ChatCompletionsClient:
                     scenario=scenario,
                     strict_json=strict,
                     glossary_lines=glossary_lines,
+                    stream=stream_override,
                 )
                 parsed = _parse_llm_json(content)
                 rewritten_text = normalize_text(parsed.get("rewritten_text", ""))
@@ -792,8 +829,12 @@ class ChatCompletionsClient:
                     degraded=False,
                 )
             except (RewriteError, json.JSONDecodeError, ValueError) as exc:
+                if isinstance(exc, EmptyStreamError) and not empty_stream_retried:
+                    max_attempts += 1
+                    empty_stream_retried = True
                 last_exc = exc
-                logger.info("LLM parse attempt %d/%d failed: %s", attempt + 1, LLM_RETRIES + 1, exc)
+                logger.info("LLM parse attempt %d/%d failed: %s", attempt + 1, max_attempts, exc)
+                attempt += 1
                 continue
 
         raise RewriteError(f"LLM returned an invalid payload after retries: {last_exc}")
