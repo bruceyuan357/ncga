@@ -1674,6 +1674,24 @@ class FeedbackStoreTests(unittest.TestCase):
         self.assertEqual(bucket.stats.n, 2)
         self.assertAlmostEqual(bucket.stats.mean, 3.0, places=2)
 
+    def test_counters_persist_reload_and_stay_out_of_buckets(self) -> None:
+        """2026-08 dashboard telemetry: increment() counters round-trip through
+        the same (encrypted) document under __counters__ and never appear as
+        (variety, scenario) rating buckets."""
+        from native_chinese_assistant.feedback import QualityStore
+
+        s1 = QualityStore(path=self.tmp)
+        s1.increment("rewrite_requests::beijing_mandarin")
+        s1.increment("rewrite_requests::beijing_mandarin")
+        s1.increment("rewrite_degraded::beijing_mandarin")
+        s2 = QualityStore(path=self.tmp)  # reload
+        self.assertEqual(
+            s2.counters_snapshot(),
+            {"rewrite_requests::beijing_mandarin": 2, "rewrite_degraded::beijing_mandarin": 1},
+        )
+        # Counters must not leak into the rating-bucket view
+        self.assertEqual(s2.stats_snapshot(), [])
+
     def test_load_failure_quarantines_file_instead_of_clobbering(self) -> None:
         """Cycle 17: a genuinely corrupt store file (parse error) must NOT be
         silently overwritten with an empty store on the next persist. It gets
@@ -1699,6 +1717,60 @@ class FeedbackStoreTests(unittest.TestCase):
         s2 = QualityStore(path=self.tmp)
         snap = s2.stats_snapshot()
         self.assertEqual(snap[0]["stats"]["count"], 1)
+
+
+class QualityDashboardTests(unittest.TestCase):
+    """2026-08: /api/quality-dashboard aggregates ratings + rewrite telemetry
+    + corpus review gaps; rewrites feed the telemetry via the handler tap."""
+
+    def test_rewrite_handler_records_telemetry(self) -> None:
+        from native_chinese_assistant.feedback import QualityStore
+
+        client, _ = _build_client(_llm_json("好嘅"))
+        store = QualityStore()
+        app = App(rewrite_service=RewriteService(client=client), quality_store=store)
+        status, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            json.dumps({"text": "好的", "target_variety": "cantonese_written"}).encode(),
+        )
+        self.assertEqual(status, "200 OK")
+        counters = store.counters_snapshot()
+        self.assertEqual(counters.get("rewrite_requests::cantonese_written"), 1)
+        self.assertNotIn("rewrite_degraded::cantonese_written", counters)
+        latency_buckets = [
+            b for b in store.stats_snapshot() if b["scenario"] == "_latency_ms"
+        ]
+        self.assertEqual(len(latency_buckets), 1)
+        self.assertEqual(latency_buckets[0]["stats"]["count"], 1)
+
+    def test_dashboard_endpoint_shape(self) -> None:
+        from native_chinese_assistant.feedback import QualityStore
+
+        client, _ = _build_client(_llm_json("好嘅"))
+        store = QualityStore()
+        app = App(rewrite_service=RewriteService(client=client), quality_store=store)
+        call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            json.dumps({"text": "好的", "target_variety": "cantonese_written"}).encode(),
+        )
+        status, _, body = call_app(app, "GET", "/api/quality-dashboard")
+        self.assertEqual(status, "200 OK")
+        payload = json.loads(body.decode("utf-8"))
+        self.assertIn("ratings", payload)
+        self.assertIn("rewrite_ops", payload)
+        self.assertIn("corpus", payload)
+        ops = payload["rewrite_ops"]["cantonese_written"]
+        self.assertEqual(ops["requests"], 1)
+        self.assertEqual(ops.get("degraded", 0), 0)
+        # Repo corpus ships 400 entries; dashboard reports the tier breakdown
+        self.assertGreaterEqual(payload["corpus"]["total"], 1)
+        self.assertIn("needs_review_by_variety", payload["corpus"])
+        # Internal latency buckets must not leak into the ratings section
+        self.assertTrue(all(b["scenario"] != "_latency_ms" for b in payload["ratings"]))
 
 
 class GlossaryTests(unittest.TestCase):

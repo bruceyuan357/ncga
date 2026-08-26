@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>质量看板 · 地道中文 NCGA</title>
+  <link rel="stylesheet" href="/static/quality.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <h1>质量看板</h1>
+        <p class="subtitle">评分 · 降级率 · 延迟 · 语料库健康度</p>
+      </div>
+      <a class="back-link" href="/">← 返回工作台</a>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="card">
+      <h2>改写运行<span class="card-note">每个方言的请求量、降级率与延迟</span></h2>
+      <div id="ops-body" class="table-wrap"><p class="empty">加载中…</p></div>
+    </section>
+
+    <section class="card">
+      <h2>质量评分<span class="card-note">用户与评审打分(0-5 / 0-100 各自原样展示)</span></h2>
+      <div id="ratings-body" class="table-wrap"><p class="empty">加载中…</p></div>
+    </section>
+
+    <section class="card">
+      <h2>语料库<span class="card-note">needs_review 缺口指引下一轮语料建设</span></h2>
+      <div id="corpus-body"><p class="empty">加载中…</p></div>
+    </section>
+
+    <p class="foot">数据来自本机质量存储(<code>quality.json</code>,AES-GCM)与 <code>data/corpus.jsonl</code> · 每分钟限流 30 次</p>
+  </main>
+
+  <script src="/static/quality.js"></script>
+</body>
+</html>

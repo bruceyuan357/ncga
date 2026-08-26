@@ -28,6 +28,10 @@ from native_chinese_assistant.crypto import encrypt, resolve_key
 
 logger = logging.getLogger("ncga.feedback")
 
+# Reserved document key holding the operational-counters dict. Can't collide
+# with a real bucket key — those are always "<variety>::<scenario>".
+_COUNTERS_KEY = "__counters__"
+
 
 @dataclass
 class WelfordStats:
@@ -88,6 +92,7 @@ class QualityStore:
         # with the Refiner in Cycle 23.)
         self._lock = threading.Lock()
         self._buckets: dict[tuple[str, str], BucketState] = {}
+        self._counters: dict[str, int] = {}
         if self.path and self.path.is_file():
             self._load()
 
@@ -116,6 +121,17 @@ class QualityStore:
             bucket.stats.update(float(score))
             self._persist_unlocked()
 
+    def increment(self, counter: str, amount: int = 1) -> None:
+        """Bump a named integer counter (e.g. rewrite request/degraded counts).
+
+        Counters live in the same persisted document under the reserved
+        `__counters__` key — they are operational telemetry, not ratings, so
+        they must never land in a (variety, scenario) bucket and skew means.
+        """
+        with self._lock:
+            self._counters[counter] = self._counters.get(counter, 0) + amount
+            self._persist_unlocked()
+
     # --- accessors ---
 
     def get_bucket(self, variety: str, scenario: str) -> BucketState | None:
@@ -136,6 +152,11 @@ class QualityStore:
                 )
         return out
 
+    def counters_snapshot(self) -> dict[str, int]:
+        """Operational counters (requests, degradations) for the dashboard."""
+        with self._lock:
+            return dict(self._counters)
+
     # --- persistence ---
 
     def _persist_unlocked(self) -> None:
@@ -146,7 +167,7 @@ class QualityStore:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
-            data = {
+            data: dict[str, Any] = {
                 self._key_str(v, s): {
                     "stats": {
                         "n": b.stats.n,
@@ -158,6 +179,8 @@ class QualityStore:
                 }
                 for (v, s), b in self._buckets.items()
             }
+            if self._counters:
+                data[_COUNTERS_KEY] = dict(self._counters)
             # Cycle 21 self-audit #10: drop indent when encrypting (the blob is opaque
             # anyway; indent ~doubles bytes-on-disk + bytes-fed-to-AES-GCM for nothing).
             # Keep indent for the plaintext path so the file stays greppable.
@@ -249,6 +272,10 @@ class QualityStore:
             self._quarantine(f"parse failed: {exc}")
             return
         for key_str, payload in data.items():
+            if key_str == _COUNTERS_KEY:
+                if isinstance(payload, dict):
+                    self._counters = {str(k): int(v) for k, v in payload.items()}
+                continue
             v, s = self._from_key_str(key_str)
             stats_d = payload.get("stats", {})
             # Legacy stores may carry override/draft/sample fields from the old Refiner;

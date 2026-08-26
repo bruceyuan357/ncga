@@ -13,6 +13,7 @@ import time
 from collections import deque
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 from native_chinese_assistant.feedback import QualityStore
 from native_chinese_assistant.presets import parse_scenario, preset_options, scenario_options
@@ -635,6 +636,10 @@ class App:
             ),
             ("GET", "/api/healthz"): lambda env, sr: json_response(sr, "200 OK", {"status": "ok"}),
             ("GET", "/api/quality-stats"): self.handle_quality_stats,
+            ("GET", "/api/quality-dashboard"): self.handle_quality_dashboard,
+            ("GET", "/quality"): lambda env, sr: static_response(
+                sr, STATIC_DIR / "quality.html", environ=env
+            ),
             ("GET", "/api/phrase-of-the-day"): self.handle_phrase_of_the_day,
             ("GET", "/api/transform-modes"): lambda env, sr: json_response(
                 sr,
@@ -734,8 +739,14 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
         try:
+            import time as _time
+
+            t0 = _time.perf_counter()
             result = self.rewrite_service.rewrite(
                 text, target, scenario=scenario, glossary_lines=glossary_lines
+            )
+            self._record_rewrite_telemetry(
+                target.value, result.degraded, (_time.perf_counter() - t0) * 1000
             )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
@@ -959,7 +970,12 @@ class App:
             ),
         )
         return _sse_iter_rewrite_stream(
-            self.rewrite_service, text, target, scenario, glossary_lines=glossary_lines
+            self.rewrite_service,
+            text,
+            target,
+            scenario,
+            glossary_lines=glossary_lines,
+            on_result=self._record_rewrite_telemetry,
         )
 
     def handle_rate(self, environ: dict, start_response: Callable) -> list[bytes]:
@@ -1224,7 +1240,24 @@ class App:
             scenario,
             glossary_lines=glossary_lines,
             max_parallel=max_parallel,
+            on_result=self._record_rewrite_telemetry,
         )
+
+    def _record_rewrite_telemetry(self, variety: str, degraded: bool, latency_ms: float) -> None:
+        """Feed the quality dashboard: per-variety request count, degradation
+        count (counters), and latency (Welford bucket under the reserved
+        `_latency_ms` scenario). Telemetry must never break a rewrite — any
+        store failure is logged and swallowed."""
+        store = self.quality_store
+        if store is None:
+            return
+        try:
+            store.increment(f"rewrite_requests::{variety}")
+            if degraded:
+                store.increment(f"rewrite_degraded::{variety}")
+            store.record(variety, "_latency_ms", latency_ms)
+        except Exception:  # noqa: BLE001
+            logger.warning("rewrite telemetry record failed", exc_info=True)
 
     def handle_quality_stats(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Cycle 21 self-audit #2: was a bare lambda, no rate limit. A leaked
@@ -1239,6 +1272,51 @@ class App:
                 {"error": "Rate limit exceeded. Please slow down."},
             )
         return json_response(start_response, "200 OK", {"buckets": self.quality_store.stats_snapshot()})
+
+    def handle_quality_dashboard(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """Aggregate feed for the /quality dashboard page.
+
+        Three sections:
+          ratings     — the existing (variety, scenario) Welford buckets,
+                        minus internal `_`-prefixed telemetry scenarios
+          rewrite_ops — per-variety operational counters (requests, degraded)
+                        merged with the `_latency_ms` latency stats
+          corpus      — quality-tier counts from the corpus file (the
+                        needs_review gaps tell the operator where the next
+                        corpus-building hour goes)
+        """
+        ip = client_ip(environ)
+        if not self.rate_limiter.allow(ip):
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        store = self.quality_store
+        snapshot = store.stats_snapshot() if store is not None else []
+        counters = store.counters_snapshot() if store is not None else {}
+        ratings = [b for b in snapshot if not b["scenario"].startswith("_")]
+        latency_by_variety = {
+            b["variety"]: b["stats"] for b in snapshot if b["scenario"] == "_latency_ms"
+        }
+        ops: dict[str, dict[str, Any]] = {}
+        for name, count in counters.items():
+            kind, _, variety = name.partition("::")
+            if kind == "rewrite_requests":
+                ops.setdefault(variety, {})["requests"] = count
+            elif kind == "rewrite_degraded":
+                ops.setdefault(variety, {})["degraded"] = count
+        for variety, stats in latency_by_variety.items():
+            ops.setdefault(variety, {})["latency_ms"] = stats
+        return json_response(
+            start_response,
+            "200 OK",
+            {
+                "ratings": ratings,
+                "rewrite_ops": ops,
+                "corpus": _corpus_review_stats(),
+            },
+        )
 
     def handle_feedback(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Cycle 20: accept a reflection-form submission and append to JSONL.
@@ -1467,14 +1545,55 @@ def _sse_event(event_type: str, data: dict | str) -> bytes:
     return f"event: {event_type}\n{lines}\n\n".encode()
 
 
-def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=None):
+def _corpus_review_stats() -> dict[str, Any]:
+    """Corpus quality-tier counts for the dashboard's corpus-loop section.
+
+    Reads the same corpus file the BM25 retriever uses (NCGA_CORPUS_PATH or
+    data/corpus.jsonl) and counts entries by tier, plus needs_review per
+    variety — the gaps tell the operator which dialect needs native-speaker
+    attention next. Missing/unreadable file → zeroed payload (dashboard must
+    not 500 because a data file is absent).
+    """
+    import json as _json
+
+    path = os.environ.get("NCGA_CORPUS_PATH", "").strip() or str(BASE_DIR / "data" / "corpus.jsonl")
+    total = 0
+    needs_review = 0
+    by_variety: dict[str, int] = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except ValueError:
+                    continue
+                total += 1
+                if entry.get("quality_tier") != "verified":
+                    needs_review += 1
+                    variety = str(entry.get("variety", "?"))
+                    by_variety[variety] = by_variety.get(variety, 0) + 1
+    except OSError as exc:
+        logger.info("corpus review stats unavailable: %s", exc)
+    return {"total": total, "needs_review": needs_review, "needs_review_by_variety": by_variety}
+
+
+def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=None, on_result=None):
     """Generator yielding SSE bytes for a single streamed rewrite.
 
     Review fixes P2+P3: glossary_lines now actually threads into the LLM call
     (the old docstring admitted it didn't), and the done event carries the
     same degraded/warning fields as non-streaming /api/rewrite so heuristic
     fallbacks are no longer presented as genuine LLM results.
+
+    `on_result(variety_value, degraded, latency_ms)` — optional telemetry tap,
+    fired once on the done event (dashboard counters ride on it).
     """
+    import time as _time
+
+    t0 = _time.perf_counter()
     try:
         last_partial = ""
         for delta, partial, done, meta in service.rewrite_stream(
@@ -1482,13 +1601,16 @@ def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=Non
         ):
             if done:
                 meta = meta or {}
+                degraded = bool(meta.get("degraded", False))
+                if on_result is not None:
+                    on_result(target.value, degraded, (_time.perf_counter() - t0) * 1000)
                 yield _sse_event(
                     "done",
                     {
                         "rewritten_text": partial,
                         "target_variety": target.value,
                         "effective_scenario": scenario.value,
-                        "degraded": bool(meta.get("degraded", False)),
+                        "degraded": degraded,
                         "warning": meta.get("warning") or "",
                     },
                 )
@@ -1531,7 +1653,7 @@ def _sse_iter_transform_stream(service, text, mode):
         yield _sse_event("error", {"error": str(exc)})
 
 
-def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, max_parallel=3):
+def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, max_parallel=3, on_result=None):
     """Generator yielding SSE bytes for batch progress.
 
     Cycle 9: TRUE PARALLELISM via ThreadPoolExecutor. Within one batch request,
@@ -1559,8 +1681,13 @@ def _sse_iter_batch(service, items, varieties, scenario, glossary_lines=None, ma
     )
 
     def one(idx, item, variety):
+        import time as _time
+
+        t0 = _time.perf_counter()
         try:
             result = service.rewrite(item, variety, scenario=scenario, glossary_lines=glossary_lines)
+            if on_result is not None:
+                on_result(variety.value, result.degraded, (_time.perf_counter() - t0) * 1000)
             return (
                 idx,
                 variety,

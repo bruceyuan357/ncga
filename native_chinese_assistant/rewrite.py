@@ -1021,8 +1021,11 @@ class ChatCompletionsClient:
                 if delta:
                     yield delta
 
-    def rate_quality(self, rewritten: str, target: VarietyPreset) -> dict[str, Any]:
-        """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}."""
+    def rate_quality(self, rewritten: str, target: VarietyPreset, *, model: str | None = None) -> dict[str, Any]:
+        """Score 0-5 how natively `rewritten` reads in `target`. Returns {score, reason}.
+
+        `model` (2026-08): optional one-call override — the quality sweep tool
+        judges with the pro tier while interactive rating stays on flash."""
         metadata = PRESET_METADATA[target]
         # Cycle 14: routes through general_chat → free 5xx retry + clean error path.
         # Cycle 17: bumped max_tokens 100 → 400 because DeepSeek-V4 burns reasoning
@@ -1042,6 +1045,7 @@ class ChatCompletionsClient:
             max_tokens=800,
             temperature=0.2,
             thinking="low",  # judging nativeness wants light reasoning, bounded
+            model=model,
         )
         if not content or not content.strip():
             raise RewriteError("LLM returned empty content for rate.")

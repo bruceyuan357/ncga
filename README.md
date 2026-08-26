@@ -81,7 +81,7 @@ python app.py                          # http://127.0.0.1:8000
 
 每次 `/api/rewrite` 调用时,后端用纯 stdlib BM25(`native_chinese_assistant/corpus.py`)从目标方言池里检索 top-3 最像的示例,以「【本地人示例】参考这些真实的本地说法,不要逐字复制」块注入 system prompt。LLM 因此能看到具体的「原文 → 本地说法」对子,而非仅靠风格描述脑补。
 
-**当前状态**:390 条 verified + 10 条 needs_review(全部在福建闽南 — 母语者欢迎 PR)。
+**当前状态**:400 条中 256 条 verified + 144 条 needs_review(全部 40 条标准普通话、24 条广东普通话、其余 8 方言各 10 条 — 母语者欢迎 PR;/quality 看板实时展示缺口)。
 
 **继续扩充**(每个方言已有 40 条;需 `DEEPSEEK_API_KEY`):
 ```bash
@@ -147,7 +147,20 @@ tools/smoke.sh                           # 默认 http://127.0.0.1:8000
 BASE=https://ncga.example.com tools/smoke.sh
 ```
 
-`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 18 项：公开 GET（healthz / presets / scenarios / quality-stats / transform-modes / SPA / 静态 + 两个路径穿越探针；不含会扣 10 个每日额度的 phrase-of-the-day）、rewrite 与 transform 的 auth gating、4 个 LLM 走通、Cycle 16 的 4xx 诊断。建议挂 cron 每日跑一次。
+`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 19 项：公开 GET（healthz / presets / scenarios / quality-stats / transform-modes / SPA / 静态 + 两个路径穿越探针；不含会扣 10 个每日额度的 phrase-of-the-day）、rewrite 与 transform 的 auth gating、4 个 LLM 走通、hokkien `degraded=false` 回归探针（2026-08 reasoning 吃光 max_tokens → 静默降级事件）、Cycle 16 的 4xx 诊断。
+
+本机已挂 cron：`tools/daily_smoke.sh` 每天 09:17 跑（服务器没在跑时自动拉起再关掉），结果追加到 `~/.local/share/ncga/smoke.log`。
+
+## 质量看板与评审扫描 (2026-08)
+
+- **`/quality`** — 质量看板页（深玉漆器风）：每个方言的请求数 / 降级率 / 平均延迟（改写 handler 自动埋点，`__counters__` 与 `_latency_ms` 桶）、评分桶分布、语料库 needs_review 缺口。数据来自 `GET /api/quality-dashboard`（与主限流桶共享 30/min）。
+- **`tools/quality_sweep.py`** — LLM 评审扫描：20 条固定探针句 × 10 方言改写（flash,thinking off），由 `deepseek-v4-pro` 逐条打分（0-5），落到质量存储 `judge_sweep` 场景桶 — 不用等用户点星星就有质量趋势线，并指出当前最弱方言。
+
+```bash
+python3 tools/quality_sweep.py                  # 全量 20×10(400 次调用,几分钱)
+python3 tools/quality_sweep.py --sentences 5    # 省钱小扫
+python3 tools/quality_sweep.py --dry-run        # 只看分,不写存储
+```
 
 ## 生产部署
 
