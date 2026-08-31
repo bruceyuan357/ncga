@@ -313,10 +313,12 @@ def static_response(start_response: Callable, path: Path, *, environ: dict | Non
     if path.name == "index.html" and _check_auth(environ or {}):
         cookie_val = _make_session_cookie()
         if cookie_val:
-            secure_flag = (bool(environ) and environ.get("wsgi.url_scheme") == "https") or (
-                environ and (environ.get("HTTP_X_FORWARDED_PROTO") or "").lower() == "https"
-            )
-            headers.append(("Set-Cookie", _format_session_cookie(cookie_val, secure=bool(secure_flag))))
+            secure_flag = False
+            if environ:
+                secure_flag = (environ.get("wsgi.url_scheme") == "https") or (
+                    (environ.get("HTTP_X_FORWARDED_PROTO") or "").lower() == "https"
+                )
+            headers.append(("Set-Cookie", _format_session_cookie(cookie_val, secure=secure_flag)))
     start_response("200 OK", _security_headers(headers, csp_nonce=csp_nonce))
     return [content]
 
@@ -601,7 +603,7 @@ class App:
         )
         self.feedback_store = FeedbackStore(FeedbackStore.default_path())
 
-    def _check_daily_cap(self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1):
+    def _check_daily_cap(self, ip: str, start_response: Callable, endpoint: str, *, units: int = 1) -> list[bytes] | None:
         """Cycle 18 v2: shared per-IP daily ceiling check. Call this in every
         LLM-spending handler BEFORE the per-minute limiter. `units` is the
         expected number of LLM calls this request will generate — most endpoints
@@ -882,7 +884,9 @@ class App:
 
     # ------------------ streaming + batch (Cycle 7-8) ------------------
 
-    def _read_json_body(self, environ: dict, start_response: Callable, max_bytes: int | None = None):
+    def _read_json_body(
+        self, environ: dict, start_response: Callable, max_bytes: int | None = None
+    ) -> tuple[Any, list[bytes] | None]:
         """Common: read+parse JSON body. Returns (payload_dict, error_response_or_none).
 
         Cycle 16: each failure class gets a distinct, actionable message
@@ -1505,6 +1509,13 @@ class App:
                 {"error": "Wrong token."},
             )
         cookie_val = _make_session_cookie()
+        if not cookie_val:
+            # No NCGA_AUTH_TOKEN configured → cookies can't be signed; nothing to issue.
+            return json_response(
+                start_response,
+                "500 Internal Server Error",
+                {"error": "Session unavailable."},
+            )
         secure_flag = environ.get("wsgi.url_scheme") == "https" or (
             environ.get("HTTP_X_FORWARDED_PROTO", "").lower() == "https"
         )
@@ -1523,7 +1534,7 @@ class App:
         return [resp]
 
 
-def _coerce_glossary(raw) -> list[str] | None:
+def _coerce_glossary(raw: Any) -> list[str] | None:
     """Coerce the `glossary` field from request body into a clean list of lines.
     Caps at 30 entries and 80 chars each to keep prompt size sane."""
     if not raw:

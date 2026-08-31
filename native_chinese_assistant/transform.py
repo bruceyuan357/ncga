@@ -14,6 +14,7 @@ knowledge where flash-tier models confidently err (user decision, Cycle 23).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -209,7 +210,7 @@ class TransformService:
         cleaned, warning = self._finalize(content)
         return TransformResult(cleaned, mode, model, warning=warning)
 
-    def transform_stream(self, text: str, mode: TransformMode):
+    def transform_stream(self, text: str, mode: TransformMode) -> Iterator[tuple[str, str, bool, dict[str, Any] | None]]:
         """Yield (delta, partial, is_done, meta) — same 4-tuple contract as rewrite_stream.
 
         The final is_done=True meta carries {"degraded", "warning", "model"} so the

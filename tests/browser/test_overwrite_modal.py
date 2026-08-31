@@ -30,8 +30,13 @@ def page_at_workbench(live_app, page):
     We wait for `domcontentloaded` instead of `load` because the daily-phrase
     card kicks off ~10 stub-LLM rewrites async — those keep the `load` event
     pending and timeout the test. The chip handlers are wired during the same
-    DOMContentLoaded synchronous init pass, so we can interact immediately."""
-    page.goto(live_app + "/", wait_until="domcontentloaded")
+    DOMContentLoaded synchronous init pass, so we can interact immediately.
+
+    2026-08: the app now boots on the daily-phrase landing page (v3 随四时
+    design); the workbench lives at #workbench. The old fixture went to `/`
+    and waited for chips that are display:none on the daily route — every
+    test timed out in setup."""
+    page.goto(live_app + "/#workbench", wait_until="domcontentloaded")
     page.wait_for_selector(".chip[data-example]", state="visible")
     # Daily-phrase card might appear later; tests don't depend on it.
     return page

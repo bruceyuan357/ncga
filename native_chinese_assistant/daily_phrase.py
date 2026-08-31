@@ -219,11 +219,12 @@ def _generate_fresh_pool(service: RewriteService) -> list[WisdomSeed]:
     # refresh failure NEVER takes the feature offline, and an AttributeError
     # here would break that promise (it did: a cold cache + a client-less
     # service raised instead of degrading gracefully).
-    if getattr(service, "_client", None) is None:
+    client = getattr(service, "_client", None)
+    if client is None:
         logger.warning("phrase-pool refresh skipped: no LLM client")
         return list(_SEED_POOL)
     try:
-        content = service._client.general_chat(
+        content = client.general_chat(
             [
                 {"role": "system", "content": _REFRESH_SYSTEM_PROMPT},
                 {"role": "user", "content": "请给我下一批 30 条。"},
@@ -390,8 +391,8 @@ def get_phrase_of_the_day(service: RewriteService) -> dict[str, Any]:
                 logger.warning("daily-phrase rewrite failed for %s: %s", variety.value, exc)
                 return variety.value, f"__error__:{type(exc).__name__}"
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            for value, text in pool.map(_rewrite_one, VarietyPreset):
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            for value, text in executor.map(_rewrite_one, VarietyPreset):
                 translations[value] = text
 
         images = [{"url": url, "caption": caption} for url, caption in TOP_12_LANDMARKS]

@@ -15,6 +15,7 @@ import os
 import re
 import ssl
 import time
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -374,7 +375,7 @@ def default_ca_bundle() -> str | None:
     if override:
         return override
     try:
-        import certifi  # type: ignore[import-not-found]
+        import certifi
     except ImportError:
         logger.debug("certifi not installed; falling back to system trust store")
         return None
@@ -469,7 +470,7 @@ def extract_streamed_content(response: Any) -> str:
     return "".join(chunks)
 
 
-def iter_streamed_deltas(response: Any):
+def iter_streamed_deltas(response: Any) -> Iterator[tuple[str, bool]]:
     """Generator yielding (delta_text, done) pairs from an OpenAI-format SSE response.
 
     Yields ('hello', False), (' world', False), ('', True). 'done' is True for the
@@ -749,7 +750,7 @@ class ChatCompletionsClient:
         scenario: Scenario = Scenario.FRIENDS_CASUAL,
         *,
         glossary_lines: list[str] | None = None,
-    ):
+    ) -> Iterator[tuple[str, str, bool, dict[str, Any] | None]]:
         """Yield (delta, partial_extracted_text, is_done, meta) tuples.
 
         Every chunk yielded is whatever the LLM has streamed so far, *plus* an
@@ -1017,7 +1018,7 @@ class ChatCompletionsClient:
         max_tokens: int = 1024,
         temperature: float = 0.5,
         thinking: str | None = None,
-    ):
+    ) -> Iterator[str]:
         """Stream raw content deltas for an arbitrary chat call (no JSON envelope).
 
         Cycle 23: transform modes stream plain prose, so unlike rewrite_stream
@@ -1257,6 +1258,7 @@ class RewriteService:
         quality_store: Any = None,  # native_chinese_assistant.feedback.QualityStore | None
     ) -> None:
         # Allow tests / callers to inject either a ready client or a synthetic config.
+        self._config: LLMConfig | None
         if client is not None:
             self._config = client.config
             self._client: ChatCompletionsClient | None = client
@@ -1339,7 +1341,7 @@ class RewriteService:
         scenario: Scenario = Scenario.FRIENDS_CASUAL,
         *,
         glossary_lines: list[str] | None = None,
-    ):
+    ) -> Iterator[tuple[str, str, bool, dict[str, Any] | None]]:
         """Stream chunks. Yields (delta_text, partial_text, is_done, meta).
 
         meta is None on chunks; on is_done=True it carries

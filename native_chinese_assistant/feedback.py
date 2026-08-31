@@ -206,6 +206,7 @@ class QualityStore:
         Key problems (missing key, KeyMismatchError) must NOT come here — they
         raise in _load() instead, leaving the healthy file in place.
         """
+        assert self.path is not None  # only reachable via _load(), which requires a path
         try:
             from datetime import datetime
 
@@ -233,6 +234,7 @@ class QualityStore:
     def _load(self) -> None:
         from native_chinese_assistant.crypto import KeyMismatchError, decrypt, is_encrypted, resolve_key
 
+        assert self.path is not None  # caller (__init__) only invokes us behind is_file()
         try:
             blob = self.path.read_bytes()
         except OSError as exc:
