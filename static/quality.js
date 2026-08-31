@@ -127,6 +127,47 @@
     host.appendChild(table);
   }
 
+  function renderEvalTrend(runs) {
+    var host = document.getElementById("eval-body");
+    host.textContent = "";
+    if (!runs.length) {
+      host.appendChild(el("p", "empty", "还没有评估记录 — 跑一次 python3 tools/eval_dialects.py 建立基线。"));
+      return;
+    }
+    var table = el("table");
+    var head = el("tr");
+    ["日期", "SHA", "评审", "总均分", "最弱方言"].forEach(function (h, i) {
+      head.appendChild(el("th", i >= 3 ? "num" : "", h));
+    });
+    var thead = el("thead");
+    thead.appendChild(head);
+    table.appendChild(thead);
+    var tbody = el("tbody");
+    runs.forEach(function (run) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "", (run.date || "").slice(0, 16).replace("T", " ")));
+      tr.appendChild(el("td", "", run.git_sha || "—"));
+      tr.appendChild(el("td", "", run.judge_version || "—"));
+      var overallTd = el("td", "num");
+      var overall = run.overall;
+      var cls = overall >= 4.5 ? "badge-ok" : overall >= 3.5 ? "badge-warn" : "badge-bad";
+      overallTd.appendChild(el("span", "badge " + cls, overall === null ? "—" : overall.toFixed(2)));
+      tr.appendChild(overallTd);
+      var weakest = "—";
+      var weakestScore = 99;
+      Object.keys(run.varieties || {}).forEach(function (v) {
+        if (run.varieties[v] < weakestScore) {
+          weakestScore = run.varieties[v];
+          weakest = label(v) + " " + run.varieties[v].toFixed(2);
+        }
+      });
+      tr.appendChild(el("td", "num", weakest));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    host.appendChild(table);
+  }
+
   function renderCorpus(corpus) {
     var host = document.getElementById("corpus-body");
     host.textContent = "";
@@ -159,11 +200,12 @@
     })
     .then(function (data) {
       renderOps(data.rewrite_ops || {});
+      renderEvalTrend(data.eval_trend || []);
       renderRatings(data.ratings || []);
       renderCorpus(data.corpus || { total: 0, needs_review: 0, needs_review_by_variety: {} });
     })
     .catch(function (err) {
-      ["ops-body", "ratings-body", "corpus-body"].forEach(function (id) {
+      ["ops-body", "eval-body", "ratings-body", "corpus-body"].forEach(function (id) {
         var host = document.getElementById(id);
         host.textContent = "";
         host.appendChild(el("p", "empty", "加载失败:" + err.message));

@@ -1315,6 +1315,7 @@ class App:
                 "ratings": ratings,
                 "rewrite_ops": ops,
                 "corpus": _corpus_review_stats(),
+                "eval_trend": _eval_trend(),
             },
         )
 
@@ -1543,6 +1544,38 @@ def _sse_event(event_type: str, data: dict | str) -> bytes:
     # Per WHATWG SSE spec: each \n inside data must become its own data: line.
     lines = "\n".join(f"data: {ln}" for ln in data.split("\n"))
     return f"event: {event_type}\n{lines}\n\n".encode()
+
+
+def _eval_trend(limit: int = 10) -> list[dict[str, Any]]:
+    """Recent eval runs for the dashboard trend section (newest first).
+
+    Reads data/eval_runs/*.json written by tools/eval_dialects.py — per-run
+    overall + per-variety means, judge version, and git SHA, so the trend is
+    attributable to a code state. Missing dir → empty list.
+    """
+    import json as _json
+
+    runs_dir = BASE_DIR / "data" / "eval_runs"
+    out: list[dict[str, Any]] = []
+    try:
+        files = sorted(runs_dir.glob("*.json"), reverse=True)[:limit]
+    except OSError:
+        return out
+    for path in files:
+        try:
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            out.append(
+                {
+                    "date": data.get("date", ""),
+                    "git_sha": data.get("git_sha", ""),
+                    "judge_version": (data.get("judge") or {}).get("prompt_version", ""),
+                    "overall": data.get("overall"),
+                    "varieties": data.get("varieties", {}),
+                }
+            )
+        except (ValueError, OSError):
+            continue
+    return out
 
 
 def _corpus_review_stats() -> dict[str, Any]:

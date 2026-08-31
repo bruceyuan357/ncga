@@ -24,6 +24,7 @@ Public API:
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import os
@@ -226,6 +227,46 @@ def format_examples_for_prompt(entries: list[CorpusEntry]) -> list[str]:
 
 # ---------- module singleton ----------
 
+_DEFAULT_EVAL_PATH = Path(__file__).parent.parent / "data" / "eval_golden.jsonl"
+
+
+@functools.lru_cache(maxsize=1)
+def _eval_exclusion_pairs() -> frozenset[tuple[str, str]]:
+    """(variety, original) pairs held out for eval. Frozen file → cached read."""
+    pairs: set[tuple[str, str]] = set()
+    path = Path(os.environ.get("NCGA_EVAL_PATH", "").strip() or _DEFAULT_EVAL_PATH)
+    try:
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if not s or s.startswith("#"):
+                continue
+            try:
+                obj = json.loads(s)
+                pairs.add((str(obj["variety"]), str(obj["original"])))
+            except (KeyError, ValueError, TypeError):
+                continue
+    except OSError:
+        pass
+    return frozenset(pairs)
+
+
+def load_eval_entries(path: str | Path | None = None) -> list[dict]:
+    """The golden eval rows themselves (used by tools/eval_dialects.py)."""
+    p = Path(path) if path else Path(os.environ.get("NCGA_EVAL_PATH", "").strip() or _DEFAULT_EVAL_PATH)
+    out: list[dict] = []
+    if not p.is_file():
+        return out
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        s = raw.strip()
+        if not s or s.startswith("#"):
+            continue
+        try:
+            out.append(json.loads(s))
+        except ValueError:
+            continue
+    return out
+
+
 _default_lock = threading.Lock()
 _default_retriever: BM25Retriever | None = None
 
@@ -252,6 +293,11 @@ def get_default_retriever() -> BM25Retriever | None:
         # (36% of the corpus, incl. ALL 40 putonghua + 24 guangdong entries,
         # was being shown to the model as "真实的本地说法").
         entries = [e for e in entries if e.quality_tier == "verified"]
+        # Eval-protocol contamination guard: golden eval rows (data/eval_golden.jsonl)
+        # are the reference answers the anchored judge grades against — a row
+        # can't both teach (few-shot) and grade (eval). Exclude them here so
+        # eval scores reflect generation, not memorized retrieval.
+        entries = [e for e in entries if (e.variety, e.original) not in _eval_exclusion_pairs()]
         if not entries:
             return None
         _default_retriever = BM25Retriever(entries)
@@ -263,3 +309,4 @@ def _reset_default_retriever_for_tests() -> None:
     global _default_retriever
     with _default_lock:
         _default_retriever = None
+    _eval_exclusion_pairs.cache_clear()

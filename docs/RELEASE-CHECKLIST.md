@@ -40,3 +40,14 @@ No key? It still runs — falls back to an offline heuristic rewriter and says s
 - **The repo (code + data)** — yes, verified secret-clean. This is the easy path.
 - **A live URL** — would need a TLS reverse proxy + your own API key paying for all traffic + abuse limits. Not set up.
 - **The Chrome extension** — only after the live Chrome pass above.
+
+## 方言质量门槛 (2026-08 起生效)
+
+任何改动 prompt / 模型 / 路由 / 语料的提交前:
+
+```bash
+python3 tools/eval_dialects.py            # 任一方言较基线掉 >0.3 → exit 1,阻断提交
+python3 tools/eval_dialects.py --limit 3  # 省钱快扫(每方言 3 行)
+```
+
+基线:`data/eval_baseline.json`(由 `--set-baseline` 写入);每次运行落 `data/eval_runs/` 并在 `/quality` 看板展示趋势。评审:`deepseek-v4-pro`,temperature=0,双评取中位数,prompt 版本 `anchored-v1`。详见 README「方言质量评估协议」。

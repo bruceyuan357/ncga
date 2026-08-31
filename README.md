@@ -359,6 +359,22 @@ LLM_MODEL_EXPLAIN=deepseek-v4-pro
 
 语料注入只用 `verified` 条目 — `needs_review` 的未审 LLM 草稿不再作为「本地人示例」注入(占语料 36%,含全部标准普通话条目)。
 
+## 方言质量评估协议 (2026-08)
+
+一句话:**golden 集 + 锚定评审 + 基线门槛** — 任何方言质量结论都必须来自这条流水线,不接受「肉眼看几句」。
+
+1. **Golden 集** `data/eval_golden.jsonl`(88 行,9 方言 × 每场景 1 条,全部 verified):由 `tools/build_eval_split.py` 从语料库确定性抽出,是冻结的标准答案。语料 few-shot 注入会**排除**这些行(防污染:同一行不能既当教材又当考卷);标准普通话语料 0 verified,暂不参评。
+2. **锚定评审**:评审看到的是【原文 + 母语参考改写 + 候选改写】,按「意思保留 + 与参考同水准的方言地道度」打 0-5 — 比自由发挥的「像不像方言」稳定得多。评审固定 `deepseek-v4-pro` / temperature=0 / 每格评两次取中位数 / prompt 版本 `anchored-v1` 随结果记录。开跑前自检:参考答案自评必须 ≥4.5,否则判定评审配置坏了直接中止。
+3. **基线门槛** `tools/eval_dialects.py`:每方言均分写入 `data/eval_runs/<时间>.json`(带 git SHA + 评审版本,可追溯);与 `data/eval_baseline.json` 比较,**任一方言掉 >0.3 即 exit 1**(0.3 以下是评审噪声,不算信号)。
+
+```bash
+python3 tools/eval_dialects.py --set-baseline   # 建立/更新基线
+python3 tools/eval_dialects.py                  # 发布前回归(掉分即失败)
+python3 tools/eval_dialects.py --limit 3 --varieties jianghuai_or_lower_yangtze_mandarin
+```
+
+`/quality` 看板展示最近 10 次运行趋势。旧的 `tools/quality_sweep.py` 保留作快速无锚扫描。
+
 ## 许可
 
 MIT

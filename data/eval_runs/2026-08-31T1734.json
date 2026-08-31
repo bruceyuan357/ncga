@@ -1,0 +1,23 @@
+{
+  "date": "2026-08-31T17:34:47+0800",
+  "git_sha": "81350b2",
+  "judge": {
+    "model": "deepseek-v4-pro",
+    "prompt_version": "anchored-v1",
+    "temperature": 0.0,
+    "reps": 2
+  },
+  "rows": 88,
+  "overall": 4.004,
+  "varieties": {
+    "beijing_mandarin": 4.15,
+    "cantonese_written": 4.35,
+    "dongbei_mandarin": 4.1,
+    "guangdong_mandarin": 4.062,
+    "hokkien_written": 4.15,
+    "jianghuai_or_lower_yangtze_mandarin": 3.35,
+    "minnan_written": 3.722,
+    "shanghai_mandarin_style": 4.1,
+    "sichuan_chongqing_mandarin": 4.05
+  }
+}

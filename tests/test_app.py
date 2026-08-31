@@ -2846,6 +2846,75 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         hits = r.retrieve("坏", "beijing_mandarin", top_k=5)
         self.assertTrue(all(h.quality_tier == "verified" for h in hits))
 
+    def test_eval_golden_split_is_valid_and_held_out(self) -> None:
+        """Eval protocol Stage 1: golden rows must (a) exist, (b) be verified
+        corpus rows, (c) never be served as few-shot examples (contamination
+        guard — a row can't both teach and grade)."""
+        from native_chinese_assistant.corpus import (
+            _reset_default_retriever_for_tests,
+            get_default_retriever,
+            load_corpus,
+            load_eval_entries,
+        )
+
+        _reset_default_retriever_for_tests()
+        os.environ.pop("NCGA_CORPUS_PATH", None)
+        rows = load_eval_entries()
+        self.assertGreaterEqual(len(rows), 80, "golden split should cover ~9 dialects × ~10 scenarios")
+        corpus_verified = {(e.variety, e.original) for e in load_corpus() if e.quality_tier == "verified"}
+        for row in rows:
+            self.assertIn("reference_rewrite", row)
+            self.assertIn(
+                (row["variety"], row["original"]),
+                corpus_verified,
+                f"eval row not a verified corpus row: {row}",
+            )
+        r = get_default_retriever()
+        self.assertIsNotNone(r)
+        assert r is not None
+        for row in rows[:15]:  # spot-check a slice across varieties
+            hits = r.retrieve(row["original"], row["variety"], top_k=5)
+            self.assertNotIn(
+                row["original"],
+                [h.original for h in hits],
+                f"eval row leaked into few-shot retrieval: {row['variety']} | {row['original']}",
+            )
+
+
+class EvalGateTests(unittest.TestCase):
+    """Eval protocol Stage 3: baseline regression-gate logic (offline)."""
+
+    def _mod(self):
+        import importlib.util
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location("eval_dialects", root / "tools/eval_dialects.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_compare_flags_drop_beyond_floor(self) -> None:
+        mod = self._mod()
+        baseline = {"varieties": {"beijing_mandarin": 4.5, "hokkien_written": 4.0}}
+        failures = mod.compare_to_baseline(
+            {"beijing_mandarin": 4.2, "hokkien_written": 3.6}, baseline
+        )
+        # 4.2 ≥ 4.5-0.3 passes; 3.6 < 4.0-0.3 fails
+        self.assertEqual(len(failures), 1)
+        self.assertIn("hokkien_written", failures[0])
+
+    def test_compare_treats_small_deltas_as_noise(self) -> None:
+        mod = self._mod()
+        baseline = {"varieties": {"beijing_mandarin": 4.5}}
+        self.assertEqual(mod.compare_to_baseline({"beijing_mandarin": 4.21}, baseline), [])
+
+    def test_compare_flags_missing_variety(self) -> None:
+        mod = self._mod()
+        baseline = {"varieties": {"minnan_written": 4.0}}
+        failures = mod.compare_to_baseline({}, baseline)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("missing", failures[0])
+
     def test_bm25_empty_query_falls_back_to_first_entries(self) -> None:
         from native_chinese_assistant.corpus import BM25Retriever, load_corpus
 
