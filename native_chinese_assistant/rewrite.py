@@ -219,17 +219,34 @@ _RATE_SYSTEM_PROMPT = (
     "5. 不要 markdown，不要解释自己。\n"
 )
 
+# 2026-08: near-identity targets (标准普通话) need a different 0-anchor — the
+# default rubric scores "和原文几乎一样" as 0, but for standard Mandarin that
+# IS the correct output. The old rubric made every putonghua sweep row score
+# near-zero regardless of quality (the 2.60/5 "weakest dialect" artifact).
+_RATE_SYSTEM_PROMPT_NEAR_IDENTITY = (
+    "你是{label}的母语者，专门评估别人写出来的{label}地不地道。"
+    "学生递来一段{label}，请你打分：0-5 分（0=完全不像{label}，5=完全像本地人讲的）。\n\n"
+    "硬性规则：\n"
+    "1. 只看这段{label}本身，不要去脑补它原意是什么、跟谁讲。\n"
+    "2. 这个目标语体和普通话原文本来就非常接近——和原文几乎一样不是缺点。"
+    "0=画蛇添足、乱加方言味或语体错误；2-3=通顺但不够自然得体；5=自然、规范、语气到位。\n"
+    "3. 给一句 ≤20 字的简短理由，要点出最关键的语体特征。\n"
+    '4. 严格 JSON：{{"score": 0-5, "reason": "..."}}\n'
+    "5. 不要 markdown，不要解释自己。\n"
+)
+
 
 # Cycle 21 self-audit #9: PRESET_METADATA is module-level + frozen, so for any
 # given metadata.label the .replace() chain produces the same string every
 # call. Cache by label string. ~20µs per call avoided × ~10 calls/min.
 @functools.lru_cache(maxsize=32)
-def _rate_prompt_for_label(label: str) -> str:
-    return _RATE_SYSTEM_PROMPT.replace("{label}", label).replace("{{", "{").replace("}}", "}")
+def _rate_prompt_for_label(label: str, near_identity_target: bool = False) -> str:
+    template = _RATE_SYSTEM_PROMPT_NEAR_IDENTITY if near_identity_target else _RATE_SYSTEM_PROMPT
+    return template.replace("{label}", label).replace("{{", "{").replace("}}", "}")
 
 
-def build_rate_system_prompt(metadata: PresetMetadata) -> str:
-    return _rate_prompt_for_label(metadata.label)
+def build_rate_system_prompt(metadata: PresetMetadata, *, near_identity_target: bool = False) -> str:
+    return _rate_prompt_for_label(metadata.label, near_identity_target)
 
 
 # --- Explain prompt (Cycle 3) ---
@@ -648,7 +665,7 @@ class ChatCompletionsClient:
         except Exception:
             lexicon_lines = None
         payload: dict[str, Any] = {
-            "model": self.config.model,
+            "model": metadata.model or self.config.model,
             "messages": [
                 {
                     "role": "system",
@@ -670,10 +687,11 @@ class ChatCompletionsClient:
             "top_p": 0.9,
         }
         if self.config.provider == "deepseek":
-            # Dialect rewriting needs no CoT — disabling thinking kills the
-            # reasoning-eats-max_tokens empty-content failure and cuts latency
-            # ~10x (19s → ~2s). See _apply_thinking.
-            _apply_thinking(payload, self.config.provider, "disabled")
+            # Per-variety reasoning control (PresetMetadata.reasoning):
+            # Mandarin-family = "disabled" (no CoT needed, ~10x faster);
+            # low-resource varieties = "low" (grammar transform wants light
+            # planning). See _apply_thinking for the 2026-08 root cause.
+            _apply_thinking(payload, self.config.provider, metadata.reasoning)
         return payload
 
     def _call_once(
@@ -1039,7 +1057,13 @@ class ChatCompletionsClient:
         #           "smallest that worked in one test".
         content = self.general_chat(
             [
-                {"role": "system", "content": build_rate_system_prompt(metadata)},
+                {
+                    "role": "system",
+                    "content": build_rate_system_prompt(
+                        metadata,
+                        near_identity_target=(target == VarietyPreset.STANDARD_PUTONGHUA),
+                    ),
+                },
                 {"role": "user", "content": rewritten},
             ],
             max_tokens=800,

@@ -468,6 +468,18 @@ class ThinkingControlTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _apply_thinking({}, "deepseek", "maximum")
 
+    def test_hard_variety_routes_to_pro_model(self) -> None:
+        """2026-08 experiment: pro tier is the quality lever for low-resource
+        varieties. hokkien/minnan/cantonese/shanghai/jianghuai → pro; the
+        Mandarin family stays on the configured (flash) model."""
+        client, transport = _build_client(_llm_json("好"))
+        client.rewrite("好", VarietyPreset.HOKKIEN_WRITTEN)
+        payload = self._last_payload(transport)
+        self.assertEqual(payload["model"], "deepseek-v4-pro")
+        client.rewrite("好", VarietyPreset.BEIJING_MANDARIN)
+        payload = self._last_payload(transport)
+        self.assertEqual(payload["model"], "test-model")
+
     @staticmethod
     def _system_content(transport):
         body = json.loads(transport.calls[0]["body"].decode("utf-8"))
@@ -2813,6 +2825,26 @@ class CorpusAndRetrievalTests(unittest.TestCase):
         for h in hits_bj:
             self.assertEqual(h.variety, "beijing_mandarin")
         self.assertNotEqual(hits_sh[0].rewrite, hits_bj[0].rewrite)
+
+    def test_default_retriever_serves_verified_only(self) -> None:
+        """2026-08 quality fix: needs_review rows are unreviewed LLM drafts and
+        must never be injected as 【本地人示例】 ground truth (36% of the corpus
+        was, incl. all putonghua rows). The singleton filters them at load."""
+        from native_chinese_assistant.corpus import get_default_retriever
+
+        tmp = Path(tempfile.mkdtemp(prefix="ncga-corpus-")) / "corpus.jsonl"
+        tmp.write_text(
+            '{"variety":"beijing_mandarin","scenario":"x","original":"好","rewrite":"好嘞","quality_tier":"verified"}\n'
+            '{"variety":"beijing_mandarin","scenario":"x","original":"坏","rewrite":"坏嘞","quality_tier":"needs_review"}\n',
+            encoding="utf-8",
+        )
+        os.environ["NCGA_CORPUS_PATH"] = str(tmp)
+        r = get_default_retriever()
+        self.assertIsNotNone(r)
+        assert r is not None
+        self.assertEqual(r.variety_size("beijing_mandarin"), 1)
+        hits = r.retrieve("坏", "beijing_mandarin", top_k=5)
+        self.assertTrue(all(h.quality_tier == "verified" for h in hits))
 
     def test_bm25_empty_query_falls_back_to_first_entries(self) -> None:
         from native_chinese_assistant.corpus import BM25Retriever, load_corpus

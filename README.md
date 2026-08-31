@@ -351,6 +351,14 @@ LLM_MODEL_EXPLAIN=deepseek-v4-pro
 
 响应和 SSE `done` 事件都带 `"model"` 字段 — 客户端能看到这次请求实际由哪个模型回答(路由是否生效是可观测的)。
 
+### 方言改写的模型路由 (2026-08)
+
+改写路径不按 env 路由,而是按**方言难度**写死在 `presets.py`(`PresetMetadata.model`):低资源方言(江淮、上海话风格、粤语书面、台湾闽南、福建闽南)→ `deepseek-v4-pro`,官话系(普通话/北京/东北/川渝/广东普通话)→ 全局 `LLM_MODEL`(flash)。依据是一次 4 配置 A/B 实验(pro 评审打分):pro 档是唯一显著提升低资源方言质量的杠杆(均分 4.33 vs 3.67,下限更高,零空响应),轻量 CoT 无效果。
+
+配套的 reasoning 策略:`PresetMetadata.reasoning` 逐方言控制 DeepSeek 思考链(默认全 `disabled` — 方言转换是风格任务,关 CoT 快 ~10x 且免疫「思考链吃光 max_tokens → 空内容」故障)。
+
+语料注入只用 `verified` 条目 — `needs_review` 的未审 LLM 草稿不再作为「本地人示例」注入(占语料 36%,含全部标准普通话条目)。
+
 ## 许可
 
 MIT

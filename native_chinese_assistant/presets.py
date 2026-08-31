@@ -158,6 +158,18 @@ class PresetMetadata:
     landmarks: tuple[Landmark, ...]  # background images
     trial: bool = False  # mark "试用版" — UI flags it and disables Mandarin TTS
     tts_lang: str | None = None  # BCP-47 lang for SpeechSynthesis; None = TTS disabled
+    # DeepSeek reasoning control for rewrite generation (2026-08 quality work):
+    # "disabled" = no CoT (fast, right for Mandarin-family varieties where the
+    # transform is shallow); "low" = bounded light CoT (low-resource varieties
+    # whose grammar genuinely differs — function words, word order, sentence-
+    # final particles need planning, and zero-CoT flash just sprinkles flavor
+    # words onto Mandarin syntax). Anything else = provider default (full CoT).
+    reasoning: str = "disabled"
+    # Model routing for rewrite generation (2026-08 A/B/C/D experiment, judged
+    # by deepseek-v4-pro: the pro tier is the ONLY lever that moved low-resource
+    # dialect quality — 4.33 vs 3.67 mean, higher floor, zero empty-content
+    # errors; light CoT was neutral). None = global LLM_MODEL (flash tier).
+    model: str | None = None
 
 
 # ---------------- preset table ----------------
@@ -357,6 +369,7 @@ PRESET_METADATA: dict[VarietyPreset, PresetMetadata] = {
             ),
         ),
         tts_lang="zh-CN",
+        model="deepseek-v4-pro",  # low-resource variety → pro tier (2026-08 experiment)
     ),
     VarietyPreset.GUANGDONG_MANDARIN: PresetMetadata(
         label="广东普通话",
@@ -453,6 +466,7 @@ PRESET_METADATA: dict[VarietyPreset, PresetMetadata] = {
             ),
         ),
         tts_lang="zh-CN",
+        model="deepseek-v4-pro",  # low-resource variety → pro tier (2026-08 experiment)
     ),
     VarietyPreset.CANTONESE_WRITTEN: PresetMetadata(
         label="粵語書面語",
@@ -534,6 +548,7 @@ PRESET_METADATA: dict[VarietyPreset, PresetMetadata] = {
             Landmark("https://commons.wikimedia.org/wiki/Special:FilePath/Lionrock.jpg?width=2400", "狮子山"),
         ),
         tts_lang="zh-HK",
+        model="deepseek-v4-pro",  # low-resource variety → pro tier (2026-08 experiment)
     ),
     VarietyPreset.HOKKIEN_WRITTEN: PresetMetadata(
         label="閩南語書面語（臺灣）",
@@ -609,6 +624,7 @@ PRESET_METADATA: dict[VarietyPreset, PresetMetadata] = {
         ),
         trial=True,
         tts_lang=None,  # no widely-deployed Min Nan TTS — disable to avoid Mandarin mispronunciation
+        model="deepseek-v4-pro",  # low-resource variety → pro tier (2026-08 experiment)
     ),
     VarietyPreset.MINNAN_WRITTEN: PresetMetadata(
         label="閩南語書面語（福建）",
@@ -692,6 +708,7 @@ PRESET_METADATA: dict[VarietyPreset, PresetMetadata] = {
         ),
         trial=True,
         tts_lang=None,
+        model="deepseek-v4-pro",  # low-resource variety → pro tier (2026-08 experiment)
     ),
 }
 

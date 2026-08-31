@@ -246,6 +246,12 @@ def get_default_retriever() -> BM25Retriever | None:
             return _default_retriever
         path_override = os.environ.get("NCGA_CORPUS_PATH")
         entries = load_corpus(path_override or _DEFAULT_CORPUS_PATH)
+        # 2026-08 quality fix: only verified entries may be injected as
+        # 【本地人示例】 ground truth. needs_review rows are unreviewed LLM
+        # drafts — serving them as few-shot taught the model their mistakes
+        # (36% of the corpus, incl. ALL 40 putonghua + 24 guangdong entries,
+        # was being shown to the model as "真实的本地说法").
+        entries = [e for e in entries if e.quality_tier == "verified"]
         if not entries:
             return None
         _default_retriever = BM25Retriever(entries)
