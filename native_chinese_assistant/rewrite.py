@@ -208,9 +208,15 @@ def build_system_prompt(
 
 # --- Rate-quality prompt (Cycle 8) ---
 
+# 2026-08: the judge now receives the target's own definition ({register})
+# and scores against THAT, not its own guess. Without it, ambiguous varieties
+# drift: 广东普通话 outputs got scored against written-Cantonese expectations
+# (嘅/屋企/食 → 5.0) while spec-correct accented Mandarin (讲清楚点啦) scored
+# 2.0 — the judge and the preset disagreed on what the variety even is.
 _RATE_SYSTEM_PROMPT = (
     "你是{label}的母语者，专门评估别人写出来的{label}地不地道。"
     "学生递来一段{label}，请你打分：0-5 分（0=完全不像方言，5=完全像本地人讲的）。\n\n"
+    "先给你「{label}」的判定标准（以此为准，不要按自己的想象另立标准）：\n{register}\n\n"
     "硬性规则：\n"
     "1. 只看这段{label}本身，不要去脑补它原意是什么、跟谁讲。\n"
     "2. 0=普通话原文几乎没改；2-3=有方言味但还能改进；5=听起来跟本地人一字不差。\n"
@@ -226,6 +232,7 @@ _RATE_SYSTEM_PROMPT = (
 _RATE_SYSTEM_PROMPT_NEAR_IDENTITY = (
     "你是{label}的母语者，专门评估别人写出来的{label}地不地道。"
     "学生递来一段{label}，请你打分：0-5 分（0=完全不像{label}，5=完全像本地人讲的）。\n\n"
+    "先给你「{label}」的判定标准（以此为准，不要按自己的想象另立标准）：\n{register}\n\n"
     "硬性规则：\n"
     "1. 只看这段{label}本身，不要去脑补它原意是什么、跟谁讲。\n"
     "2. 这个目标语体和普通话原文本来就非常接近——和原文几乎一样不是缺点。"
@@ -237,16 +244,21 @@ _RATE_SYSTEM_PROMPT_NEAR_IDENTITY = (
 
 
 # Cycle 21 self-audit #9: PRESET_METADATA is module-level + frozen, so for any
-# given metadata.label the .replace() chain produces the same string every
-# call. Cache by label string. ~20µs per call avoided × ~10 calls/min.
-@functools.lru_cache(maxsize=32)
-def _rate_prompt_for_label(label: str, near_identity_target: bool = False) -> str:
+# given (label, register) the .replace() chain produces the same string every
+# call. Cache by both strings. ~20µs per call avoided × ~10 calls/min.
+@functools.lru_cache(maxsize=64)
+def _rate_prompt_for_preset(label: str, register: str, near_identity_target: bool = False) -> str:
     template = _RATE_SYSTEM_PROMPT_NEAR_IDENTITY if near_identity_target else _RATE_SYSTEM_PROMPT
-    return template.replace("{label}", label).replace("{{", "{").replace("}}", "}")
+    return (
+        template.replace("{label}", label)
+        .replace("{register}", register)
+        .replace("{{", "{")
+        .replace("}}", "}")
+    )
 
 
 def build_rate_system_prompt(metadata: PresetMetadata, *, near_identity_target: bool = False) -> str:
-    return _rate_prompt_for_label(metadata.label, near_identity_target)
+    return _rate_prompt_for_preset(metadata.label, metadata.register, near_identity_target)
 
 
 # --- Explain prompt (Cycle 3) ---
