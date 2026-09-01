@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 from native_chinese_assistant.presets import (
@@ -3234,6 +3235,162 @@ class ImporterValidationTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("unknown variety", reason)
+
+
+class TestBYOK(unittest.TestCase):
+    """BYOK (bring-your-own-key): the X-LLM-API-Key header doubles as the access
+    credential and routes the request's LLM spend to the visitor's own key —
+    never the operator's key, daily cap, or quality stats."""
+
+    def setUp(self) -> None:
+        self.original_env = os.environ.copy()
+
+    def tearDown(self) -> None:
+        os.environ.clear()
+        os.environ.update(self.original_env)
+
+    def _blank_server_key(self) -> None:
+        # load_dotenv() uses setdefault, so "" wins over the real .env values.
+        os.environ["LLM_API_KEY"] = ""
+        os.environ["DEEPSEEK_API_KEY"] = ""
+
+    def test_user_llm_key_shape_validation(self) -> None:
+        from native_chinese_assistant.web import _user_llm_key
+
+        good = "sk-" + "a" * 32
+        self.assertEqual(_user_llm_key({"HTTP_X_LLM_API_KEY": good}), good)
+        self.assertIsNone(_user_llm_key({"HTTP_X_LLM_API_KEY": "sk-short"}))
+        self.assertIsNone(_user_llm_key({"HTTP_X_LLM_API_KEY": "pk-" + "a" * 32}))
+        self.assertIsNone(_user_llm_key({"HTTP_X_LLM_API_KEY": "sk-" + "a" * 20 + " x"}))
+        self.assertIsNone(_user_llm_key({"HTTP_X_LLM_API_KEY": "sk-" + "a" * 300}))
+        self.assertIsNone(_user_llm_key({}))
+
+    def test_llm_config_for_user_key_uses_server_defaults(self) -> None:
+        from native_chinese_assistant.rewrite import llm_config_for_user_key
+
+        os.environ["LLM_PROVIDER"] = "deepseek"
+        os.environ["LLM_MODEL"] = "deepseek-v4-flash-test"
+        user_key = "sk-" + "b" * 32
+        cfg = llm_config_for_user_key(user_key)
+        self.assertEqual(cfg.api_key, user_key)
+        self.assertEqual(cfg.model, "deepseek-v4-flash-test")
+        self.assertEqual(cfg.provider, "deepseek")
+        self.assertIn("explain", cfg.model_overrides)
+
+    def test_byok_header_passes_token_gate_and_reaches_upstream(self) -> None:
+        os.environ["NCGA_AUTH_TOKEN"] = "secret-token-xyz"
+        os.environ["LLM_STREAM"] = "false"  # non-streaming path → single POST
+        self._blank_server_key()
+        user_key = "sk-" + "u" * 40
+        app = App(rewrite_service=RewriteService(config=None))
+        captured: dict[str, Any] = {}
+
+        def fake_post(transport_self, url, body, headers, *, timeout, ssl_context):
+            captured["headers"] = headers
+            return FakeStreamResponse(_llm_json("方言版"))
+
+        from native_chinese_assistant.rewrite import UrllibTransport
+
+        with mock.patch.object(UrllibTransport, "post", fake_post):
+            status, _, payload = call_app(
+                app,
+                "POST",
+                "/api/rewrite",
+                body=json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode(),
+                extra_environ={"HTTP_X_LLM_API_KEY": user_key},
+            )
+        self.assertEqual(status, "200 OK")
+        # The upstream call carried the USER's key — not any server credential.
+        self.assertEqual(captured["headers"]["Authorization"], f"Bearer {user_key}")
+        data = json.loads(payload)
+        self.assertFalse(data["degraded"])
+        self.assertEqual(data["rewritten_text"], "方言版")
+
+    def test_malformed_byok_header_does_not_authenticate(self) -> None:
+        os.environ["NCGA_AUTH_TOKEN"] = "secret-token-xyz"
+        self._blank_server_key()
+        app = App(rewrite_service=RewriteService(config=None))
+        status, _, _ = call_app(
+            app,
+            "POST",
+            "/api/rewrite",
+            body=json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode(),
+            extra_environ={"HTTP_X_LLM_API_KEY": "not-a-key"},
+        )
+        self.assertEqual(status, "401 Unauthorized")
+
+    def test_byok_bypasses_operator_daily_cap(self) -> None:
+        os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "1"
+        os.environ["LLM_STREAM"] = "false"
+        self._blank_server_key()
+        user_key = "sk-" + "u" * 40
+        app = App(rewrite_service=RewriteService(config=None))
+        body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode()
+
+        from native_chinese_assistant.rewrite import UrllibTransport
+
+        def fake_post(transport_self, url, body_bytes, headers, *, timeout, ssl_context):
+            return FakeStreamResponse(_llm_json("ok"))
+
+        with mock.patch.object(UrllibTransport, "post", fake_post):
+            # Operator path: first call consumes the single daily unit (heuristic
+            # fallback, no key), second call hits the cap.
+            s1, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
+            self.assertEqual(s1, "200 OK")
+            s2, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
+            self.assertEqual(s2, "429 Too Many Requests")
+            # BYOK path: cap skipped entirely — the user funds their own calls.
+            s3, _, _ = call_app(
+                app, "POST", "/api/rewrite", body=body,
+                extra_environ={"HTTP_X_LLM_API_KEY": user_key},
+            )
+            self.assertEqual(s3, "200 OK")
+
+    def test_key_check_reports_server_mode_without_header(self) -> None:
+        client, _ = _build_client(_llm_json("ok"))
+        app_with = App(rewrite_service=RewriteService(client=client))
+        status, _, payload = call_app(app_with, "POST", "/api/key-check")
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(json.loads(payload)["mode"], "server")
+
+        self._blank_server_key()
+        app_without = App(rewrite_service=RewriteService(config=None))
+        _, _, payload2 = call_app(app_without, "POST", "/api/key-check")
+        self.assertEqual(json.loads(payload2)["mode"], "none")
+
+    def test_key_check_round_trips_user_key(self) -> None:
+        self._blank_server_key()
+        user_key = "sk-" + "u" * 40
+        app = App(rewrite_service=RewriteService(config=None))
+
+        from native_chinese_assistant.rewrite import UrllibTransport
+
+        def ok_post(transport_self, url, body, headers, *, timeout, ssl_context):
+            self.assertEqual(headers["Authorization"], f"Bearer {user_key}")
+            return FakeStreamResponse(_llm_json_raw("pong"))
+
+        with mock.patch.object(UrllibTransport, "post", ok_post):
+            status, _, payload = call_app(
+                app, "POST", "/api/key-check",
+                extra_environ={"HTTP_X_LLM_API_KEY": user_key},
+            )
+        self.assertEqual(status, "200 OK")
+        data = json.loads(payload)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["mode"], "byok")
+        self.assertIn("latency_ms", data)
+
+        def bad_post(transport_self, url, body, headers, *, timeout, ssl_context):
+            raise RewriteError("LLM request failed: 401 Unauthorized")
+
+        with mock.patch.object(UrllibTransport, "post", bad_post):
+            _, _, payload2 = call_app(
+                app, "POST", "/api/key-check",
+                extra_environ={"HTTP_X_LLM_API_KEY": user_key},
+            )
+        data2 = json.loads(payload2)
+        self.assertFalse(data2["ok"])
+        self.assertIn("error", data2)
 
 
 if __name__ == "__main__":

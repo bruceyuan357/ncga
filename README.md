@@ -1,35 +1,57 @@
 # 地道中文 · Native Chinese Grammar Assistant (NCGA)
 
-把任意语言的输入,揉成 10 种地区中文方言/语体(普通话、北京话、东北话、川渝话、江淮话、广东普通话、上海话风格、粤语书面语、台湾闽南语、福建闽南语)。
+把书面普通话,改写成十种真实的中文方言口感 — 北京、东北、川渝、江淮、广普、上海话风格、粤语书面语、台湾/福建闽南语。
+Rewrite standard Mandarin into how people actually talk — 10 regional Chinese varieties, with dialect quality that is *measured and gated*, not vibes.
 
-> **Cycle 20:**
-> - **多语言输入** — 中文/英文/日文/法文… 都可,输出始终是你选的中文方言
-> - **反馈表单** `/api/feedback` — 内嵌浮动按钮 + JSONL 存储
-> - **双轨认证** — SPA 走 HMAC cookie,扩展/脚本走 Bearer header
-> - **`/api/logout`** — cookie 撤销,无需轮转 token
-> - **CSP 锁紧** — `style-src` 不再有 `unsafe-inline`
->
-> **Cycle 22 v3「随四时」(已默认 · v1/v2 仍可切回):**
-> - **整站浅色** — 暖白偏粉底色,告别 v2 黑底窄卡
-> - **紧凑季节情境头图**(非 daily 页)+ daily 自带 slideshow,核心工具首屏可达
-> - **4 季调色板** — 春樱粉 #E89BB0 / 夏林绿 #4A8A5A / 秋枫橙 #D26A2F / 冬松青 #4A7B98(各带 -deep 强调 + -2 次 accent)
-> - **克制的四季材质与色彩** — 保留节气、古诗和地标,移除全屏持续粒子干扰
-> - **节气小章 caption** — 24 节气自动按月日定 → 立夏 / 谷雨 / 大寒…
-> - **16 首古诗每日轮换** — 春夏秋冬各 4 首
-> - **桌面常驻 glass sidebar** + 移动端同源左侧抽屉,导航位置稳定可预测
-> - **页面 max-width 1380px** + workbench 双栏 + 统一卡片/按钮/状态层级
-> - **settings 加「随四时」切换器** — 古朴 / 墨韵 / 随四时 三选
-> - 切回 v2/v1:右下角 sidebar 底部 version-switch 点其他选项
->
-> **Cycle 23 · 四种文本变换**(详见 [文本变换 API](#cycle-23--文本变换-api)):
-> - **润色** (`polish`) — 改通顺、改得体,保持原意
-> - **中英互译** (`translate`) — 中文→英文,英文→中文,自动判向
-> - **总结** (`summarize`) — 压缩成一句话或要点列表
-> - **白话解释** (`explain`) — 术语/法条/难句,用大白话讲明白;deepseek 下默认走更强的 `deepseek-v4-pro` 模型(其他 provider 跟随全局 `LLM_MODEL`)
+![重写台 / Workbench](docs/screenshots/workbench.png)
 
-- 后端：Python 3.10+。运行时依赖仅 `certifi` + `cryptography`（AES-GCM 落盘加密；见 `requirements.txt`）。WSGI。
-- 前端：原生 JS / CSS / HTML，无构建步骤。
-- LLM：默认 DeepSeek（OpenAI 兼容协议），可切换。LLM 不可用时**方言改写**回退到本地启发式重写并明示降级；**文本变换**（Cycle 23）无启发式回退，直接返回 503。
+## 是什么
+
+一个本地优先的网页应用:粘贴一句书面中文,选一个方言,得到一句像当地人写出来的话。不是词替换 — 语气、语序、句末助词整体到位。任何语言的输入都可以,输出始终是你选的中文方言。
+
+A local-first web app: paste textbook Mandarin (or English/Japanese/French — output stays Chinese), pick a variety, get back a sentence that reads like a local wrote it. Register, word order, and sentence-final particles move together, not just vocabulary.
+
+## 为什么不一样
+
+- **方言质量是门禁,不是玄学** — 每种方言带 golden 评测集 + 锚定 LLM 评审;任何改动让任一方言掉分 >0.3 直接失败(见 [方言质量评估协议](#方言质量评估协议-2026-08))。Dialect quality is a CI gate: golden sets + an anchored judge, regressions fail the build.
+- **按方言路由模型** — 官话系走 DeepSeek V4 Flash(快、便宜),低资源方言(江淮/上海话风格/粤语书面/闽南语)自动路由到 Pro;响应带 `model` 字段,路由可观测。依据:[一次 A/B 实验](#方言改写的模型路由-2026-08)。
+- **BYOK 自带 Key** — 设置页粘贴你自己的 DeepSeek key,全部 AI 功能走你的账户,无需访问令牌;key 只存浏览器 localStorage,随请求直传上游。见 [自带 Key(BYOK)](#自带-keybyok)。
+- **诚实降级** — LLM 抖动时回退本地启发式改写,UI 与 API 都明示 `degraded: true`,不装没发生。
+- **近乎零依赖** — 后端 Python 3.10+ 标准库(运行时仅 `certifi` + `cryptography`),前端原生 HTML/CSS/JS 无构建步骤。
+
+还有:流式改写 · 批量工作台(100 条 × 4 方言)· 情境向导(两句话生成语域画像)· 每日方言一句配地标摄影 · 润色/中英互译/总结/白话解释 · 实时质量面板。
+
+| 每日方言一句 | 自带 Key 设置 |
+| --- | --- |
+| ![每日方言](docs/screenshots/daily.png) | ![BYOK](docs/screenshots/byok-settings.png) |
+
+## 快速开始
+
+```bash
+pip install -r requirements.txt        # 仅运行
+pip install -r requirements-dev.txt    # 开发 / 测试 / 生产 server
+
+cp .env.example .env                   # 填入 DEEPSEEK_API_KEY
+python app.py                          # http://127.0.0.1:8000
+```
+
+没有 API key 也能跑 — 方言改写回退启发式(并明示降级);有 key 但不想给别人用?开 `NCGA_AUTH_TOKEN` 即可(见 [安全](#安全--security))。
+
+## 测试与质量门禁
+
+```bash
+pytest                                  # 离线测试(LLM 全部 mock),含 Playwright 浏览器用例
+tools/smoke.sh                          # 真 LLM 冒烟(19 项,每次几分钱),发布前必跑
+python3 tools/eval_dialects.py          # 方言质量回归:任一方言掉分 >0.3 即 exit 1
+```
+
+## 文档地图
+
+- [环境变量全表](#环境变量) · [语料库 few-shot](#语料库与少样本注入-cycle-22-stage-c) · [词音表 lexicon](#词音对应表-lexicon-cycle-22-stage-d)
+- [文本变换 API(润色/互译/总结/解释)](#cycle-23--文本变换-api) · [模型路由](#模型路由)
+- [生产部署(waitress/Docker)](#生产部署) · [安全清单](#安全--security) · [架构速览](#架构速览) · [加一种新方言](#加一种新方言)
+
+---
 
 ## 运行
 
@@ -41,24 +63,28 @@ cp .env.example .env                   # 填入 DEEPSEEK_API_KEY
 python app.py                          # http://127.0.0.1:8000
 ```
 
+- 后端:Python 3.10+。运行时依赖仅 `certifi` + `cryptography`(AES-GCM 落盘加密;见 `requirements.txt`)。WSGI。
+- 前端:原生 JS / CSS / HTML,无构建步骤。
+- LLM:默认 DeepSeek(OpenAI 兼容协议),可切换。LLM 不可用时**方言改写**回退到本地启发式重写并明示降级;**文本变换**(Cycle 23)无启发式回退,直接返回 503。
+
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `LLM_PROVIDER` | `deepseek` | `deepseek` 或 `openai` |
-| `LLM_API_KEY` 或 `DEEPSEEK_API_KEY` | — | LLM API key（缺省走启发式 fallback） |
+| `LLM_API_KEY` 或 `DEEPSEEK_API_KEY` | — | LLM API key(缺省走启发式 fallback) |
 | `LLM_MODEL` | `deepseek-chat` / `gpt-4.1-mini` | 模型名 |
-| `LLM_MODEL_<MODE>` | 仅 `explain` 在 deepseek 下默认 `deepseek-v4-pro` | Cycle 23: 按变换模式覆盖模型，见 [模型路由](#模型路由) |
+| `LLM_MODEL_<MODE>` | 仅 `explain` 在 deepseek 下默认 `deepseek-v4-pro` | Cycle 23: 按变换模式覆盖模型,见 [模型路由](#模型路由) |
 | `LLM_BASE_URL` | provider 默认 | OpenAI 兼容 base URL |
 | `LLM_STREAM` | `true` | 是否使用 SSE 流式 |
-| `LLM_TIMEOUT_SECONDS` | `60` | 整个请求的超时上限（秒） |
+| `LLM_TIMEOUT_SECONDS` | `60` | 整个请求的超时上限(秒) |
 | `LLM_CA_BUNDLE` | `certifi.where()` | 自定义 CA 文件路径 |
-| `LLM_SKIP_SSL_VERIFY` | `false` | **危险**：跳过 SSL 校验，仅供调试 |
-| `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟的主限流桶（`/api/rewrite` 与三个 transform POST 端点等共享；`GET /api/transform-modes` 不限流；0 = 关闭） |
-| `NCGA_MAX_BODY_BYTES` | `65536` | 请求体字节上限（64 KB，容纳 batch 输入） |
+| `LLM_SKIP_SSL_VERIFY` | `false` | **危险**:跳过 SSL 校验,仅供调试 |
+| `NCGA_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟的主限流桶(`/api/rewrite` 与三个 transform POST 端点等共享;`GET /api/transform-modes` 不限流;0 = 关闭) |
+| `NCGA_MAX_BODY_BYTES` | `65536` | 请求体字节上限(64 KB,容纳 batch 输入) |
 | `NCGA_BATCH_RATE_LIMIT_PER_MIN` | `6` | 每个 IP 每分钟可调 `/api/rewrite-batch` 的次数 |
-| `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限（rewrite/batch/rate/transform/rate-transform/explain/characterize/phrase 共享） |
-| `NCGA_QUALITY_STORE` | `~/.local/share/ncga/quality.json` | 质量存储路径（用户数据目录不可写时回退到源码目录 `.ncga-quality.json`） |
+| `NCGA_DAILY_LLM_CAP_PER_IP` | `300` | 每个 IP 每日 LLM 调用总上限(rewrite/batch/rate/transform/rate-transform/explain/characterize/phrase 共享) |
+| `NCGA_QUALITY_STORE` | `~/.local/share/ncga/quality.json` | 质量存储路径(用户数据目录不可写时回退到源码目录 `.ncga-quality.json`) |
 | `NCGA_FEEDBACK_RATE_LIMIT_PER_MIN` | `5` | Cycle 20: 每个 IP 每分钟可提交 `/api/feedback` 的次数 |
 | `NCGA_FEEDBACK_MAX_BODY_BYTES` | `8192` | Cycle 20: 反馈表单请求体上限 |
 | `NCGA_FEEDBACK_STORE` | `~/.local/share/ncga/feedback.jsonl` | Cycle 20: 反馈 JSONL 落地路径 (`0o600`) |
@@ -71,6 +97,25 @@ python app.py                          # http://127.0.0.1:8000
 | `NCGA_CORPUS_DISABLE` | — | Cycle 22 Stage C: 设 `1` 关掉句子级 few-shot 注入(回到无示例 prompt) |
 | `NCGA_LEXICON_PATH` | `data/lexicon.jsonl` | Cycle 22 Stage D: 词音对应表 JSONL 路径(覆盖默认) |
 | `NCGA_LEXICON_DISABLE` | — | Cycle 22 Stage D: 设 `1` 关掉词级 hint 注入 |
+
+## 自带 Key(BYOK)
+
+来访者无需访问令牌:在「设置 → API 密钥」粘贴自己的 DeepSeek key 即可使用全部 AI 功能。
+
+工作原理:
+
+- key 只保存在浏览器的 `localStorage`,前端把它作为 `X-LLM-API-Key` 头随每次 `/api/` 请求发出。
+- 服务端对该请求构造一次性的 LLM 客户端,key 直传上游 DeepSeek — **不落盘、不进日志、不碰 `.env`**。
+- 携带有效形态的 key 本身就是第三条认证轨道(与 Bearer token / HMAC cookie 并列);形态校验(`sk-` 前缀、长度、无空白)只是门槛,真正的有效性由首次上游调用证明。
+- BYOK 请求**不占**部署者的每日 LLM 额度,也**不写入**部署者的质量统计与遥测 — 各付各的账,各看各的数。
+- 「保存并测试连接」走 `POST /api/key-check`:一次 1-token 的上游往返,报告 ok/延迟;服务端无 key 时报告 `mode: "none"`。
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/rewrite \
+  -H "Content-Type: application/json" \
+  -H "X-LLM-API-Key: sk-访客的key" \
+  -d '{"text":"今天天气不错","target_variety":"beijing_mandarin"}'
+```
 
 ## 语料库与少样本注入 (Cycle 22 Stage C)
 
@@ -140,21 +185,21 @@ pytest
 
 ### 真 LLM 冒烟测试
 
-离线测试覆盖不到「LLM 端协议变了」这一类回归（Cycle 17 发现 DeepSeek-V4 升级后 `/api/rate` 因 `max_tokens` 太小静默坏掉，离线 mock 测试全绿）。每次发布后跑一次：
+离线测试覆盖不到「LLM 端协议变了」这一类回归(Cycle 17 发现 DeepSeek-V4 升级后 `/api/rate` 因 `max_tokens` 太小静默坏掉,离线 mock 测试全绿)。每次发布后跑一次:
 
 ```bash
 tools/smoke.sh                           # 默认 http://127.0.0.1:8000
 BASE=https://ncga.example.com tools/smoke.sh
 ```
 
-`tools/smoke.sh` 会真调 LLM（每次几分钱），覆盖 19 项：公开 GET（healthz / presets / scenarios / quality-stats / transform-modes / SPA / 静态 + 两个路径穿越探针；不含会扣 10 个每日额度的 phrase-of-the-day）、rewrite 与 transform 的 auth gating、4 个 LLM 走通、hokkien `degraded=false` 回归探针（2026-08 reasoning 吃光 max_tokens → 静默降级事件）、Cycle 16 的 4xx 诊断。
+`tools/smoke.sh` 会真调 LLM(每次几分钱),覆盖 19 项:公开 GET(healthz / presets / scenarios / quality-stats / transform-modes / SPA / 静态 + 两个路径穿越探针;不含会扣 10 个每日额度的 phrase-of-the-day)、rewrite 与 transform 的 auth gating、4 个 LLM 走通、hokkien `degraded=false` 回归探针(2026-08 reasoning 吃光 max_tokens → 静默降级事件)、Cycle 16 的 4xx 诊断。
 
-本机已挂 cron：`tools/daily_smoke.sh` 每天 09:17 跑（服务器没在跑时自动拉起再关掉），结果追加到 `~/.local/share/ncga/smoke.log`。
+本机已挂 cron:`tools/daily_smoke.sh` 每天 09:17 跑(服务器没在跑时自动拉起再关掉),结果追加到 `~/.local/share/ncga/smoke.log`。
 
 ## 质量看板与评审扫描 (2026-08)
 
-- **`/quality`** — 质量看板页（深玉漆器风）：每个方言的请求数 / 降级率 / 平均延迟（改写 handler 自动埋点，`__counters__` 与 `_latency_ms` 桶）、评分桶分布、语料库 needs_review 缺口。数据来自 `GET /api/quality-dashboard`（与主限流桶共享 30/min）。
-- **`tools/quality_sweep.py`** — LLM 评审扫描：20 条固定探针句 × 10 方言改写（flash,thinking off），由 `deepseek-v4-pro` 逐条打分（0-5），落到质量存储 `judge_sweep` 场景桶 — 不用等用户点星星就有质量趋势线，并指出当前最弱方言。
+- **`/quality`** — 质量看板页(深玉漆器风):每个方言的请求数 / 降级率 / 平均延迟(改写 handler 自动埋点,`__counters__` 与 `_latency_ms` 桶)、评分桶分布、语料库 needs_review 缺口。数据来自 `GET /api/quality-dashboard`(与主限流桶共享 30/min)。
+- **`tools/quality_sweep.py`** — LLM 评审扫描:20 条固定探针句 × 10 方言改写(flash,thinking off),由 `deepseek-v4-pro` 逐条打分(0-5),落到质量存储 `judge_sweep` 场景桶 — 不用等用户点星星就有质量趋势线,并指出当前最弱方言。
 
 ```bash
 python3 tools/quality_sweep.py                  # 全量 20×10(400 次调用,几分钱)
@@ -164,22 +209,22 @@ python3 tools/quality_sweep.py --dry-run        # 只看分,不写存储
 
 ## 生产部署
 
-`wsgiref.simple_server` 是开发服务器。生产用 `waitress`：
+`wsgiref.simple_server` 是开发服务器。生产用 `waitress`:
 
 ```bash
 pip install waitress
 waitress-serve --host 0.0.0.0 --port 8000 native_chinese_assistant.web:application
 ```
 
-或 `gunicorn` / `uvicorn --interface wsgi`。**务必**在反代层（Caddy / nginx）做 TLS 与额外限流。
+或 `gunicorn` / `uvicorn --interface wsgi`。**务必**在反代层(Caddy / nginx)做 TLS 与额外限流。
 
 ## 安全 / Security
 
-详见 [SECURITY.md](SECURITY.md)。**公网部署前**至少做以下三件：
+详见 [SECURITY.md](SECURITY.md)。**公网部署前**至少做以下三件:
 
-1. **TLS 反代**（Caddy / Nginx / Cloudflare）。NCGA 自身只跑 HTTP，永远不要直接暴露到公网。
-2. **设 `NCGA_AUTH_TOKEN`**：所有 `POST /api/*` 走双轨鉴权 — 浏览器 SPA 用 HMAC 签名 cookie(`POST /api/login` 用 token 换发,已认证的 `GET /` 刷新;token 本身**不注入 HTML**),API / 扩展 / 脚本用 `Authorization: Bearer` 头。服务端只注入一个无密钥的 `<meta name="ncga-auth-mode">` 标记,让前端知道 cookie 模式已开。
-3. **设 `NCGA_DATA_KEY`**：质量存储 AES-GCM 落盘（自 Refiner 移除起仅存评分统计聚合,不再含用户原文）。
+1. **TLS 反代**(Caddy / Nginx / Cloudflare)。NCGA 自身只跑 HTTP,永远不要直接暴露到公网。
+2. **设 `NCGA_AUTH_TOKEN`**:所有 `POST /api/*` 走双轨鉴权 — 浏览器 SPA 用 HMAC 签名 cookie(`POST /api/login` 用 token 换发,已认证的 `GET /` 刷新;token 本身**不注入 HTML**),API / 扩展 / 脚本用 `Authorization: Bearer` 头。服务端只注入一个无密钥的 `<meta name="ncga-auth-mode">` 标记,让前端知道 cookie 模式已开。此外,携带 `X-LLM-API-Key` 的 BYOK 请求构成第三条轨道(见 [自带 Key(BYOK)](#自带-keybyok))。
+3. **设 `NCGA_DATA_KEY`**:质量存储 AES-GCM 落盘(自 Refiner 移除起仅存评分统计聚合,不再含用户原文)。
 
 ```bash
 # 生成两个密钥
@@ -194,10 +239,10 @@ echo "NCGA_DATA_KEY=$NCGA_DATA_KEY" >> .env
 | 限流 30/min/IP | ✅ on | 反代层应再加一层 |
 | Body cap 64KB | ✅ on | 防 OOM |
 | 路径穿越拒绝 | ✅ on | 多种编码全部 404 |
-| CSP（无 `'unsafe-inline'` script-src） | ✅ on | 内联引导脚本走 nonce |
+| CSP(无 `'unsafe-inline'` script-src) | ✅ on | 内联引导脚本走 nonce |
 | HSTS | ✅ on | 反代层 TLS 时生效 |
 | Bearer auth | ⚪ 默认关 | 设 `NCGA_AUTH_TOKEN` 开 |
-| Quality store AES-GCM | ⚪ 默认关 | 设 `NCGA_DATA_KEY` 开（或自动落地到 `~/.local/share/ncga/`） |
+| Quality store AES-GCM | ⚪ 默认关 | 设 `NCGA_DATA_KEY` 开(或自动落地到 `~/.local/share/ncga/`) |
 | X-Forwarded-For 信任 | ⚪ 默认关 | 反代后才设 `NCGA_TRUST_FORWARDED_FOR=true` |
 
 ## Docker 部署
@@ -211,7 +256,7 @@ docker run -d --name ncga --restart unless-stopped \
   ncga
 ```
 
-容器以非 root 用户跑（uid 1000），用 waitress 多线程 serve，tini 做 PID 1 接信号。
+容器以非 root 用户跑(uid 1000),用 waitress 多线程 serve,tini 做 PID 1 接信号。
 **前面必须套 TLS 反代**——容器只暴露 HTTP。
 
 ## 架构速览
@@ -219,26 +264,26 @@ docker run -d --name ncga --restart unless-stopped \
 ```
 app.py
 └── native_chinese_assistant/
-    ├── web.py           # WSGI 路由 / 限流 / 安全头 / 双轨认证 / 反馈表单
+    ├── web.py           # WSGI 路由 / 限流 / 安全头 / 双轨认证 + BYOK 轨道 / 反馈表单
     ├── rewrite.py       # LLM 客户端 + 启发式 fallback + RewriteService
-    ├── transform.py     # Cycle 23: 四种文本变换模式，复用 rewrite 的 LLM 客户端，无启发式回退
-    ├── presets.py       # 所有方言元数据（label / register / style / landmarks / keywords / letter）
-    ├── corpus.py        # 句子级方言语料 + 纯 stdlib BM25 检索（few-shot 注入）
-    ├── lexicon.py       # 词级「普通话 → 方言」对应表 + BM25 检索（词音 hint 注入）
+    ├── transform.py     # Cycle 23: 四种文本变换模式,复用 rewrite 的 LLM 客户端,无启发式回退
+    ├── presets.py       # 所有方言元数据(label / register / style / landmarks / keywords / letter)
+    ├── corpus.py        # 句子级方言语料 + 纯 stdlib BM25 检索(few-shot 注入)
+    ├── lexicon.py       # 词级「普通话 → 方言」对应表 + BM25 检索(词音 hint 注入)
     ├── crypto.py        # 质量存储 AES-GCM 落盘加解密
-    ├── daily_phrase.py  # 今日方言一句：每日确定性选词 + 10 方言改写 + 24h 缓存
+    ├── daily_phrase.py  # 今日方言一句:每日确定性选词 + 10 方言改写 + 24h 缓存
     └── feedback.py      # 质量评分存储 + Reflexion 自我改进 prompt 系统
 static/
 ├── index.html
-├── app.js               # 单文件前端，所有方言数据从 /api/presets 拉
+├── app.js               # 单文件前端,所有方言数据从 /api/presets 拉
 └── styles.css
-tests/test_app.py        # 离线测试，mock 掉 LLM HTTP
-tests/browser/           # Playwright 真浏览器行为测试（pytest-playwright，仅 dev 依赖）
+tests/test_app.py        # 离线测试,mock 掉 LLM HTTP
+tests/browser/           # Playwright 真浏览器行为测试(pytest-playwright,仅 dev 依赖)
 ```
 
 ## 加一种新方言
 
-只改 [`presets.py`](native_chinese_assistant/presets.py) 一处：在 `VarietyPreset` 加 enum，然后在 `PRESET_METADATA` 加完整元数据（label/register/style_notes/keywords/landmarks/letter/description）。前端会自动加载。
+只改 [`presets.py`](native_chinese_assistant/presets.py) 一处:在 `VarietyPreset` 加 enum,然后在 `PRESET_METADATA` 加完整元数据(label/register/style_notes/keywords/landmarks/letter/description)。前端会自动加载。
 
 ## Cycle 20 · 多语言输入
 
@@ -286,6 +331,7 @@ jq -r 'select(.note != "") | "[\(.rating)★] \(.note)"' \
 |---|---|---|
 | 浏览器 SPA | HMAC-signed cookie | 自动 (`credentials: same-origin`) |
 | Chrome 扩展 / curl / 脚本 | Bearer token | `Authorization: Bearer $NCGA_AUTH_TOKEN` |
+| 访客自带 key | BYOK header | `X-LLM-API-Key: sk-…`(见 [自带 Key(BYOK)](#自带-keybyok)) |
 
 `_check_auth` 任一通过即放行。一个写定的设计点:**cookie 用 `NCGA_AUTH_TOKEN` 当签名密钥** → 轮转 token 立刻吊销所有 cookie。
 
@@ -323,7 +369,7 @@ curl -X POST http://127.0.0.1:8000/api/logout \
 
 错误响应(均为 `{"error": "..."}`):
 - `400` — 缺字段 / `text` 不是字符串(`rate-transform`:`transformed` 不是非空字符串)/ 未知 mode / 文本过长(`text` 原始 >4800 字符或规范化后 >1200 字符;`rate-transform` 不查长度,仅受全局请求体上限约束)
-- `401` — 设了 `NCGA_AUTH_TOKEN` 且 cookie / Bearer 两轨都没过
+- `401` — 设了 `NCGA_AUTH_TOKEN` 且 cookie / Bearer / BYOK 三轨都没过
 - `429` — 每分钟限流或每日 LLM 上限
 - `503` — LLM 未配置或不可达(见上,无回退)
 

@@ -384,11 +384,25 @@ def default_ca_bundle() -> str | None:
 
 def load_llm_config() -> LLMConfig | None:
     load_dotenv()
-    provider = os.environ.get("LLM_PROVIDER", "deepseek").strip().lower()
     api_key = os.environ.get("LLM_API_KEY", "").strip() or os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
         return None
+    return _build_llm_config(api_key)
 
+
+def llm_config_for_user_key(user_key: str) -> LLMConfig:
+    """BYOK: build a config around a user-supplied API key.
+
+    Reuses every server-side default (provider, base URL, model, per-mode
+    overrides, timeouts, TLS settings) — only the credential changes. The key
+    rides one request and is never persisted or logged.
+    """
+    load_dotenv()
+    return _build_llm_config(user_key)
+
+
+def _build_llm_config(api_key: str) -> LLMConfig:
+    provider = os.environ.get("LLM_PROVIDER", "deepseek").strip().lower()
     default_base_url = "https://api.deepseek.com" if provider == "deepseek" else "https://api.openai.com/v1"
     default_model = "deepseek-chat" if provider == "deepseek" else "gpt-4.1-mini"
     base_url = os.environ.get("LLM_BASE_URL", default_base_url).strip()

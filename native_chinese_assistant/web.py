@@ -21,6 +21,7 @@ from native_chinese_assistant.rewrite import (
     MAX_INPUT_CHARS,
     RewriteError,
     RewriteService,
+    llm_config_for_user_key,
     load_dotenv,
     parse_variety,
 )
@@ -65,6 +66,31 @@ def _const_eq(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
+# BYOK (bring-your-own-key): a visitor may paste their own DeepSeek key in
+# 设置 → API 密钥; the SPA then sends it as X-LLM-API-Key on every POST. The
+# key doubles as the access credential AND the billing identity — requests
+# carrying it never touch the operator's key, daily cap, or quality stats.
+_USER_KEY_HEADER = "HTTP_X_LLM_API_KEY"
+_USER_KEY_MAX_LEN = 200
+
+
+def _user_llm_key(environ: dict) -> str | None:
+    """Extract a syntactically plausible user-supplied LLM key, else None.
+
+    Shape check only (sk- prefix, printable, no whitespace) — validity is
+    proven by the first real upstream call, not here. Never log the value.
+    """
+    raw = environ.get(_USER_KEY_HEADER, "")
+    if not isinstance(raw, str):
+        return None
+    key = raw.strip()
+    if not key.startswith("sk-") or not (16 <= len(key) <= _USER_KEY_MAX_LEN):
+        return None
+    if any(ch.isspace() for ch in key) or not key.isprintable():
+        return None
+    return key
+
+
 def _check_auth(environ: dict) -> bool:
     """Cycle 20: dual-track auth.
 
@@ -74,6 +100,8 @@ def _check_auth(environ: dict) -> bool:
          it out manually.
       2. Cookie: ncga_sess=<HMAC-signed cookie>  — the "browser path". Server
          sets this cookie when serving / so the SPA never sees the raw token.
+      3. X-LLM-API-Key: <user's own DeepSeek key>  — the BYOK path. The key
+         pays for the request it rides on, so possession is the credential.
 
     If NCGA_AUTH_TOKEN is unset, auth is disabled (backwards-compatible).
     """
@@ -89,7 +117,11 @@ def _check_auth(environ: dict) -> bool:
 
     # Track 2 — signed session cookie (SPA).
     cookie_val = _get_cookie(environ, _SESSION_COOKIE_NAME)
-    return bool(cookie_val and _verify_session_cookie(cookie_val))
+    if cookie_val and _verify_session_cookie(cookie_val):
+        return True
+
+    # Track 3 — BYOK header (self-funded requests).
+    return _user_llm_key(environ) is not None
 
 
 # Cycle 20 — session cookie helpers.
@@ -622,6 +654,84 @@ class App:
             )
         return None
 
+    def _services_for(
+        self, environ: dict
+    ) -> tuple[RewriteService, TransformService, bool]:
+        """Return (rewrite_service, transform_service, byok) for this request.
+
+        BYOK: when the request carries a plausible X-LLM-API-Key header, build
+        throwaway services around that key. Their quality_store is None so a
+        visitor's ratings never pollute the operator's stats, and handlers
+        skip the operator's daily LLM cap (the user funds their own calls).
+        Client construction is cheap — one SSL context, no network I/O.
+        """
+        key = _user_llm_key(environ)
+        if key is None:
+            return self.rewrite_service, self.transform_service, False
+        svc = RewriteService(config=llm_config_for_user_key(key), quality_store=None)
+        return svc, TransformService(client=svc.client), True
+
+    def _check_daily_cap_byok(
+        self, environ: dict, ip: str, start_response: Callable, endpoint: str, *, units: int = 1
+    ) -> list[bytes] | None:
+        """Daily-cap check that BYOK requests bypass (they don't spend the
+        operator's key). Thin wrapper so handlers keep a one-line guard."""
+        if _user_llm_key(environ) is not None:
+            return None
+        return self._check_daily_cap(ip, start_response, endpoint, units=units)
+
+    def handle_key_check(self, environ: dict, start_response: Callable) -> list[bytes]:
+        """POST /api/key-check — verify a BYOK key with a 1-token upstream call.
+
+        With X-LLM-API-Key: round-trips the key against the provider and
+        reports ok/latency. Without it: reports whether the server itself has
+        a key configured (mode=server|none). Always 200 — a failed check is a
+        valid answer, not a server fault. Not charged against the daily cap.
+        """
+        ip = client_ip(environ)
+        if not self.rate_limiter.allow(ip):
+            logger.info("rate_limited ip=%s endpoint=key-check", ip)
+            return json_response(
+                start_response,
+                "429 Too Many Requests",
+                {"error": "Rate limit exceeded. Please slow down."},
+            )
+        key = _user_llm_key(environ)
+        if key is None:
+            configured = self.rewrite_service.client is not None
+            return json_response(
+                start_response,
+                "200 OK",
+                {"ok": configured, "mode": "server" if configured else "none"},
+            )
+        svc, _, _ = self._services_for(environ)
+        assert svc.client is not None  # BYOK config always yields a client
+        t0 = time.perf_counter()
+        try:
+            svc.client.general_chat(
+                [{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                temperature=0.0,
+                response_format_json=False,  # DeepSeek 400s on json_object mode unless the prompt says "json"
+                retry_on_empty=False,  # 1 token proves the key — don't double the probe
+                thinking="disabled",
+            )
+        except RewriteError as exc:
+            return json_response(
+                start_response, "200 OK", {"ok": False, "mode": "byok", "error": str(exc)}
+            )
+        except Exception:  # noqa: BLE001 — network/TLS errors surface as a failed check
+            logger.info("key-check failed with unexpected error", exc_info=True)
+            return json_response(
+                start_response,
+                "200 OK",
+                {"ok": False, "mode": "byok", "error": "连接上游失败，请检查网络后重试。"},
+            )
+        latency_ms = round((time.perf_counter() - t0) * 1000)
+        return json_response(
+            start_response, "200 OK", {"ok": True, "mode": "byok", "latency_ms": latency_ms}
+        )
+
     def _route_table(self) -> dict[tuple[str, str], Callable]:
         """Cycle 18 architecture cleanup: replace the 16-line if-chain dispatch with
         a (method, path) → handler table. Lookup is O(1) and adding a new endpoint
@@ -663,6 +773,7 @@ class App:
             ("POST", "/api/explain"): self.handle_explain,
             ("POST", "/api/characterize"): self.handle_characterize,
             ("POST", "/api/feedback"): self.handle_feedback,
+            ("POST", "/api/key-check"): self.handle_key_check,
             ("POST", "/api/login"): self.handle_login,
             ("POST", "/api/logout"): self.handle_logout,
         }
@@ -705,7 +816,7 @@ class App:
 
     def handle_rewrite(self, environ: dict, start_response: Callable) -> list[bytes]:
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "rewrite")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -744,12 +855,14 @@ class App:
             import time as _time
 
             t0 = _time.perf_counter()
-            result = self.rewrite_service.rewrite(
+            svc, _, byok = self._services_for(environ)
+            result = svc.rewrite(
                 text, target, scenario=scenario, glossary_lines=glossary_lines
             )
-            self._record_rewrite_telemetry(
-                target.value, result.degraded, (_time.perf_counter() - t0) * 1000
-            )
+            if not byok:
+                self._record_rewrite_telemetry(
+                    target.value, result.degraded, (_time.perf_counter() - t0) * 1000
+                )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
 
@@ -760,7 +873,7 @@ class App:
     def handle_explain(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Take {original, rewritten, target_variety} and return {summary, points[]}."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "explain")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "explain")
         if cap_err is not None:
             return cap_err
         # Reuse the same rate limiter — explain is also LLM-backed and costs money.
@@ -795,7 +908,8 @@ class App:
             )
 
         try:
-            data = self.rewrite_service.explain(original, rewritten, target)
+            svc, _, _ = self._services_for(environ)
+            data = svc.explain(original, rewritten, target)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
@@ -816,7 +930,7 @@ class App:
           * No persistence (no PII storage)
         """
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "characterize")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "characterize")
         if cap_err is not None:
             return cap_err
         if not self.characterize_limiter.allow(ip):
@@ -840,7 +954,8 @@ class App:
                 {"error": "`recipient` and `mood` must be strings."},
             )
         try:
-            data = self.rewrite_service.characterize(recipient, mood)
+            svc, _, _ = self._services_for(environ)
+            data = svc.characterize(recipient, mood)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
@@ -865,12 +980,15 @@ class App:
             cache_warm = False
         if not cache_warm:
             # Generation costs ~10 LLM calls (one per variety); count honestly.
-            cap_err = self._check_daily_cap(ip, start_response, "phrase-of-the-day", units=10)
+            cap_err = self._check_daily_cap_byok(
+                environ, ip, start_response, "phrase-of-the-day", units=10
+            )
             if cap_err is not None:
                 return cap_err
 
         try:
-            data = get_phrase_of_the_day(self.rewrite_service)
+            svc, _, _ = self._services_for(environ)
+            data = get_phrase_of_the_day(svc)
         except RewriteError as exc:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
@@ -931,7 +1049,7 @@ class App:
     def handle_rewrite_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint. Streams partial rewrite text as the LLM emits tokens."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "rewrite-stream")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite-stream")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -973,19 +1091,20 @@ class App:
                 ]
             ),
         )
+        svc, _, byok = self._services_for(environ)
         return _sse_iter_rewrite_stream(
-            self.rewrite_service,
+            svc,
             text,
             target,
             scenario,
             glossary_lines=glossary_lines,
-            on_result=self._record_rewrite_telemetry,
+            on_result=None if byok else self._record_rewrite_telemetry,
         )
 
     def handle_rate(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Rate the 'native-ness' of a rewritten text: small LLM call, returns {score, reason}."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "rate")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rate")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -1014,7 +1133,8 @@ class App:
                 start_response, "400 Bad Request", {"error": "`rewritten` must be a string."}
             )
         try:
-            data = self.rewrite_service.rate_quality(
+            svc, _, _ = self._services_for(environ)
+            data = svc.rate_quality(
                 rewritten,
                 target,
                 scenario=scenario,
@@ -1032,7 +1152,7 @@ class App:
         heuristic fallback — an unreachable LLM is a 503, not a degraded 200.
         """
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "transform")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "transform")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -1060,7 +1180,8 @@ class App:
         if len(text) > MAX_INPUT_CHARS * 4:  # before normalize, hard cap on raw payload size
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
         try:
-            result = self.transform_service.transform(text, mode)
+            _, tsvc, _ = self._services_for(environ)
+            result = tsvc.transform(text, mode)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
@@ -1070,7 +1191,7 @@ class App:
     def handle_transform_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint for transforms. Same event shape as /api/rewrite-stream."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "transform-stream")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "transform-stream")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -1109,14 +1230,15 @@ class App:
                 ]
             ),
         )
-        return _sse_iter_transform_stream(self.transform_service, text, mode)
+        _, tsvc, _ = self._services_for(environ)
+        return _sse_iter_transform_stream(tsvc, text, mode)
 
     def handle_rate_transform(self, environ: dict, start_response: Callable) -> list[bytes]:
         """LLM-judge a transform result; records into the quality store under
         bucket (mode:<key>, "transform") so the stats page gets the same Welford
         treatment as dialect buckets. No Reflexion for modes (v1: measure only)."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap(ip, start_response, "rate-transform")
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rate-transform")
         if cap_err is not None:
             return cap_err
         if not self.rate_limiter.allow(ip):
@@ -1145,12 +1267,14 @@ class App:
                 start_response, "400 Bad Request", {"error": "`transformed` must be a non-empty string."}
             )
         try:
-            data = self.transform_service.rate(transformed, mode, original=original)
+            _, tsvc, byok = self._services_for(environ)
+            data = tsvc.rate(transformed, mode, original=original)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
         except RewriteError as exc:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
-        self.quality_store.record(f"mode:{mode.value}", "transform", float(data["score"]))
+        if not byok:
+            self.quality_store.record(f"mode:{mode.value}", "transform", float(data["score"]))
         return json_response(start_response, "200 OK", data)
 
     def handle_rewrite_batch(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -1221,8 +1345,8 @@ class App:
                 )
         # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
         # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
-        cap_err = self._check_daily_cap(
-            ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
+        cap_err = self._check_daily_cap_byok(
+            environ, ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
         )
         if cap_err is not None:
             return cap_err
@@ -1237,14 +1361,15 @@ class App:
                 ]
             ),
         )
+        svc, _, byok = self._services_for(environ)
         return _sse_iter_batch(
-            self.rewrite_service,
+            svc,
             items,
             varieties,
             scenario,
             glossary_lines=glossary_lines,
             max_parallel=max_parallel,
-            on_result=self._record_rewrite_telemetry,
+            on_result=None if byok else self._record_rewrite_telemetry,
         )
 
     def _record_rewrite_telemetry(self, variety: str, degraded: bool, latency_ms: float) -> None:
