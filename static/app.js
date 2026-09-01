@@ -490,9 +490,12 @@
     const list = (VARIETIES[varietyKey] && VARIETIES[varietyKey].landmarks) || [];
     // 照片回流:时令地标(seasonal_landmarks.json)排在首位,既作首图也入轮播,
     // 让 JSON 里的季节实景真正驱动全幅背景;固定地标(pinned)仍按 url 命中原位。
+    // Root fix (2026-09-01): keep the FULL seasonal entry (location/caption ride
+    // along) so the hero can render the identity of whichever photo is showing,
+    // not just the carousel's first item.
     const seasonal = getSeasonalEntry(varietyKey, currentSeason());
     const merged = (seasonal && seasonal.url)
-      ? [{ url: seasonal.url, name: seasonal.landmark }, ...list.filter((l) => l.url !== seasonal.url)]
+      ? [{ ...seasonal, name: seasonal.landmark }, ...list.filter((l) => l.url !== seasonal.url)]
       : list;
     const filtered = merged.filter((l) => !FAILED_BG.has(l.url));
     return filtered.length ? filtered : merged;
@@ -518,7 +521,11 @@
         const item = list[currentBgIndex];
         if (FAILED_BG.has(item.url)) continue;
         const ok = await setBackgroundUrl(item.url, item.name, myVersion);
-        if (ok) break;
+        if (ok) {
+          // Keep the hero in lockstep with the photo that just rotated in.
+          updateV3Hero(varietyKey, item);
+          break;
+        }
       }
     }, 12000);
   }
@@ -534,19 +541,20 @@
     bgVersion++;  // cycle 9: invalidate any in-flight preload from previous variety
     stopBgRotate();
 
-    // v3「随四时」: hero always updates (independent of bgMode), pick the first landmark.
-    const allLandmarks = (VARIETIES[varietyKey] && VARIETIES[varietyKey].landmarks) || [];
-    if (allLandmarks.length) updateV3Hero(varietyKey, allLandmarks[0]);
-
     if (SETTINGS.bgMode === "off") {
       document.body.setAttribute("data-bg-mode", "off");
       updateLandmarkTag(null);
+      // No photo on screen — hero falls back to the seasonal identity.
+      updateV3Hero(varietyKey);
       return;
     }
     document.body.removeAttribute("data-bg-mode");
 
     const list = getValidLandmarks(varietyKey) || [];
-    if (!list.length) return;
+    if (!list.length) {
+      updateV3Hero(varietyKey);
+      return;
+    }
 
     const pinnedUrl = SETTINGS.pinnedLandmark[varietyKey];
     let pickIdx = 0;
@@ -556,8 +564,17 @@
     }
     currentBgIndex = pickIdx;
     const first = list[pickIdx];
-    setBackgroundUrl(first.url);
-    updateLandmarkTag(first.name);
+    // Paint-then-label: the hero and landmark tag only update AFTER the photo
+    // has actually painted. Updating them eagerly opened a seconds-long window
+    // on slow first-loads where the old photo showed under the new text —
+    // the same class of mismatch as the frozen-hero bug, just transient.
+    const myVersion = bgVersion;
+    setBackgroundUrl(first.url, undefined, myVersion).then((ok) => {
+      if (ok && myVersion === bgVersion) {
+        updateLandmarkTag(first.name);
+        updateV3Hero(varietyKey, first);
+      }
+    });
 
     if (SETTINGS.bgMode === "rotate") startBgRotate(varietyKey);
   }
@@ -677,11 +694,24 @@
     if (!v) return;
     const season = currentSeason();
 
-    // Resolve photo source: seasonal entry > caller-supplied landmark > nothing
+    // Resolve photo source: the caller-supplied landmark IS the photo currently
+    // on screen (rotation passes the shown item) — its identity wins. Only when
+    // no photo is being displayed (bg off / empty list) does the seasonal entry
+    // provide the hero identity. Previously seasonal always won, so the hero
+    // text froze on the first landmark while the background rotated — the
+    // "黄山 text over a temple roof" mismatch.
     const seasonal = getSeasonalEntry(varietyKey, season);
-    const photoUrl = (seasonal && seasonal.url) || (landmark && landmark.url) || null;
-    const landmarkLabel = (seasonal && seasonal.landmark) || (landmark && landmark.name) || "—";
-    const locationLabel = (seasonal && seasonal.location) || v.label || "";
+    const photoUrl = (landmark && landmark.url) || (seasonal && seasonal.url) || null;
+    const landmarkLabel =
+      (landmark && (landmark.landmark || landmark.name)) ||
+      (seasonal && seasonal.landmark) ||
+      "—";
+    // Location follows the SHOWN photo too: only the seasonal item carries a
+    // location field; presets landmarks don't, so for those the seasonal
+    // location must NOT leak in (中山陵 is not 安徽·黟县). Blank is honest.
+    const locationLabel = landmark
+      ? landmark.location || ""
+      : (seasonal && seasonal.location) || v.label || "";
 
     const photo = $("#v3-hero-photo");
     const metaPlace = $("#v3-hero-meta-place");
@@ -1099,7 +1129,7 @@
             <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
           </button>
           <button class="icon-btn" data-act="copy" title="复制结果">
-            <i class="far fa-copy" aria-hidden="true"></i>
+            <i class="fas fa-copy" aria-hidden="true"></i>
           </button>
           <button class="icon-btn" data-act="delete" title="删除">
             <i class="fas fa-trash" aria-hidden="true"></i>
@@ -2344,7 +2374,7 @@
 
     const actions = card.querySelector(".compare-card-actions");
     actions.innerHTML = `
-      <button class="icon-btn" data-act="copy" title="复制"><i class="far fa-copy" aria-hidden="true"></i></button>
+      <button class="icon-btn" data-act="copy" title="复制"><i class="fas fa-copy" aria-hidden="true"></i></button>
       <button class="icon-btn" data-act="remove" title="移除"><i class="fas fa-xmark" aria-hidden="true"></i></button>
     `;
     actions.querySelector('[data-act="copy"]').addEventListener("click", async () => {
@@ -2706,7 +2736,7 @@
       actions.className = "row-output-actions";
       actions.innerHTML = `
         <button data-act="winner" class="${isWinner ? "is-winner-btn" : ""}" title="标记为本行赢家"><i class="${isWinner ? "fas" : "far"} fa-crown" aria-hidden="true"></i></button>
-        <button data-act="copy" title="复制"><i class="far fa-copy" aria-hidden="true"></i></button>
+        <button data-act="copy" title="复制"><i class="fas fa-copy" aria-hidden="true"></i></button>
         <select class="row-scenario-select" data-act="scenario-pick" title="换场景重新生成">
           ${scenarioOrder.map((s) => `<option value="${escapeHtml(s)}"${s === batchScenarioSelected ? " selected" : ""}>${escapeHtml(SCENARIOS[s].label)}</option>`).join("")}
         </select>
