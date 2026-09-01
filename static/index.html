@@ -39,13 +39,22 @@
       })();
     </script>
 
-    <link rel="stylesheet" href="/static/styles.css?v=29">
+    <link rel="stylesheet" href="/static/styles.css?v=31">
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0"
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
+    >
+    <!-- 现代墨斋 typography: Noto Serif SC body serif via Google Fonts (CSP-allowed,
+         display=swap + local serif fallbacks keep the app fully usable offline).
+         LXGW WenKai display face is self-hosted — see @font-face in styles.css. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
     >
   </head>
   <body data-route="daily">
@@ -74,9 +83,9 @@
       </button>
 
       <a class="brand" href="#workbench" aria-label="地道中文">
-        <span class="brand-seal" aria-hidden="true">语</span>
+        <span class="brand-seal" aria-hidden="true" translate="no">语</span>
         <div class="brand-text">
-          <strong>地道中文</strong>
+          <strong translate="no">地道中文</strong>
           <span class="brand-sub">Native Chinese · Studio</span>
         </div>
       </a>
@@ -221,6 +230,8 @@
               </figure>
               <div class="daily-phrase-text">
                 <blockquote class="daily-phrase-original" id="daily-phrase-original">—</blockquote>
+                <!-- 印章签名 — 纯装饰,与侧栏 brand-seal 同为朱砂「语」印 -->
+                <span class="seal-stamp" aria-hidden="true" translate="no">语</span>
                 <p class="daily-phrase-meaning" id="daily-phrase-meaning">—</p>
                 <div class="daily-phrase-translations daily-phrase-translations-open">
                   <h3 class="daily-phrase-translations-title">
@@ -367,16 +378,16 @@
                 </span>
               </div>
               <div class="card-head-tools">
-                <button type="button" class="icon-btn" id="compare-toggle" title="并排对照原文" aria-pressed="false">
+                <button type="button" class="icon-btn" id="compare-toggle" title="并排对照原文" aria-label="并排对照原文" aria-pressed="false">
                   <i class="fas fa-table-columns" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="icon-btn" id="speak-button" disabled title="朗读结果">
+                <button type="button" class="icon-btn" id="speak-button" disabled title="朗读结果" aria-label="朗读结果">
                   <i class="fas fa-volume-up" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="icon-btn" id="download-button" disabled title="导出为 .txt">
+                <button type="button" class="icon-btn" id="download-button" disabled title="导出为 .txt" aria-label="导出为 .txt">
                   <i class="fas fa-download" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="icon-btn primary-icon" id="copy-button" disabled title="复制">
+                <button type="button" class="icon-btn primary-icon" id="copy-button" disabled title="复制" aria-label="复制重写结果">
                   <i class="far fa-copy" aria-hidden="true"></i>
                 </button>
               </div>
@@ -627,6 +638,29 @@
 
       <section class="page page-settings" id="page-settings">
         <div class="settings-grid">
+          <article class="settings-card wide" id="byok-card">
+            <header><i class="fas fa-key" aria-hidden="true"></i> API 密钥（自带 Key）</header>
+            <p>粘贴你自己的 DeepSeek API key 即可使用全部 AI 功能，无需访问令牌。Key 只保存在你的浏览器
+              localStorage 中，随每次请求直传 DeepSeek，服务器不记录、不保存。</p>
+            <div class="byok-row">
+              <input type="password" id="byok-key-input" class="byok-input" placeholder="sk-…"
+                autocomplete="off" spellcheck="false" aria-label="DeepSeek API key" />
+              <button type="button" class="byok-toggle" id="byok-toggle-visibility"
+                aria-label="显示或隐藏密钥" title="显示/隐藏">
+                <i class="fas fa-eye" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="settings-actions">
+              <button type="button" class="ghost-btn" id="byok-save-test">
+                <i class="fas fa-plug-circle-check" aria-hidden="true"></i> 保存并测试连接
+              </button>
+              <button type="button" class="ghost-btn danger" id="byok-clear">
+                <i class="fas fa-trash-can" aria-hidden="true"></i> 清除 Key
+              </button>
+            </div>
+            <p class="settings-hint" id="byok-status">未配置 — 当前使用服务器默认密钥。</p>
+          </article>
+
           <article class="settings-card">
             <header><i class="fas fa-image" aria-hidden="true"></i> 背景模式</header>
             <p>每种方言都准备了 5 张地标实景图，你可以让它自动轮播，也可以挑一张你最爱的固定。</p>
@@ -901,6 +935,10 @@ deadline → 截止日期
       </div>
     </div>
 
-    <script src="/static/app.js?v=29"></script>
+    <!-- jsdiff (kpdecker/jsdiff, BSD) — vendored locally because CSP script-src is
+         'self' only. app.js guards on window.Diff and degrades to the plain
+         sentence mirror when this file is missing. -->
+    <script src="/static/assets/vendor/diff.min.js"></script>
+    <script src="/static/app.js?v=31"></script>
   </body>
 </html>

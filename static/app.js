@@ -32,7 +32,7 @@
     _loginInFlight = (async () => {
       try {
         const token = window.prompt(
-          "需要访问令牌 (NCGA_AUTH_TOKEN)。\n向部署者索取后粘贴到这里:",
+          "需要访问令牌 (NCGA_AUTH_TOKEN)。\n向部署者索取后粘贴到这里:\n（或点「取消」，去 设置 → API 密钥 粘贴自己的 DeepSeek key）",
         );
         if (!token || !token.trim()) return false;
         const res = await _origFetch("/api/login", {
@@ -55,14 +55,38 @@
     return _loginInFlight;
   }
 
+  // BYOK: user-supplied DeepSeek key (设置 → API 密钥). Stored only in this
+  // browser's localStorage; attached as X-LLM-API-Key on every /api/ call.
+  // The server never persists it — it rides the request straight upstream.
+  const _BYOK_LS_KEY = "ncga.byokKey";
+  function _getByokKey() {
+    try {
+      return (localStorage.getItem(_BYOK_LS_KEY) || "").trim();
+    } catch (_) {
+      return "";
+    }
+  }
+
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";
     if (url.startsWith("/api/")) {
       init = init || {};
       if (!init.credentials) init.credentials = "same-origin";
+      const byok = _getByokKey();
+      if (byok) {
+        const headers = new Headers(
+          init.headers || (typeof input !== "string" && input && input.headers) || {},
+        );
+        headers.set("X-LLM-API-Key", byok);
+        init.headers = headers;
+      }
     }
     return _origFetch(input, init).then(async (res) => {
       if (res && res.status === 401 && url.startsWith("/api/") && url !== "/api/login") {
+        // A configured BYOK key doubles as the credential — a 401 then means
+        // the key itself was rejected upstream or is malformed, so don't loop
+        // the token prompt; send the user to the settings card instead.
+        if (_getByokKey()) return res;
         const ok = await _promptLogin();
         if (ok) {
           // One retry with the fresh cookie; if it 401s again, return as-is.
@@ -417,6 +441,17 @@
   // ---------------- background ----------------
   const FAILED_BG = new Set();
 
+  // 照片回流:Wikimedia 的 Special:FilePath?width=N 现在 302 到 thumb.wikimedia.org,
+  // 不在本站 CSP img-src 白名单('self' + upload/commons.wikimedia.org)内,
+  // 凡需要缩放大图(原图宽于请求宽度)都会被浏览器拦掉,背景只剩兜底纸色。
+  // 统一改走 commons.wikimedia.org 自有的 thumb.php —— 同源直出缩略图,不跳转。
+  // 数据文件(presets.py / seasonal_landmarks.json / 后端 API)保持原样,只在渲染端改写。
+  function commonsImageUrl(url) {
+    const m = /^https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/([^?]+)(?:\?.*)?$/.exec(url || "");
+    if (!m) return url;
+    return `https://commons.wikimedia.org/w/thumb.php?f=${m[1]}&width=1920`;
+  }
+
   function preloadImage(url) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -431,6 +466,7 @@
   let bgVersion = 0;
 
   async function setBackgroundUrl(url, name, expectedVersion) {
+    url = commonsImageUrl(url);
     if (!url || url === lastBgUrl) return true;
     if (expectedVersion === undefined) expectedVersion = bgVersion;
     const ok = await preloadImage(url);
@@ -452,8 +488,14 @@
 
   function getValidLandmarks(varietyKey) {
     const list = (VARIETIES[varietyKey] && VARIETIES[varietyKey].landmarks) || [];
-    const filtered = list.filter((l) => !FAILED_BG.has(l.url));
-    return filtered.length ? filtered : list;
+    // 照片回流:时令地标(seasonal_landmarks.json)排在首位,既作首图也入轮播,
+    // 让 JSON 里的季节实景真正驱动全幅背景;固定地标(pinned)仍按 url 命中原位。
+    const seasonal = getSeasonalEntry(varietyKey, currentSeason());
+    const merged = (seasonal && seasonal.url)
+      ? [{ url: seasonal.url, name: seasonal.landmark }, ...list.filter((l) => l.url !== seasonal.url)]
+      : list;
+    const filtered = merged.filter((l) => !FAILED_BG.has(l.url));
+    return filtered.length ? filtered : merged;
   }
 
   function stopBgRotate() {
@@ -646,7 +688,7 @@
     const metaSolar = $("#v3-hero-meta-solar");
     const headline = $("#v3-hero-headline");
     if (photo && photoUrl) {
-      photo.style.backgroundImage = `url("${photoUrl}")`;
+      photo.style.backgroundImage = `url("${commonsImageUrl(photoUrl)}")`;
     }
     if (metaPlace) metaPlace.textContent = locationLabel;
     if (metaSolar) metaSolar.textContent = currentSolarTerm();
@@ -946,6 +988,77 @@
       renderScenarioChips();
       showToast("已重置偏好", "fa-rotate-left");
     });
+
+    // ---------------- BYOK (设置 → API 密钥) ----------------
+    const byokInput = $("#byok-key-input");
+    const byokStatus = $("#byok-status");
+    const byokSaveTest = $("#byok-save-test");
+    const byokClear = $("#byok-clear");
+    const byokToggle = $("#byok-toggle-visibility");
+
+    function _renderByokStatus(state, detail) {
+      if (!byokStatus) return;
+      const has = !!_getByokKey();
+      if (state === "testing") {
+        byokStatus.textContent = "正在测试连接…";
+      } else if (state === "ok") {
+        byokStatus.textContent = `已启用自带 Key（测试通过${detail ? `，${detail}` : ""}）。所有 AI 功能将使用你的 Key。`;
+      } else if (state === "fail") {
+        byokStatus.textContent = `Key 已保存，但测试未通过：${detail || "上游拒绝了该 Key"}`;
+      } else {
+        byokStatus.textContent = has
+          ? "已启用自带 Key。所有 AI 功能将使用你的 Key。"
+          : "未配置 — 当前使用服务器默认密钥。";
+      }
+    }
+
+    if (byokInput && byokSaveTest && byokClear) {
+      // Never pre-fill the stored key back into the input — shoulder-surfing
+      // guard. Presence is communicated via the status line instead.
+      _renderByokStatus();
+
+      byokToggle?.addEventListener("click", () => {
+        const showing = byokInput.type === "text";
+        byokInput.type = showing ? "password" : "text";
+        byokToggle.querySelector("i")?.classList.toggle("fa-eye", showing);
+        byokToggle.querySelector("i")?.classList.toggle("fa-eye-slash", !showing);
+      });
+
+      byokSaveTest.addEventListener("click", async () => {
+        const val = (byokInput.value || "").trim();
+        if (val) {
+          if (!/^sk-\S{12,}$/.test(val)) {
+            _renderByokStatus("fail", "格式不对（应以 sk- 开头）");
+            return;
+          }
+          try { localStorage.setItem(_BYOK_LS_KEY, val); } catch (_) { /* blocked */ }
+          byokInput.value = "";
+        } else if (!_getByokKey()) {
+          _renderByokStatus("fail", "请先粘贴 Key 再测试");
+          return;
+        }
+        _renderByokStatus("testing");
+        try {
+          const res = await fetch("/api/key-check", { method: "POST" });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.ok) {
+            _renderByokStatus("ok", data.latency_ms ? `延迟 ${data.latency_ms}ms` : "");
+            showToast("Key 可用，已启用自带 Key", "fa-circle-check");
+          } else {
+            _renderByokStatus("fail", data.error || `HTTP ${res.status}`);
+          }
+        } catch (_) {
+          _renderByokStatus("fail", "网络错误");
+        }
+      });
+
+      byokClear.addEventListener("click", () => {
+        try { localStorage.removeItem(_BYOK_LS_KEY); } catch (_) { /* blocked */ }
+        byokInput.value = "";
+        _renderByokStatus();
+        showToast("已清除自带 Key，改回服务器默认密钥", "fa-trash-can");
+      });
+    }
   }
 
   // ---------------- history ----------------
@@ -1096,7 +1209,7 @@
     }).join("");
     $$(".variety-thumb[data-bg]", atlasGrid).forEach((el) => {
       const url = el.dataset.bg;
-      if (url) el.style.backgroundImage = `url('${url}')`;
+      if (url) el.style.backgroundImage = `url('${commonsImageUrl(url)}')`;
     });
 
     $$(".variety-tile", atlasGrid).forEach((tile) => {
@@ -1154,7 +1267,7 @@
       </button>
     `).join("");
     $$(".landmark-pick", landmarkModalGrid).forEach((p) => {
-      if (p.dataset.url) p.style.backgroundImage = `url('${p.dataset.url}')`;
+      if (p.dataset.url) p.style.backgroundImage = `url('${commonsImageUrl(p.dataset.url)}')`;
       p.addEventListener("click", () => {
         modalCurrentPick = p.dataset.url;
         $$(".landmark-pick", landmarkModalGrid).forEach((x) => {
@@ -1254,6 +1367,23 @@
   function syncRound2Compare() {
     if (!round2CompareCopy) return;
     const raw = (textInput.value || "").trim();
+    // 现代墨斋:有重写结果且 jsdiff 可用时,对照栏升级为逐字 diff。
+    // 中文没有空格分词,diffChars 按字切正合适;库加载失败(离线)时
+    // 自然退化为下面的逐句镜像,行为与样式都无害。
+    const rewritten = ((lastResult && (lastResult.rewritten_text || lastResult.transformed_text)) || "").trim();
+    if (raw && rewritten && window.Diff && typeof window.Diff.diffChars === "function") {
+      const parts = window.Diff.diffChars(raw, rewritten);
+      const diffHtml = parts.map((part) => {
+        const text = escapeHtml(part.value);
+        if (part.added) return `<ins class="diff-add">${text}</ins>`;
+        if (part.removed) return `<del class="diff-del">${text}</del>`;
+        return text;
+      }).join("");
+      round2CompareCopy.innerHTML =
+        '<p class="diff-legend"><i class="fas fa-code-compare" aria-hidden="true"></i>与最近结果的逐字对照</p>' +
+        `<p class="diff-line">${diffHtml}</p>`;
+      return;
+    }
     if (!raw) {
       round2CompareCopy.innerHTML = "<p>把原文贴进左侧，这里会保持一份安静的逐句对照。</p>";
       return;
@@ -1813,6 +1943,7 @@
         const orig = resultStage.querySelector(".result-compare-orig");
         if (orig) orig.textContent = originalText;
       }
+      syncRound2Compare();   // 对照栏:有结果后升级为逐字 diff
 
       showToast(isDegraded ? "已降级为本地启发式" : "重写完成！", isDegraded ? "fa-triangle-exclamation" : "fa-check-circle");
     } catch (err) {
@@ -1973,6 +2104,7 @@
       };
 
       renderResult(data.transformed_text, null);
+      syncRound2Compare();   // 对照栏:有结果后升级为逐字 diff
 
       // degraded/warning chip 逻辑与方言结果一致（transform 今天恒为 false，契约保留）。
       const isDegraded = !!data.degraded;
@@ -3459,7 +3591,7 @@
       if (textEl) textEl.classList.add("is-warming");
       images.forEach((img, i) => {
         const el = document.createElement("img");
-        el.src = img.url;
+        el.src = commonsImageUrl(img.url);
         el.alt = img.caption || "";
         el.loading = i === 0 ? "eager" : "lazy";  // first image fast, rest lazy
         if (i === 0) el.classList.add("is-active");
@@ -3718,6 +3850,10 @@
       clearAll();
       renderAtlas();
       renderHistory();
+      // Init-race fix: on a direct first load of #batch the router rendered the
+      // chips before /api/presets resolved (early-return on empty varietyOrder)
+      // and never retried. Re-render now that both lists are in — idempotent.
+      renderBatchInputs();
     })
     .catch((err) => {
       console.error("Init failed:", err);

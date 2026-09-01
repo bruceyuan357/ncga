@@ -10,7 +10,8 @@
   /* ============ 字体 ============ */
   --serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
   --sans: 'Noto Sans SC', 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-  --calligraphy: 'Ma Shan Zheng', 'Noto Serif SC', cursive;
+  /* 现代墨斋: 霞鹜文楷(自托管 subset) 为书法/展示字,未加载时回落宋体系 */
+  --calligraphy: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'STSong', cursive;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* ============ v3「随四时」 Cinematic Editorial 字体 ============ */
@@ -98,8 +99,17 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-xl: 28px;
-  --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 现代墨斋:弃用 transition:all —— 只过渡廉价且需要的属性 */
+  --transition: color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   --font-scale: 1;
   --sidebar-w: 240px;
   --sidebar-w-collapsed: 72px;
@@ -2329,6 +2339,35 @@ mark.kw-hl {
   resize: vertical;
 }
 .glossary-textarea:focus { border-color: var(--gold-soft); }
+
+/* BYOK key input (设置 → API 密钥) */
+.byok-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  margin: 0.55rem 0;
+}
+.byok-input {
+  flex: 1;
+  padding: 0.7rem 0.9rem;
+  background: var(--panel-soft);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+.byok-input:focus { border-color: var(--gold-soft); }
+.byok-toggle {
+  padding: 0 0.85rem;
+  background: var(--panel-soft);
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.byok-toggle:hover { color: var(--ink); }
 
 /* Quality-stats panel */
 .quality-stats {
@@ -6114,4 +6153,1297 @@ body[data-v3="on"][data-route="daily"] .cmdbar {
 @media (max-width: 620px) {
   body[data-v3="on"] .v3-hero + .cmdbar,
   body[data-v3="on"][data-route="daily"] .cmdbar { top: 14px; right: 14px; }
+}
+
+
+/* ============================================================
+   现代墨斋 · Ink Atelier (final layer, v3 default view)
+   设计决策:
+   - 漆面全幅照片退场 → 宣纸场(暖米白渐变 + feTurbulence 纸纹,
+     照片仅以 ~5% 残影留在纸下,作为"记忆里的墨")
+   - 墨绿为骨,朱砂为印:vermilion 只给主 CTA / 关键激活态 / 印章
+   - 卡片 = 案上纸:暖白 + 1px 发丝边 + 墨绿色调阴影(不用黑影),
+     外容器圆角软、内控件圆角紧
+   - 展示字:霞鹜文楷(自托管 GB2312 subset,1.5MB,font-display:swap,
+     加载失败回落宋体系,离线可用)
+   - 本层只覆写 v3(data-v3="on")默认视图;v1 古朴 / v2 墨韵不受影响
+   ============================================================ */
+
+/* 霞鹜文楷 — 自托管 subset(见 index.html 注释与 --calligraphy) */
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("/static/assets/fonts/LXGWWenKai-GB2312.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+body[data-v3="on"] {
+  /* —— 墨斋色板 —— */
+  --at-paper: #f4efe4;          /* 宣纸场 */
+  --at-paper-deep: #ece5d5;
+  --at-raised: #fbf8ef;         /* 案上纸(卡面) */
+  --at-sunk: #f0e9d9;           /* 凹陷纸(井/槽) */
+  --at-ink: #242b25;            /* 墨(偏绿的黑) */
+  --at-ink-soft: #57615a;
+  --at-ink-faint: #8a9084;
+  --at-jade: #2f5d4c;           /* 墨绿(品牌骨色) */
+  --at-jade-deep: #21453a;
+  --at-jade-bright: #4f8a68;
+  --at-vermilion: #c0452f;      /* 朱砂(唯一 accent) */
+  --at-vermilion-deep: #a03826;
+  --at-rail: #132c24;           /* 侧栏墨绿 */
+  --at-rail-deep: #0d211b;
+  --at-rule: rgba(36, 43, 37, 0.13);          /* 发丝边 */
+  --at-rule-strong: rgba(36, 43, 37, 0.24);
+  --at-shadow-sm: 0 1px 2px rgba(33, 69, 58, 0.05), 0 3px 10px rgba(33, 69, 58, 0.05);
+  --at-shadow-md: 0 2px 6px rgba(33, 69, 58, 0.05), 0 16px 38px rgba(33, 69, 58, 0.09);
+  --at-shadow-lg: 0 28px 68px rgba(33, 69, 58, 0.14), 0 5px 16px rgba(33, 69, 58, 0.07);
+
+  /* —— 接入既有变量系统:朱砂成为 v3 唯一 accent —— */
+  --ui-accent: var(--at-vermilion);
+  --ui-accent-soft: color-mix(in srgb, var(--at-vermilion) 8%, #fdfaf1);
+  --gold: #8f7c53;              /* 茶金退居次要,不再抢戏 */
+  --gold-soft: color-mix(in srgb, #8f7c53 70%, var(--at-ink));
+
+  color: var(--at-ink);
+
+  /* 宣纸场:两层暖白纱罩住漆面照片(照片残影 ~5%),最底层兜底纯色 */
+  background:
+    radial-gradient(ellipse 75% 55% at 86% 0%, rgba(47, 93, 76, 0.055), transparent 62%),
+    linear-gradient(165deg, rgba(247, 243, 234, 0.965) 0%, rgba(244, 239, 228, 0.935) 45%, rgba(238, 232, 219, 0.96) 100%),
+    url("/static/assets/summer-lacquer-silk.png") center / cover fixed no-repeat,
+    var(--at-paper) !important;
+}
+
+/* 纸纹:feTurbulence 细颗粒,fixed + pointer-events:none,压在内容之下 */
+body[data-v3="on"]::before {
+  display: block !important;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.22  0 0 0 0 0.18  0 0 0 0.055 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+}
+
+/* ============ 侧栏:墨绿漆面 rail + 朱砂印 ==================== */
+body[data-v3="on"] .sidebar {
+  background: linear-gradient(180deg, var(--at-rail) 0%, var(--at-rail-deep) 100%);
+  border-right: 0;
+  box-shadow: 2px 0 22px rgba(19, 44, 36, 0.22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 20px 9px 16px;
+}
+
+/* 印章签名(品牌):朱砂方印 + 文楷「语」,内刻发丝边 */
+body[data-v3="on"] .brand { margin: 0 0 20px; }
+body[data-v3="on"] .brand-seal {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(158deg, #c0452f 0%, #a93a26 100%);
+  color: #f9f2e0;
+  border: 1px solid rgba(249, 226, 196, 0.28);
+  box-shadow:
+    0 7px 16px rgba(13, 33, 27, 0.38),
+    inset 0 0 0 1.5px rgba(249, 242, 224, 0.30),
+    inset 0 -3px 8px rgba(96, 22, 12, 0.32);
+  font-family: var(--calligraphy);
+  font-size: 1.42rem;
+  font-weight: 400;
+  text-shadow: 0 1px 0 rgba(96, 22, 12, 0.45);
+}
+
+body[data-v3="on"] .nav-rail { gap: 6px; }
+
+body[data-v3="on"] .nav-item {
+  min-height: 60px;
+  gap: 6px;
+  border-radius: 10px;
+  color: rgba(241, 236, 222, 0.74);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .nav-item i { font-size: 1.02rem; }
+
+body[data-v3="on"] .nav-item:hover,
+body[data-v3="on"] .nav-item:focus-visible {
+  color: #f8f3e5;
+  background: rgba(246, 242, 233, 0.07);
+  border-color: transparent;
+}
+
+/* 激活态:朱砂竖笔 + 纸光微亮 */
+body[data-v3="on"] .nav-item.is-active {
+  color: #faf5e8;
+  background: rgba(246, 242, 233, 0.09);
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--at-vermilion);
+}
+body[data-v3="on"] .nav-item:active { transform: scale(0.97); }
+
+body[data-v3="on"] .sidebar-bottom { border-top-color: rgba(246, 242, 233, 0.10); }
+body[data-v3="on"] .sidebar-meta {
+  color: rgba(241, 236, 222, 0.52);
+  letter-spacing: 0.12em;
+}
+
+/* ============ 刊头(hero):纸上墨字,安静留白 ==================== */
+body[data-v3="on"] .v3-hero {
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-v3="on"] .v3-hero-caption {
+  color: var(--at-ink);
+  text-shadow: none;
+}
+
+/* 节气 · 地点:tracked 小标 + 墨绿细边胶囊 */
+body[data-v3="on"] .v3-hero-meta {
+  color: var(--at-jade);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+body[data-v3="on"] .v3-hero-meta-solar {
+  border: 1px solid rgba(47, 93, 76, 0.42);
+  color: var(--at-jade-deep);
+  background: rgba(251, 248, 239, 0.55);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+body[data-v3="on"] .v3-hero-meta .sep { color: var(--at-ink-faint); }
+
+/* 地名大字:文楷展示字,墨绿近黑,微收字距 */
+body[data-v3="on"] .v3-hero-place {
+  color: var(--at-ink);
+  font-family: var(--calligraphy);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-wrap: balance;
+}
+
+/* 日期:等宽 + tabular-nums,浅墨 */
+body[data-v3="on"] .round2-hero-date {
+  color: var(--at-ink-faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.10em;
+}
+
+body[data-v3="on"] .v3-hero-verse {
+  color: var(--at-ink-soft);
+  font-family: var(--serif);
+  letter-spacing: 0.06em;
+}
+
+/* ============ 顶栏(cmdbar):纸上瓷白瓷钮 + 朱砂主钮 ============ */
+body[data-v3="on"] .round2-command-search {
+  color: var(--at-ink-soft);
+  background: rgba(251, 248, 239, 0.88);
+  border: 1px solid var(--at-rule);
+  border-radius: 12px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .round2-command-search kbd {
+  color: var(--at-ink-faint);
+  background: var(--at-sunk);
+  border: 1px solid var(--at-rule);
+}
+body[data-v3="on"] .round2-command-search:hover,
+body[data-v3="on"] .round2-command-search:focus-visible {
+  color: var(--at-ink);
+  background: #fdfbf3;
+  border-color: rgba(47, 93, 76, 0.45);
+  box-shadow: var(--at-shadow-md);
+  transform: translateY(-1px);
+}
+
+body[data-v3="on"] .cmd-btn.round2-save-draft {
+  color: var(--at-ink-soft);
+  background: rgba(251, 248, 239, 0.88);
+  border: 1px solid var(--at-rule);
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .cmd-btn.round2-save-draft:hover {
+  color: var(--at-jade-deep);
+  background: #fdfbf3;
+  border-color: rgba(47, 93, 76, 0.45);
+  transform: translateY(-1px);
+}
+
+/* 主 CTA:朱砂,全站唯一实心 accent */
+body[data-v3="on"] .cmdbar .cmd-btn.primary,
+body[data-v3="on"] .cmdbar .cmd-btn.primary:hover {
+  color: #fdf6e7;
+  background: linear-gradient(165deg, #c0452f 0%, #a93a26 100%);
+  border: 1px solid rgba(122, 30, 16, 0.35);
+  box-shadow: 0 8px 20px rgba(192, 69, 47, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+body[data-v3="on"] .cmdbar .cmd-btn.primary:hover {
+  background: linear-gradient(165deg, #a93a26 0%, #97331f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(192, 69, 47, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+body[data-v3="on"] .cmdbar .cmd-btn.primary:active { transform: scale(0.97); }
+body[data-v3="on"] .cmdbar .cmd-btn.primary .kbd-hint {
+  background: rgba(255, 244, 224, 0.16);
+}
+
+/* ============ 重写台:一案宣纸 ============================== */
+body[data-v3="on"] .workbench {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 18px 18px 20px 20px;
+  box-shadow: var(--at-shadow-lg);
+}
+
+body[data-v3="on"] .card { background: transparent; }
+body[data-v3="on"] .card-input {
+  background: rgba(240, 233, 217, 0.38);
+  border-right: 1px solid var(--at-rule);
+  box-shadow: none;
+}
+body[data-v3="on"] .card-output {
+  background: transparent;
+  border-right: 1px solid var(--at-rule);
+  box-shadow: none;
+}
+
+body[data-v3="on"] .card-head { border-bottom-color: var(--at-rule); }
+body[data-v3="on"] .card-head h2 {
+  color: var(--at-ink);
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+body[data-v3="on"] .card-head-title i { color: var(--at-jade); }
+
+body[data-v3="on"] .char-count,
+body[data-v3="on"] .landmark-tag,
+body[data-v3="on"] .degraded-tag,
+body[data-v3="on"] .model-tag {
+  color: var(--at-ink-soft);
+  background: rgba(251, 248, 239, 0.72);
+  border: 1px solid var(--at-rule);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 模式 / 场景行:浅凹纸槽,内控件圆角收紧 */
+body[data-v3="on"] .mode-row,
+body[data-v3="on"] .scenario-row {
+  background: rgba(36, 43, 37, 0.035);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+}
+body[data-v3="on"] .mode-label,
+body[data-v3="on"] .scenario-label {
+  color: var(--at-ink-faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+}
+
+body[data-v3="on"] .mode-chip,
+body[data-v3="on"] .scenario-chip { color: var(--at-ink-soft); }
+body[data-v3="on"] .mode-chip:hover,
+body[data-v3="on"] .scenario-chip:hover {
+  color: var(--at-jade-deep);
+  background: rgba(47, 93, 76, 0.07);
+}
+body[data-v3="on"] .mode-chip.is-active {
+  color: #f8f3e3;
+  background: var(--at-jade);
+}
+body[data-v3="on"] .scenario-chip.is-active {
+  color: var(--at-jade-deep);
+  background: rgba(47, 93, 76, 0.11);
+  border-color: rgba(47, 93, 76, 0.22);
+}
+
+/* 参考例句 chip:虚线样,hover 走墨绿 */
+body[data-v3="on"] .example-chips .chip-label {
+  color: var(--at-ink-faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+body[data-v3="on"] .example-chips .chip {
+  color: var(--at-ink-soft);
+  border: 1px dashed var(--at-rule-strong);
+  background: transparent;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .example-chips .chip:hover {
+  color: var(--at-jade-deep);
+  border-color: rgba(47, 93, 76, 0.55);
+  border-style: solid;
+  background: rgba(47, 93, 76, 0.06);
+  transform: translateY(-1px);
+}
+body[data-v3="on"] .example-chips .chip:active { transform: scale(0.97); }
+
+/* 输入 / 输出纸面 */
+body[data-v3="on"] textarea,
+body[data-v3="on"] .result,
+body[data-v3="on"] .result-compare-orig,
+body[data-v3="on"] .select-wrap select {
+  color: var(--at-ink);
+  background: rgba(255, 253, 246, 0.62);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 6px rgba(33, 69, 58, 0.04);
+}
+body[data-v3="on"] textarea:hover,
+body[data-v3="on"] .select-wrap select:hover {
+  border-color: var(--at-rule-strong);
+}
+body[data-v3="on"] textarea:focus,
+body[data-v3="on"] .select-wrap select:focus,
+body[data-v3="on"] .result:focus {
+  border-color: rgba(47, 93, 76, 0.55);
+  box-shadow: inset 0 1px 6px rgba(33, 69, 58, 0.04), 0 0 0 3px rgba(47, 93, 76, 0.14);
+  outline: none;
+}
+body[data-v3="on"] .result:empty::before { color: var(--at-ink-faint); }
+body[data-v3="on"] textarea::placeholder { color: var(--at-ink-faint); opacity: 0.85; }
+
+body[data-v3="on"] .mic-btn {
+  color: var(--at-jade);
+  background: rgba(251, 248, 239, 0.92);
+  border: 1px solid var(--at-rule);
+}
+
+/* 状态行:墨绿薄胎 */
+body[data-v3="on"] .status {
+  color: var(--at-ink-soft);
+  background: rgba(47, 93, 76, 0.055);
+  border-color: rgba(47, 93, 76, 0.14);
+  border-radius: 10px;
+}
+
+/* 提交主钮:朱砂 */
+body[data-v3="on"] .btn-rewrite {
+  color: #fdf6e7;
+  background: linear-gradient(165deg, #c0452f 0%, #a93a26 100%);
+  border: 1px solid rgba(122, 30, 16, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(192, 69, 47, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out, filter 0.2s ease;
+}
+body[data-v3="on"] .btn-rewrite:hover:not(:disabled) {
+  background: linear-gradient(165deg, #a93a26 0%, #97331f 100%);
+  box-shadow: 0 12px 24px rgba(192, 69, 47, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  filter: none;
+}
+body[data-v3="on"] .btn-rewrite:active:not(:disabled) { transform: scale(0.98); }
+body[data-v3="on"] .btn-rewrite:disabled {
+  color: var(--at-ink-faint);
+  background: rgba(36, 43, 37, 0.06);
+  border-color: var(--at-rule);
+  box-shadow: none;
+}
+
+/* 结果统计 + 底部工具 */
+body[data-v3="on"] .result-stats {
+  border: 1px solid var(--at-rule);
+  background: rgba(36, 43, 37, 0.03);
+  border-radius: 8px;
+}
+body[data-v3="on"] .result-stat-value { font-variant-numeric: tabular-nums; }
+body[data-v3="on"] .result-foot { border-top-color: var(--at-rule); }
+
+body[data-v3="on"] .ghost-btn,
+body[data-v3="on"] .icon-btn {
+  color: var(--at-ink-soft);
+  background: rgba(255, 253, 246, 0.5);
+  border: 1px solid var(--at-rule);
+  border-radius: 8px;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .ghost-btn:hover:not(:disabled),
+body[data-v3="on"] .icon-btn:hover:not(:disabled),
+body[data-v3="on"] .ghost-btn:focus-visible,
+body[data-v3="on"] .icon-btn:focus-visible {
+  color: var(--at-jade-deep);
+  background: rgba(47, 93, 76, 0.08);
+  border-color: rgba(47, 93, 76, 0.42);
+  transform: translateY(-1px);
+}
+body[data-v3="on"] .ghost-btn:active:not(:disabled),
+body[data-v3="on"] .icon-btn:active:not(:disabled) { transform: scale(0.97); }
+
+/* 复制主钮(朱砂) */
+body[data-v3="on"] .icon-btn.primary-icon {
+  color: #fdf6e7;
+  background: var(--at-vermilion);
+  border-color: var(--at-vermilion-deep);
+}
+body[data-v3="on"] .icon-btn.primary-icon:hover:not(:disabled) {
+  color: #fff;
+  background: var(--at-vermilion-deep);
+  border-color: var(--at-vermilion-deep);
+}
+
+/* 关键词高亮保持墨绿(高亮不是 accent) */
+body[data-v3="on"] .kw-hl {
+  color: #173c2d;
+  background: rgba(75, 135, 100, 0.15);
+  border-bottom-color: rgba(47, 93, 76, 0.38);
+}
+
+/* 对照栏:凹纸边注 */
+body[data-v3="on"] .round2-compare-rail {
+  color: var(--at-ink-soft);
+  background: rgba(240, 233, 217, 0.55);
+  box-shadow: none;
+}
+body[data-v3="on"] .round2-compare-rail header {
+  border-bottom-color: var(--at-rule);
+  color: var(--at-ink);
+}
+body[data-v3="on"] .round2-compare-rail header span {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+body[data-v3="on"] .round2-compare-rail header small {
+  color: var(--at-ink-faint);
+  letter-spacing: 0.12em;
+}
+body[data-v3="on"] .round2-compare-copy {
+  color: rgba(36, 43, 37, 0.74);
+  font-family: var(--serif);
+  font-size: 0.8rem;
+  line-height: 2.3;
+}
+body[data-v3="on"] .round2-compare-copy p { border-bottom-color: rgba(36, 43, 37, 0.08); }
+body[data-v3="on"] .round2-compare-note { color: var(--at-ink-faint); }
+
+/* 对照栏内的逐字 diff(jsdiff,缺库时退化为纯镜像,样式无害) */
+body[data-v3="on"] .round2-compare-copy .diff-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.9rem;
+  padding-bottom: 0;
+  border-bottom: 0;
+  color: var(--at-ink-faint);
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+body[data-v3="on"] .round2-compare-copy .diff-legend i { color: var(--at-vermilion); }
+body[data-v3="on"] .round2-compare-copy .diff-line {
+  margin: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+  line-height: 2.2;
+}
+body[data-v3="on"] .round2-compare-copy ins,
+body[data-v3="on"] .round2-compare-copy .diff-add {
+  color: var(--at-vermilion-deep);
+  background: rgba(192, 69, 47, 0.10);
+  border-radius: 3px;
+  padding: 0 1px;
+  text-decoration: none;
+}
+body[data-v3="on"] .round2-compare-copy del,
+body[data-v3="on"] .round2-compare-copy .diff-del {
+  color: var(--at-ink-faint);
+  background: rgba(36, 43, 37, 0.05);
+  border-radius: 3px;
+  padding: 0 1px;
+  text-decoration: line-through;
+  text-decoration-color: rgba(160, 56, 38, 0.55);
+}
+
+/* 历史版本托盘:一案尽头的深色墨砚(与侧栏呼应) */
+body[data-v3="on"] .round2-version-tray {
+  color: rgba(241, 236, 222, 0.86);
+  background: linear-gradient(180deg, rgba(19, 44, 36, 0.97), rgba(13, 33, 27, 0.98));
+  border: 1px solid rgba(246, 242, 233, 0.10);
+  border-radius: 14px;
+  box-shadow: var(--at-shadow-md);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-v3="on"] .round2-version-head strong { font-family: var(--serif); letter-spacing: 0.05em; }
+body[data-v3="on"] .round2-version-head span,
+body[data-v3="on"] .round2-version-head a { color: rgba(241, 236, 222, 0.52); }
+body[data-v3="on"] .round2-version-head a:hover { color: #f4eed9; }
+
+body[data-v3="on"] .round2-version-card {
+  color: rgba(242, 234, 207, 0.74);
+  background: rgba(246, 242, 233, 0.045);
+  border: 1px solid rgba(246, 242, 233, 0.12);
+  border-radius: 10px;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .round2-version-card:hover,
+body[data-v3="on"] .round2-version-card:focus-visible {
+  color: #f6efdb;
+  background: rgba(79, 138, 104, 0.16);
+  border-color: rgba(79, 138, 104, 0.45);
+  transform: translateY(-1px);
+}
+/* 当前版本:朱砂竖笔 */
+body[data-v3="on"] .round2-version-card.is-current {
+  color: #f6efdb;
+  background: rgba(79, 138, 104, 0.14);
+  border-color: rgba(79, 138, 104, 0.38);
+  box-shadow: inset 3px 0 0 var(--at-vermilion);
+}
+body[data-v3="on"] .round2-version-empty {
+  color: rgba(241, 236, 222, 0.5);
+  border: 1px dashed rgba(246, 242, 233, 0.16);
+}
+body[data-v3="on"] .round2-new-version {
+  color: rgba(241, 236, 222, 0.72);
+  background: rgba(246, 242, 233, 0.04);
+  border: 1px solid rgba(246, 242, 233, 0.12);
+  border-radius: 10px;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .round2-new-version:hover,
+body[data-v3="on"] .round2-new-version:focus-visible {
+  color: #f6efdb;
+  background: rgba(79, 138, 104, 0.18);
+  border-color: rgba(79, 138, 104, 0.45);
+}
+
+/* 抽屉(explain / 多方言对比)与弹窗:案上纸 */
+body[data-v3="on"] .explain-drawer,
+body[data-v3="on"] .compare-panel,
+body[data-v3="on"] .landmark-modal-content {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  box-shadow: var(--at-shadow-lg);
+}
+body[data-v3="on"] .landmark-modal { background: rgba(19, 44, 36, 0.42); }
+body[data-v3="on"] .landmark-close {
+  background: rgba(36, 43, 37, 0.04);
+  border: 1px solid var(--at-rule);
+  color: var(--at-ink-soft);
+}
+body[data-v3="on"] .landmark-close:hover {
+  color: var(--at-vermilion);
+  border-color: rgba(192, 69, 47, 0.45);
+}
+
+/* 键盘焦点环:纸上墨绿,暗处(侧栏/版本托盘)换浅绿 */
+body[data-v3="on"] :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgba(47, 93, 76, 0.75);
+  outline-offset: 2px;
+}
+body[data-v3="on"] .sidebar :where(button, a):focus-visible,
+body[data-v3="on"] .round2-version-tray :where(button, a):focus-visible {
+  outline-color: #a8cbb6;
+}
+
+/* ============ 今日方言(首页):纸面 + 文楷 + 朱砂印 ========== */
+body[data-v3="on"][data-route="daily"] .card-daily-hero {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 22px;
+  box-shadow: var(--at-shadow-md);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+body[data-v3="on"][data-route="daily"] .card-daily-hero:hover {
+  transform: none;
+  border-color: var(--at-rule-strong);
+  box-shadow: var(--at-shadow-lg);
+}
+
+body[data-v3="on"][data-route="daily"] .daily-phrase-title h2 {
+  color: var(--at-ink);
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-title i { color: var(--at-vermilion); }
+
+/* 日期:tabular-nums 浅墨胶囊 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-date {
+  color: var(--at-ink-soft);
+  background: var(--at-sunk);
+  border: 1px solid var(--at-rule);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  opacity: 1;
+}
+
+/* 印章签名(index.html 的 .seal-stamp):朱砂方印,与侧栏同源;
+   落在引文左下,如字画落款的姓名印 */
+body[data-v3="on"] .seal-stamp {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 0.1rem 0 0.95rem 0.35rem;
+  border-radius: 7px;
+  background: linear-gradient(158deg, #c0452f 0%, #a93a26 100%);
+  color: #f9f2e0;
+  border: 1px solid rgba(249, 226, 196, 0.28);
+  box-shadow:
+    0 4px 10px rgba(160, 56, 38, 0.22),
+    inset 0 0 0 1.5px rgba(249, 242, 224, 0.30),
+    inset 0 -2px 5px rgba(96, 22, 12, 0.30);
+  font-family: var(--calligraphy);
+  font-size: 1.05rem;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(96, 22, 12, 0.45);
+  transform: rotate(-3deg);
+  user-select: none;
+}
+
+/* 谚语正文:文楷大字 + 朱砂引条 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-original {
+  color: var(--at-ink);
+  font-family: var(--calligraphy);
+  font-size: clamp(1.7rem, 2.8vw, 2.15rem);
+  line-height: 1.62;
+  letter-spacing: 0.02em;
+  border-left: 4px solid var(--at-vermilion);
+  padding-left: 1.3rem;
+  text-wrap: balance;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-meaning {
+  color: var(--at-ink-soft);
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+/* 装裱感的图版:发丝边 + 纸托 + 软影(取代粗彩边) */
+body[data-v3="on"][data-route="daily"] .daily-phrase-figure {
+  background: var(--at-sunk);
+  border: 1px solid var(--at-rule);
+  border-radius: 14px;
+  box-shadow: var(--at-shadow-sm);
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-figure figcaption {
+  background: rgba(247, 242, 231, 0.92);
+  color: var(--at-ink-soft);
+  border-top: 1px solid var(--at-rule);
+  letter-spacing: 0.03em;
+}
+
+/* 十方言对照:凹纸面板 + 纸签条目 */
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations,
+body[data-v3="on"][data-route="daily"] .saved-phrases-card {
+  background: rgba(240, 233, 217, 0.34);
+  border: 1px solid var(--at-rule);
+  border-radius: 14px;
+  box-shadow: none;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations-title {
+  color: var(--at-ink);
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0.10em;
+  text-transform: none;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations-title i { color: var(--at-jade); }
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations-open li {
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease-out;
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations-open li:hover {
+  border-color: rgba(47, 93, 76, 0.42);
+  box-shadow: var(--at-shadow-sm);
+  transform: translateY(-2px);
+}
+body[data-v3="on"][data-route="daily"] .daily-phrase-translations-open li > strong {
+  color: var(--at-jade-deep);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+/* 保存的方言句(弹窗列表)同色 */
+body[data-v3="on"][data-route="daily"] .saved-phrases-row {
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid var(--at-rule);
+}
+body[data-v3="on"][data-route="daily"] .saved-phrases-row:hover { border-color: rgba(47, 93, 76, 0.42); }
+body[data-v3="on"][data-route="daily"] .saved-phrases-quote {
+  border-left-color: var(--at-vermilion);
+  color: var(--at-ink);
+}
+body[data-v3="on"][data-route="daily"] .saved-phrases-meaning,
+body[data-v3="on"][data-route="daily"] .saved-phrases-row .date { color: var(--at-ink-soft); }
+
+body[data-v3="on"][data-route="daily"] .daily-page-cta { color: var(--at-ink-soft); }
+body[data-v3="on"][data-route="daily"] .daily-page-cta .link-accent {
+  color: var(--at-vermilion);
+  border-bottom-color: rgba(192, 69, 47, 0.55);
+  font-weight: 600;
+}
+body[data-v3="on"][data-route="daily"] .daily-page-cta .link-accent:hover {
+  color: var(--at-vermilion-deep);
+  border-bottom-color: var(--at-vermilion-deep);
+}
+
+/* ============ 设置页(含 BYOK):纸卡 + 朱砂小标 ============== */
+body[data-v3="on"][data-route="settings"] .settings-card,
+body[data-v3="on"][data-route="settings"] .setting-group,
+body[data-v3="on"][data-route="settings"] .glossary-card,
+body[data-v3="on"] .settings-card {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 16px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+body[data-v3="on"] .settings-card:hover {
+  transform: none;
+  border-color: var(--at-rule-strong);
+  box-shadow: var(--at-shadow-md);
+}
+body[data-v3="on"][data-route="settings"] .settings-card header,
+body[data-v3="on"] .settings-card header {
+  color: var(--at-ink);
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+body[data-v3="on"][data-route="settings"] .settings-card header i,
+body[data-v3="on"] .settings-card header i { color: var(--at-vermilion); }
+body[data-v3="on"] .settings-card p { color: var(--at-ink-soft); line-height: 1.7; }
+body[data-v3="on"] .settings-card code {
+  background: rgba(36, 43, 37, 0.06);
+  border-radius: 4px;
+  padding: 0.08em 0.35em;
+}
+body[data-v3="on"] .settings-hint { color: var(--at-ink-faint); }
+
+/* segmented control:纸槽 + 白签 + 朱砂字 */
+body[data-v3="on"][data-route="settings"] .seg-control,
+body[data-v3="on"] .seg-control {
+  background: rgba(36, 43, 37, 0.05);
+  border: 1px solid transparent;
+}
+body[data-v3="on"][data-route="settings"] .seg-control button,
+body[data-v3="on"] .seg-control button {
+  color: var(--at-ink-soft);
+  transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"][data-route="settings"] .seg-control button:hover:not(.is-active),
+body[data-v3="on"] .seg-control button:hover:not(.is-active) { color: var(--at-jade-deep); }
+body[data-v3="on"][data-route="settings"] .seg-control button.is-active,
+body[data-v3="on"] .seg-control button.is-active {
+  color: var(--at-vermilion);
+  background: #fdfbf3;
+  box-shadow: var(--at-shadow-sm);
+}
+body[data-v3="on"] .seg-control button:active { transform: scale(0.97); }
+
+/* 设置页输入件(字号 / BYOK / 字典) */
+body[data-v3="on"] .byok-input,
+body[data-v3="on"] .byok-toggle,
+body[data-v3="on"] .glossary-textarea,
+body[data-v3="on"][data-route="settings"] input[type="text"],
+body[data-v3="on"][data-route="settings"] input[type="password"],
+body[data-v3="on"][data-route="settings"] textarea,
+body[data-v3="on"][data-route="settings"] select {
+  color: var(--at-ink);
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 4px rgba(33, 69, 58, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+body[data-v3="on"] .byok-input:focus,
+body[data-v3="on"] .glossary-textarea:focus,
+body[data-v3="on"][data-route="settings"] input:focus,
+body[data-v3="on"][data-route="settings"] textarea:focus,
+body[data-v3="on"][data-route="settings"] select:focus {
+  border-color: rgba(47, 93, 76, 0.55);
+  box-shadow: inset 0 1px 4px rgba(33, 69, 58, 0.04), 0 0 0 3px rgba(47, 93, 76, 0.14);
+  outline: none;
+}
+body[data-v3="on"] .byok-toggle { cursor: pointer; color: var(--at-ink-soft); }
+body[data-v3="on"] .byok-toggle:hover {
+  color: var(--at-jade-deep);
+  border-color: rgba(47, 93, 76, 0.42);
+  background: rgba(47, 93, 76, 0.06);
+}
+
+/* 设置里的质量桶 / 数据按钮:发丝边纸件 */
+body[data-v3="on"] .quality-bucket {
+  background: rgba(255, 253, 246, 0.6);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+}
+body[data-v3="on"] .settings-actions .ghost-btn.danger:hover:not(:disabled) {
+  color: var(--at-vermilion-deep);
+  background: rgba(192, 69, 47, 0.08);
+  border-color: rgba(192, 69, 47, 0.4);
+}
+
+/* ============ 入场动效(尊重 reduced-motion) ================ */
+@keyframes at-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-v3="on"] .page.is-active .card-input,
+  body[data-v3="on"] .page.is-active .card-output,
+  body[data-v3="on"] .page.is-active .round2-compare-rail,
+  body[data-v3="on"] .page.is-active .round2-version-tray,
+  body[data-v3="on"] .page.is-active .card-daily-hero,
+  body[data-v3="on"] .page.is-active .settings-card,
+  body[data-v3="on"] .page.is-active .history-item,
+  body[data-v3="on"] .page.is-active .variety-tile {
+    animation: at-rise 0.45s cubic-bezier(0.22, 0.61, 0.21, 1) both;
+  }
+  body[data-v3="on"] .page.is-active .card-output { animation-delay: 60ms; }
+  body[data-v3="on"] .page.is-active .round2-compare-rail { animation-delay: 110ms; }
+  body[data-v3="on"] .page.is-active .round2-version-tray { animation-delay: 150ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(2) { animation-delay: 45ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(3) { animation-delay: 90ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(4) { animation-delay: 135ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(5) { animation-delay: 180ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(6) { animation-delay: 225ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(7) { animation-delay: 270ms; }
+  body[data-v3="on"] .page.is-active .settings-card:nth-child(8) { animation-delay: 315ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-v3="on"] .page.is-active :where(.card-input, .card-output, .round2-compare-rail, .round2-version-tray, .card-daily-hero, .settings-card) {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   现代墨斋 · 补遗层 (gap-fill)
+   上一墨斋层已覆盖:纸场/侧栏/印章/刊头/命令条/重写台/对照栏 diff/
+   版本托盘/今日方言/设置卡/焦点环/入场动效。本层只补未及的边角:
+   对照栏 diff 图例、图鉴/历史/批量/关于的案上纸面、移动端抽屉品牌色、
+   搜索框与杂项数字字形。沿用 --at-* token,不引入新色。
+   ============================================================ */
+
+/* 对照栏 diff 图例 + 行容器(app.js 注入,缺库时退化为逐句镜像) */
+body[data-v3="on"] .round2-compare-copy .diff-legend {
+  margin: 0 0 0.9rem;
+  padding: 0.5rem 0.7rem;
+  color: var(--at-ink-faint);
+  background: rgba(36, 43, 37, 0.04);
+  border: 1px solid var(--at-rule);
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+body[data-v3="on"] .round2-compare-copy .diff-legend i { color: var(--at-jade); margin-right: 0.35em; }
+body[data-v3="on"] .round2-compare-copy .diff-line {
+  margin: 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(36, 43, 37, 0.08);
+}
+body[data-v3="on"] .round2-compare-copy .diff-add,
+body[data-v3="on"] .round2-compare-copy .diff-del { padding: 0 1px; }
+
+/* 图鉴:纸签卡 */
+body[data-v3="on"] .variety-tile,
+body[data-v3="on"][data-route="atlas"] .atlas-card,
+body[data-v3="on"][data-route="atlas"] .variety-card {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 14px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-v3="on"] .variety-tile:hover,
+body[data-v3="on"][data-route="atlas"] .atlas-card:hover {
+  border-color: var(--at-rule-strong);
+  box-shadow: var(--at-shadow-md);
+}
+
+/* 历史:纸签条目 + 数字字形 */
+body[data-v3="on"][data-route="history"] .history-item,
+body[data-v3="on"][data-route="history"] .history-card {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 14px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-v3="on"][data-route="history"] .history-item:hover {
+  border-color: var(--at-rule-strong);
+  box-shadow: var(--at-shadow-md);
+}
+body[data-v3="on"] .history-variety { color: var(--at-jade-deep); }
+body[data-v3="on"] .history-time { color: var(--at-ink-faint); font-variant-numeric: tabular-nums; }
+body[data-v3="on"] .history-orig { color: var(--at-ink-soft); }
+body[data-v3="on"] .history-result { color: var(--at-ink); }
+body[data-v3="on"] .page-section-head h2,
+body[data-v3="on"] .batch-header h2 { letter-spacing: 0.04em; }
+body[data-v3="on"] .page-section-head p,
+body[data-v3="on"] .batch-header p { color: var(--at-ink-soft); }
+
+body[data-v3="on"] .search-input {
+  color: var(--at-ink);
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+body[data-v3="on"] .search-input:focus {
+  border-color: rgba(47, 93, 76, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 93, 76, 0.14);
+  outline: none;
+}
+
+/* 批量台:纸面容器 */
+body[data-v3="on"] .batch-textarea-wrap,
+body[data-v3="on"] .batch-config,
+body[data-v3="on"] .batch-table-wrap,
+body[data-v3="on"] .batch-empty {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 14px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-v3="on"] .batch-textarea-wrap textarea { background: transparent; }
+body[data-v3="on"] .batch-table { background: transparent; }
+body[data-v3="on"] .batch-table th {
+  color: var(--at-ink-soft);
+  background: rgba(36, 43, 37, 0.04);
+  letter-spacing: 0.08em;
+}
+body[data-v3="on"] .batch-table td { border-bottom-color: var(--at-rule); font-variant-numeric: tabular-nums; }
+body[data-v3="on"] .batch-label { color: var(--at-ink-soft); letter-spacing: 0.06em; }
+body[data-v3="on"] .batch-line-count { color: var(--at-ink-faint); font-variant-numeric: tabular-nums; }
+body[data-v3="on"] .batch-progress {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+  box-shadow: var(--at-shadow-sm);
+}
+body[data-v3="on"] .batch-progress-fill { background: var(--at-jade); }
+body[data-v3="on"] .batch-toolbar-info { color: var(--at-ink-soft); font-variant-numeric: tabular-nums; }
+
+/* 关于页:纸面 + 题签 */
+body[data-v3="on"] .about-hero,
+body[data-v3="on"] .about-block {
+  background: var(--at-raised);
+  border: 1px solid var(--at-rule);
+  border-radius: 16px;
+  box-shadow: var(--at-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body[data-v3="on"] .about-hero .eyebrow { color: var(--at-vermilion); letter-spacing: 0.14em; }
+body[data-v3="on"] .about-block h3 { letter-spacing: 0.04em; }
+body[data-v3="on"] .about-block h3 i { color: var(--at-jade); }
+body[data-v3="on"] .about-foot { color: var(--at-ink-faint); }
+body[data-v3="on"] .kbd-table kbd {
+  color: var(--at-ink-soft);
+  background: rgba(36, 43, 37, 0.05);
+  border: 1px solid var(--at-rule);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+}
+
+/* 弹窗头部排版 + 多方言对比小件 */
+body[data-v3="on"] .landmark-modal-content header h3 { letter-spacing: 0.04em; }
+body[data-v3="on"] .landmark-modal-content header p { color: var(--at-ink-soft); }
+body[data-v3="on"] .drawer-head h3 { letter-spacing: 0.04em; }
+body[data-v3="on"] .compare-hint { color: var(--at-ink-faint); }
+body[data-v3="on"] .compare-chip.is-active { background: var(--at-jade); color: #f8f3e3; }
+body[data-v3="on"] .compare-col {
+  background: rgba(255, 253, 246, 0.72);
+  border: 1px solid var(--at-rule);
+  border-radius: 10px;
+}
+
+/* 评分数字:tabular-nums */
+body[data-v3="on"] .rate-score { color: var(--at-vermilion); font-variant-numeric: tabular-nums; }
+body[data-v3="on"] .score-num,
+body[data-v3="on"] .quality-stats td,
+body[data-v3="on"] .quality-stats .badge { font-variant-numeric: tabular-nums; }
+
+/* 移动端抽屉:品牌名在墨绿栏上须为纸色(旧规则给的是深墨字) */
+@media (max-width: 940px) {
+  body[data-v3="on"] .brand-text strong { color: #f6f1e2; letter-spacing: 0.02em; }
+  body[data-v3="on"] .brand-sub { color: rgba(241, 236, 222, 0.55); }
+}
+
+/* 批量台 chips:选中态统一走墨绿(朱砂只留主 CTA/导航激活/印章,
+   茶金退出选中态,避免第二个 accent 抢戏) */
+body[data-v3="on"] .batch-chip {
+  color: var(--at-ink-soft);
+  border-color: var(--at-rule-strong);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.12s ease-out;
+}
+body[data-v3="on"] .batch-chip:hover {
+  color: var(--at-jade-deep);
+  border-color: rgba(47, 93, 76, 0.45);
+  background: rgba(47, 93, 76, 0.06);
+}
+body[data-v3="on"] .batch-chip.is-active,
+body[data-v3="on"] .batch-chip.is-active.is-scenario {
+  color: #f8f3e3;
+  background: var(--at-jade);
+  border-color: var(--at-jade);
+  font-weight: 600;
+}
+body[data-v3="on"] .batch-chip:active { transform: scale(0.97); }
+
+/* ============================================================
+   照片回流 · Photo Restore (v3 墨斋最终层之上)
+   墨斋层把全幅地标照片压成 ~5% 残影(0.93-0.97 暖白渐变罩 summer-lacquer-silk.png)。
+   本层让照片重新流动起来:
+   - .bg-stage 重新上桌(app.js 的 12s 轮播 / 固定 / 关闭三态不变)
+   - body 纸色退为兜底,只在「关闭背景」或照片缺失时可见
+   - 纸纱(.bg-vignette)只留 0.20-0.50 暖白,照片保持 ~60-75% 存在感
+   - 刊头左侧一道纸晕给墨字托底,向右渐隐,让照片从纸下流出
+   ============================================================ */
+
+/* 1) 全幅照片回归 */
+body[data-v3="on"] .bg-stage { display: block !important; }
+
+/* 2) 纸场退成兜底色(关掉照片时仍是墨斋宣纸) */
+body[data-v3="on"] {
+  background:
+    radial-gradient(ellipse 75% 55% at 86% 0%, rgba(47, 93, 76, 0.05), transparent 62%),
+    linear-gradient(165deg, #f7f3ea 0%, #f4efe4 45%, #ece5d5 100%) !important;
+}
+
+/* 3) 照片本体:墨斋不做水墨重滤镜,轻提清即可;
+      保留基底的 1.6s 交叉淡化 + 18s Ken Burns 缓推(流动感来源) */
+body[data-v3="on"] .bg-image {
+  filter: saturate(0.92) brightness(1.02) contrast(1.02);
+}
+
+/* 4) 纸纱:顶部略厚(刊头墨字区),中下渐薄,照片清晰可读 */
+body[data-v3="on"] .bg-vignette {
+  background:
+    linear-gradient(180deg,
+      rgba(244, 239, 228, 0.52) 0%,
+      rgba(244, 239, 228, 0.27) 26%,
+      rgba(244, 239, 228, 0.21) 58%,
+      rgba(244, 239, 228, 0.36) 100%);
+}
+
+/* 5) 纸纹颗粒保留,改软光模式,不再糊住照片 */
+body[data-v3="on"] .bg-grain { opacity: 0.16; mix-blend-mode: soft-light; }
+
+/* 6) 刊头:左纸右景——纸晕从左侧铺开给墨字托底,向右渐隐 */
+body[data-v3="on"] .v3-hero {
+  background: linear-gradient(100deg,
+    rgba(244, 239, 228, 0.94) 0%,
+    rgba(244, 239, 228, 0.76) 30%,
+    rgba(244, 239, 228, 0.36) 58%,
+    rgba(244, 239, 228, 0) 80%);
+}
+
+/* ============================================================
+   HIG 打磨 · Apple-style interaction polish (v3 墨斋,桌面端)
+   依据 Apple HIG (macOS):
+   - 命中目标:一切可点控件 ≥ 28×28px 有效点击区(字形可小,点击区不可小)
+   - 间距:有边控件周围 ~12px,无边控件 ~24px;过挤处加 separation
+   - 图标:同一语境同一盒型/字号,描边字重家族一致(FontAwesome),
+     视觉居中(fa-download 字形偏低,上提 1px),与相邻字重匹配
+   - 圆角:唯一刻度 --at-r-sm/md/lg/xl(8/10/14/18),pill 只留给
+     真正的 toggle/seg 控件(seg-control、chip 单选组)
+   - 反馈:hover = 底色微移或 1px 上浮(150-250ms ease),
+     active = scale(0.97),focus-visible 全站一致墨绿环,
+     位移动效全部收敛进 prefers-reduced-motion
+   - 对比:正文/标签 ≥ 4.5:1(--at-ink-faint 加深至 #6a7163,
+     实测对 --at-raised 约 4.7:1);照片上的浮字加纸衬 scrim
+   ============================================================ */
+
+body[data-v3="on"] {
+  --at-r-sm: 8px;   /* 小控件:ghost / icon / 统计槽 */
+  --at-r-md: 10px;  /* 输入件、井槽、抽屉内件 */
+  --at-r-lg: 14px;  /* 卡片 / 面板 */
+  --at-r-xl: 18px;  /* 大容器:workbench、daily hero、modal */
+}
+
+/* ---------- 命中目标 ≥ 28×28 ---------- */
+
+/* 结果区输出轨的 icon-only 钮:统一 30×30 方盒,字形 0.92rem,居中 */
+body[data-v3="on"] .card-head-tools .icon-btn,
+body[data-v3="on"] .drawer-head .icon-btn,
+body[data-v3="on"] .compare-card-actions .icon-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  border-radius: var(--at-r-sm);
+}
+
+/* 小 ghost 钮(收藏 / 已收藏 / 情境向导等)原来 ~25px,补足 28px */
+body[data-v3="on"] .ghost-btn.small {
+  min-height: 28px;
+  padding-top: 0.34rem;
+  padding-bottom: 0.34rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* chip 族(例句 / 模式 / 场景 / 批量 / 对比)原来 ~26-27px,统一 ≥28px */
+body[data-v3="on"] .chip,
+body[data-v3="on"] .mode-chip,
+body[data-v3="on"] .scenario-chip,
+body[data-v3="on"] .batch-chip,
+body[data-v3="on"] .compare-chip {
+  min-height: 28px;
+  padding-top: 0.36rem;
+  padding-bottom: 0.36rem;
+  align-items: center;
+}
+
+/* seg 控件按钮保持 pill,立 28px 下限 */
+body[data-v3="on"] .seg-control button { min-height: 28px; }
+
+/* 收藏列表里的删除钮(无边,字形小):有效区 28×28 */
+body[data-v3="on"] .saved-phrases-row .delete-btn {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--at-r-sm);
+}
+
+/* BYOK 显隐钮:跟随行高,立宽度下限 */
+body[data-v3="on"] .byok-toggle { min-width: 34px; min-height: 28px; }
+
+/* ---------- 间距:有边控件 ~12px 呼吸 ---------- */
+body[data-v3="on"] .cmdbar-right { gap: 12px; }
+body[data-v3="on"] .card-head-tools { gap: 8px; }
+body[data-v3="on"] .history-actions { gap: 8px; }
+body[data-v3="on"] .example-chips { gap: 8px; }
+body[data-v3="on"] .mode-chips,
+body[data-v3="on"] .scenario-chips,
+body[data-v3="on"] .batch-variety-chips,
+body[data-v3="on"] .batch-scenario-chips { gap: 7px; }
+body[data-v3="on"] .result-foot { gap: 9px; }
+body[data-v3="on"] .variety-actions { gap: 10px; }
+body[data-v3="on"] .settings-actions { gap: 12px; }
+
+/* ---------- 图标:同盒型 + 视觉居中 + 描边一致 ---------- */
+/* fa-download 字形偏低,上提 1px 居中;fa-volume-up / fa-table-columns 同盒已居中 */
+body[data-v3="on"] .card-head-tools #download-button i { transform: translateY(-1px); }
+
+/* ---------- 圆角:唯一刻度,消灭一次性半径 ---------- */
+body[data-v3="on"] .workbench { border-radius: var(--at-r-xl); }
+body[data-v3="on"][data-route="daily"] .card-daily-hero { border-radius: var(--at-r-xl); }
+body[data-v3="on"] .settings-card,
+body[data-v3="on"] .about-hero,
+body[data-v3="on"] .about-block { border-radius: var(--at-r-lg); }
+body[data-v3="on"] .landmark-modal-content { border-radius: var(--at-r-xl); }
+body[data-v3="on"] .explain-drawer,
+body[data-v3="on"] .compare-panel { border-radius: var(--at-r-lg); }
+body[data-v3="on"] .variety-tile,
+body[data-v3="on"][data-route="atlas"] .atlas-card,
+body[data-v3="on"][data-route="atlas"] .variety-card,
+body[data-v3="on"][data-route="history"] .history-item,
+body[data-v3="on"][data-route="history"] .history-card,
+body[data-v3="on"] .batch-textarea-wrap,
+body[data-v3="on"] .batch-config,
+body[data-v3="on"] .batch-table-wrap,
+body[data-v3="on"] .batch-empty,
+body[data-v3="on"] .round2-version-tray { border-radius: var(--at-r-lg); }
+body[data-v3="on"] .ghost-btn,
+body[data-v3="on"] .icon-btn { border-radius: var(--at-r-sm); }
+/* 圆形 icon 钮改圆角方,收进同一刻度 */
+body[data-v3="on"] .mic-btn,
+body[data-v3="on"] .landmark-close { border-radius: var(--at-r-md); }
+
+/* ---------- 反馈:hover 微移 / active 压缩 / 全站一致焦点环 ---------- */
+body[data-v3="on"] .mode-chip:active:not(.is-active),
+body[data-v3="on"] .scenario-chip:active:not(.is-active),
+body[data-v3="on"] .compare-chip:active:not(:disabled),
+body[data-v3="on"] .chip:active { transform: scale(0.97); }
+
+body[data-v3="on"] .mic-btn:hover {
+  color: var(--at-jade-deep);
+  border-color: rgba(47, 93, 76, 0.45);
+  background: rgba(47, 93, 76, 0.08);
+}
+body[data-v3="on"] .mic-btn:active { transform: scale(0.94); }
+
+body[data-v3="on"] .landmark-close:active { transform: scale(0.94); }
+body[data-v3="on"] .round2-command-search:active { transform: scale(0.98); }
+body[data-v3="on"] .cmd-btn.round2-save-draft:active { transform: scale(0.97); }
+body[data-v3="on"] .byok-toggle:active { transform: scale(0.96); }
+body[data-v3="on"] .saved-phrases-row .delete-btn:hover { background: rgba(192, 69, 47, 0.08); }
+body[data-v3="on"] .saved-phrases-row .delete-btn:active { transform: scale(0.94); }
+
+/* 位移类反馈在 reduced-motion 下全部关闭(颜色反馈保留) */
+@media (prefers-reduced-motion: reduce) {
+  body[data-v3="on"] :where(button, a, .chip, .nav-item):hover,
+  body[data-v3="on"] :where(button, a, .chip, .nav-item):active {
+    transform: none !important;
+  }
+}
+
+/* ---------- 对比:文字 ≥ 4.5:1,照片上的浮字加纸衬 ---------- */
+/* --at-ink-faint 在 6211 行墨斋层定义;此处加深到 #6a7163(对案上纸 ~4.7:1)。
+   所有 hint/日期/计数/占位文字一并受益,无需逐点覆写 */
+body[data-v3="on"] { --at-ink-faint: #6a7163; }
+body[data-v3="on"] textarea::placeholder { opacity: 1; }
+
+/* 侧栏页脚小字:墨绿栏上 0.52 → 0.68 */
+body[data-v3="on"] .sidebar-meta { color: rgba(241, 236, 222, 0.68); }
+/* 版本托盘(深墨砚)次级字同理 */
+body[data-v3="on"] .round2-version-head span,
+body[data-v3="on"] .round2-version-head a { color: rgba(241, 236, 222, 0.68); }
+body[data-v3="on"] .round2-version-empty { color: rgba(241, 236, 222, 0.68); }
+
+/* 直接压在照片上的浮字:软纸晕托底,无硬边、不成卡 */
+body[data-v3="on"] .batch-header,
+body[data-v3="on"] .page-section-head {
+  background: linear-gradient(100deg,
+    rgba(244, 239, 228, 0.90) 0%,
+    rgba(244, 239, 228, 0.66) 55%,
+    rgba(244, 239, 228, 0.28) 85%,
+    rgba(244, 239, 228, 0) 100%);
+  border-radius: var(--at-r-lg);
+  padding: 8px 20px 10px 14px;
+  margin-left: -14px;
+  margin-right: 24px;
+}
+
+/* daily 底部 CTA / about 页脚:居中浮字 → 纸丸衬底 */
+body[data-v3="on"] .daily-page-cta,
+body[data-v3="on"] .about-foot {
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(244, 239, 228, 0.82);
 }
