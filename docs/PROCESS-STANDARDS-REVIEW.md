@@ -54,27 +54,27 @@
 ## 4. 落地机制(混合 + 全局)
 
 ```
-环境锚定 → hooks (~/.claude/settings.json,硬性强制):
+环境锚定 → hooks (~/.kimi-code/settings.json,硬性强制):
   #1 commit · #9 commit-data · #10 push
 
-工程现实锚定 → 部分 skills + 部分 CLAUDE.md:
+工程现实锚定 → 部分 skills + 部分 AGENTS.md:
   #3/#11 verify-before-claim (skill)
   #12 api-contract-check (skill)
   #13 integration-smoke (skill)
-  #2/#4 → CLAUDE.md 常驻
+  #2/#4 → AGENTS.md 常驻
   #5/#6 → hooks 提醒
 
-AI 行为锚定 → skills + CLAUDE.md:
+AI 行为锚定 → skills + AGENTS.md:
   #8 clarify-before-action (已存在的 skill)
   #15 re-verify-on-switch (skill)
-  #7/#14 → CLAUDE.md 常驻
-  DRLI → CLAUDE.md(标休眠/适用边界)
+  #7/#14 → AGENTS.md 常驻
+  DRLI → AGENTS.md(标休眠/适用边界)
 ```
 
-全部装到 `~/.claude/`(全局,所有项目继承)。
+全部装到 `~/.kimi-code/`(全局,所有项目继承)。
 
 ## 5. 关键洞察
 
-用户原想法"全做成 skills 每个会话激活"有一处误解:**skills 是按相关性被模型调用的,没有"每会话强制加载"开关**。真正"常驻"的是 memory/CLAUDE.md;真正"强制"的是 hooks。所以最优解是三机制混合,各放最适合的层 —— 比 16 个 skill 严格更好。
+用户原想法"全做成 skills 每个会话激活"有一处误解:**skills 是按相关性被模型调用的,没有"每会话强制加载"开关**。真正"常驻"的是 memory/AGENTS.md;真正"强制"的是 hooks。所以最优解是三机制混合,各放最适合的层 —— 比 16 个 skill 严格更好。
 
 且:这些原则**本就已在 NCGA 每个会话自动加载**(MEMORY.md → rules_8)。真正的缺口是 ① 全局作用域 ② 强制执行(非被动提醒)。故本轮落地重心是 global + hooks,不是 skill 本身。

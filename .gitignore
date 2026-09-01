@@ -33,9 +33,6 @@ dist/
 *.swo
 .DS_Store
 
-# Project-local Claude Code state
-.claude/
-
 # Personal files — never committed (goal-mode launch work excludes them)
 NCGA_Personal_Reflection.pptx
 _deck_build/

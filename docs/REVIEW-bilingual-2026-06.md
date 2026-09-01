@@ -3,7 +3,7 @@
 > 日期 / Date: 2026-06-10
 > 方法 / Method: 7 维度并行检查 + 对每个 critical/high 发现做对抗验证（试图推翻）。20 个 agent，140 万 token，382 次工具调用。
 > 7-dimension parallel inspection with adversarial verification (each high/critical finding was attacked by an independent skeptic). 20 agents, 1.4M tokens, 382 tool calls.
-> 范围 / Scope: branch `claude/bold-bell-4750bf` @ commit 914af24 + 本地未推送的改动。
+> 范围 / Scope: branch `main` @ commit 914af24 + 本地未推送的改动。
 
 ---
 
@@ -86,8 +86,8 @@
 
 ### 🔴 P7 — CI 从来没跑过 / CI has never run once (tooling, high)
 - **文件 / File**: `.github/workflows/ci.yml:3-6`
-- **中文**: workflow 触发器是 `push: branches: [main]`,但 GitHub 默认分支是 `claude/bold-bell-4750bf`,origin 上**根本没有 main 分支**,也没有任何 PR。`gh run list` 显示 CI 任务自仓库推送(2026-05-17)以来执行了**零次**。所有"198 测试绿"的信心都只是本地的;声称支持的 Python 3.10/3.11/3.12 从没被实际验证过(本地跑的是 3.14)。
-- **English**: The push trigger targets `main`, which doesn't exist on origin (default branch is `claude/bold-bell-4750bf`); no PRs exist. The CI job has run zero times. All green-CI confidence is local-only; the advertised 3.10–3.12 matrix has never executed.
+- **中文**: workflow 触发器是 `push: branches: [main]`,但 GitHub 默认分支是 `main`,origin 上**根本没有 main 分支**,也没有任何 PR。`gh run list` 显示 CI 任务自仓库推送(2026-05-17)以来执行了**零次**。所有"198 测试绿"的信心都只是本地的;声称支持的 Python 3.10/3.11/3.12 从没被实际验证过(本地跑的是 3.14)。
+- **English**: The push trigger targets `main`, which doesn't exist on origin (default branch is `main`); no PRs exist. The CI job has run zero times. All green-CI confidence is local-only; the advertised 3.10–3.12 matrix has never executed.
 - **修复 / Fix**: 把触发器改成真实默认分支,或把默认分支改名 main,然后确认 `gh run list` 真出现一次运行。
 
 ### 🔴 P8 — `build_corpus.py` 实跑即崩 / build_corpus.py broken in real mode (tooling, high)
@@ -104,7 +104,7 @@
 
 ### 🔴 P10 — 文档修正卡在未推送的本地 main / Doc fixes stranded on unpushed main (docs, high)
 - **文件 / File**: 仓库 git 状态 / repo git state
-- **中文**: 两个修正提交(`b779c19` 修正陈旧声明、`f39f58c` 删 Refiner)只在**本地未推送的 main** 上,而 GitHub 唯一分支兼默认分支 `claude/bold-bell-4750bf` 仍然对外宣称:零依赖(假,要 cryptography)、100 条语料(实际 400)、raw token 注入 HTML(假且误导安全审查)、扩展 30 分钟自动锁(已删)。违反你自己的 Rule #10(push)。
+- **中文**: 两个修正提交(`b779c19` 修正陈旧声明、`f39f58c` 删 Refiner)只在**本地未推送的 main** 上,而 GitHub 唯一分支兼默认分支 `main` 仍然对外宣称:零依赖(假,要 cryptography)、100 条语料(实际 400)、raw token 注入 HTML(假且误导安全审查)、扩展 30 分钟自动锁(已删)。违反你自己的 Rule #10(push)。
 - **English**: Two correction commits live only on local unpushed `main`; the published default branch still serves four false claims (zero-deps, 100-entry corpus, raw-token-in-HTML, 30-min auto-lock). Violates the project's own push rule.
 - **修复 / Fix**: 推送 main → 把 GitHub 默认分支改成 main → 删/快进旧分支。
 

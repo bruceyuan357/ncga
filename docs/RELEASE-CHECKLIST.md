@@ -1,6 +1,6 @@
 # NCGA 发布就绪检查 / Release Readiness
 
-> Finalized by Opus 4.8 · 2026-05-31 · branch `claude/bold-bell-4750bf`
+> Finalized by Kimi Code · 2026-05-31 · branch `main`
 
 ## ✅ Verified (I ran these)
 
@@ -21,7 +21,7 @@
 |---|---|
 | **Chrome extension end-to-end** | Code-complete, all known bugs fixed, syntax-clean — but NOT confirmed in a live browser (especially 即时 mode). Needs a manual Chrome pass per `extension/INSTALL.md`. |
 | **10 Minnan (福建闽南) corpus rows** | Held as `needs_review` — Fujian-specific authenticity can't be verified from data alone; needs a native speaker. The other 390 rows are verified. |
-| **Global discipline hook** | Installed at `~/.claude/`; whether it fires live needs a `/hooks` reload to confirm (separate from this repo). |
+| **Global discipline hook** | Installed at `~/.kimi-code/`; whether it fires live needs a `/hooks` reload to confirm (separate from this repo). |
 
 ## How others run it (after cloning)
 

@@ -1,6 +1,6 @@
 # 地道中文 Chrome 扩展 — 安装验收清单
 
-> 给 Bruce:你回来后照这个清单从上往下走,每步若失败截图给 Claude,问"我卡在第 X 步"即可。
+> 给 Bruce:你回来后照这个清单从上往下走,每步若失败截图给 Kimi,问"我卡在第 X 步"即可。
 
 ---
 
@@ -20,7 +20,7 @@
 1. Chrome 地址栏输 `chrome://extensions`
 2. 右上角 **开发者模式** 切到开
 3. 左上角点 **加载已解压的扩展程序**
-4. 选择 `/Users/bruce/NCGA/.claude/worktrees/bold-bell-4750bf/extension` 文件夹
+4. 选择 `/Users/bruce/bruce development/01 NCGA/NCGA/extension` 文件夹
 5. 应该看到一张卡:**地道中文 · NCGA  v0.2.0**(带粉色樱花图标)
 
 ✅ **预期:** 卡片底色白,**没有红色错误提示**
@@ -189,7 +189,7 @@ cd /Users/bruce/NCGA && ls extension/icons/
 
 ```bash
 cd /Users/bruce/NCGA
-git pull             # 拉 Claude 推的最新改动
+git pull             # 拉 Kimi 推的最新改动
 ```
 然后 `chrome://extensions` → NCGA → 点刷新箭头,新代码生效。
 
@@ -209,4 +209,4 @@ git pull             # 拉 Claude 推的最新改动
 
 ## 卡住时
 
-照 Section 9 表查,查不到 → 截图 + 「我卡在第 X 步」给 Claude。
+照 Section 9 表查,查不到 → 截图 + 「我卡在第 X 步」给 Kimi。

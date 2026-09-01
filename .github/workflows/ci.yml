@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    # claude/bold-bell-4750bf is the current default branch; keep main for a future rename.
-    branches: [main, claude/bold-bell-4750bf]
+    branches: [main]
   pull_request:
 
 jobs:

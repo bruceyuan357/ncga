@@ -1,6 +1,6 @@
 # Chinese-Dialect Corpus Research Notes
 **生成时间**: 2026-05-24
-**研究员**: Claude (社会语言学 + 方言数据工程师 角色)
+**研究员**: Kimi Code (社会语言学 + 方言数据工程师 角色)
 **交付物**: corpus.jsonl (300 行) · lexicon.jsonl (1200 行) · 本笔记
 
 ---
