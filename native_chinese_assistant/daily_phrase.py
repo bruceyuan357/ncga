@@ -395,6 +395,11 @@ def get_phrase_of_the_day(service: RewriteService) -> dict[str, Any]:
             for value, text in executor.map(_rewrite_one, VarietyPreset):
                 translations[value] = text
 
+        # With the heuristic fallback gone, a keyless or flaky server yields
+        # "__error__" for every variety. Persisting that as today's card kept
+        # the landing page broken for CACHE_TTL_SECONDS even after the operator
+        # added a key. Serve it, but don't cache it — the next visitor retries.
+        any_success = any(not str(t).startswith("__error__") for t in translations.values())
         images = [{"url": url, "caption": caption} for url, caption in TOP_12_LANDMARKS]
         payload = {
             "date": today_iso,
@@ -405,7 +410,10 @@ def get_phrase_of_the_day(service: RewriteService) -> dict[str, Any]:
             "images": images,
             "_generated_at": time.time(),
         }
-        _save_cache(path, payload)
+        if any_success:
+            _save_cache(path, payload)
+        else:
+            logger.warning("daily-phrase: all %d rewrites failed; not caching", len(translations))
         return _strip_internal(payload)
 
 

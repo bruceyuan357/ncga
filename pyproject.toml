@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "native-chinese-assistant"
 version = "0.2.0"
-description = "Rewrite arbitrary Chinese text into 10 regional varieties (Mandarin/Cantonese/Hokkien) via LLM with offline heuristic fallback."
+description = "Rewrite arbitrary Chinese text into 10 regional varieties (Mandarin/Cantonese/Hokkien) via LLM; an unconfigured or unreachable LLM is reported honestly, never faked."
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "MIT" }

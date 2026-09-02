@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any
 
 from native_chinese_assistant.rewrite import (
+    NO_LLM_MESSAGE,
     ChatCompletionsClient,
     RewriteError,
     load_llm_config,
@@ -181,7 +182,7 @@ class TransformService:
 
     def _require_client(self) -> ChatCompletionsClient:
         if self._client is None:
-            raise RewriteError("No LLM provider is configured — transform modes need an API key.")
+            raise RewriteError(NO_LLM_MESSAGE)
         return self._client
 
     @staticmethod

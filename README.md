@@ -16,7 +16,7 @@ A local-first web app: paste textbook Mandarin (or English/Japanese/French — o
 - **方言质量是门禁,不是玄学** — 每种方言带 golden 评测集 + 锚定 LLM 评审;任何改动让任一方言掉分 >0.3 直接失败(见 [方言质量评估协议](#方言质量评估协议-2026-08))。Dialect quality is a CI gate: golden sets + an anchored judge, regressions fail the build.
 - **按方言路由模型** — 官话系走 DeepSeek V4 Flash(快、便宜),低资源方言(江淮/上海话风格/粤语书面/闽南语)自动路由到 Pro;响应带 `model` 字段,路由可观测。依据:[一次 A/B 实验](#方言改写的模型路由-2026-08)。
 - **BYOK 自带 Key** — 设置页粘贴你自己的 DeepSeek key,全部 AI 功能走你的账户,无需访问令牌;key 只存浏览器 localStorage,随请求直传上游。见 [自带 Key(BYOK)](#自带-keybyok)。
-- **诚实降级** — LLM 抖动时回退本地启发式改写,UI 与 API 都明示 `degraded: true`,不装没发生。
+- **诚实报错,不编结果** — LLM 不可用时直接返回 503 与一句中文说明,不再回退「原文 + 方言前缀」的伪改写。旧的启发式兜底会把你自己的句子加个前缀当成结果显示,还配上字数/耗时/方言关键词,看着像真的。宁可说不行。
 - **近乎零依赖** — 后端 Python 3.10+ 标准库(运行时仅 `certifi` + `cryptography`),前端原生 HTML/CSS/JS 无构建步骤。
 
 还有:流式改写 · 批量工作台(100 条 × 4 方言)· 情境向导(两句话生成语域画像)· 每日方言一句配地标摄影 · 润色/中英互译/总结/白话解释 · 实时质量面板。
@@ -35,7 +35,7 @@ cp .env.example .env                   # 填入 DEEPSEEK_API_KEY
 python app.py                          # http://127.0.0.1:8000
 ```
 
-没有 API key 也能跑 — 方言改写回退启发式(并明示降级);有 key 但不想给别人用?开 `NCGA_AUTH_TOKEN` 即可(见 [安全](#安全--security))。
+没有 API key 时 AI 功能不可用 — 首页会挂一条提示,设置页如实告诉你服务器有没有配置密钥,你也可以在「设置 → API 密钥」粘贴自己的 DeepSeek Key(见 [自带 Key(BYOK)](#自带-keybyok))。有 key 但不想给别人用?开 `NCGA_AUTH_TOKEN` 即可(见 [安全](#安全--security))。
 
 ## 测试与质量门禁
 
@@ -65,15 +65,15 @@ python app.py                          # http://127.0.0.1:8000
 
 - 后端:Python 3.10+。运行时依赖仅 `certifi` + `cryptography`(AES-GCM 落盘加密;见 `requirements.txt`)。WSGI。
 - 前端:原生 JS / CSS / HTML,无构建步骤。
-- LLM:默认 DeepSeek(OpenAI 兼容协议),可切换。LLM 不可用时**方言改写**回退到本地启发式重写并明示降级;**文本变换**(Cycle 23)无启发式回退,直接返回 503。
+- LLM:默认 DeepSeek(OpenAI 兼容协议,默认模型 `deepseek-v4-flash`),可切换。LLM 不可用时**方言改写**与**文本变换**都直接返回 503 + 中文说明 — 两条路径语义一致,都不伪造结果。
 
 ## 环境变量
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `LLM_PROVIDER` | `deepseek` | `deepseek` 或 `openai` |
-| `LLM_API_KEY` 或 `DEEPSEEK_API_KEY` | — | LLM API key(缺省走启发式 fallback) |
-| `LLM_MODEL` | `deepseek-chat` / `gpt-4.1-mini` | 模型名 |
+| `LLM_API_KEY` 或 `DEEPSEEK_API_KEY` | — | LLM API key(缺省时 AI 功能返回 503,UI 明示未配置) |
+| `LLM_MODEL` | `deepseek-v4-flash` / `gpt-4.1-mini` | 模型名 |
 | `LLM_MODEL_<MODE>` | 仅 `explain` 在 deepseek 下默认 `deepseek-v4-pro` | Cycle 23: 按变换模式覆盖模型,见 [模型路由](#模型路由) |
 | `LLM_BASE_URL` | provider 默认 | OpenAI 兼容 base URL |
 | `LLM_STREAM` | `true` | 是否使用 SSE 流式 |
@@ -265,7 +265,7 @@ docker run -d --name ncga --restart unless-stopped \
 app.py
 └── native_chinese_assistant/
     ├── web.py           # WSGI 路由 / 限流 / 安全头 / 双轨认证 + BYOK 轨道 / 反馈表单
-    ├── rewrite.py       # LLM 客户端 + 启发式 fallback + RewriteService
+    ├── rewrite.py       # LLM 客户端 + RewriteService(无启发式 fallback)
     ├── transform.py     # Cycle 23: 四种文本变换模式,复用 rewrite 的 LLM 客户端,无启发式回退
     ├── presets.py       # 所有方言元数据(label / register / style / landmarks / keywords / letter)
     ├── corpus.py        # 句子级方言语料 + 纯 stdlib BM25 检索(few-shot 注入)
@@ -300,7 +300,7 @@ curl -X POST http://127.0.0.1:8000/api/rewrite \
 # → {"rewritten_text": "嗨喽,今儿过得咋样啊?", ...}
 ```
 
-离线 heuristic 兜底针对非中文输入会**诚实拒绝**(不再"给你整成东北那股劲儿:very good"那种翻车)。
+LLM 不可用时**直接报错**,不做任何离线兜底(旧的启发式兜底会把原文加个方言前缀当结果,已删除)。
 
 ## Cycle 20 · 反馈表单
 
@@ -356,7 +356,7 @@ curl -X POST http://127.0.0.1:8000/api/logout \
 | `summarize` | 总结 | 压缩成一句话或要点列表 |
 | `explain` | 白话解释 | 术语/法条/难句,用大白话讲明白 |
 
-架构([`transform.py`](native_chinese_assistant/transform.py)):变换与改写**共用同一个 LLM 客户端**(`web.py` 里 `TransformService(client=rewrite_service.client)` — 一条传输通道,一套 503 语义),但**没有启发式回退** — 「翻译这段」不存在诚实的离线近似,所以 LLM 未配置或不可达时直接 503,而不是降级 200。
+架构([`transform.py`](native_chinese_assistant/transform.py)):变换与改写**共用同一个 LLM 客户端**(`web.py` 里 `TransformService(client=rewrite_service.client)` — 一条传输通道,一套 503 语义),两者都**没有启发式回退** — 不存在诚实的离线近似,所以 LLM 未配置或不可达时直接 503,而不是降级 200。
 
 端点(POST 走与 `/api/rewrite` 相同的双轨认证;与 rewrite 共享同一个 30/min 限流桶和每日 LLM 上限):
 

@@ -72,8 +72,8 @@ Second context-menu group + a button row in the popup, backed by
 
 白话解释 is routed server-side to a stronger model (per-mode model routing);
 the response carries `model` and the UI shows it as a muted chip next to the
-result, so the routing is visible rather than assumed. Transforms have no
-heuristic fallback: an unconfigured/unreachable LLM surfaces as
+result, so the routing is visible rather than assumed. Transforms have
+no fallback: an unconfigured/unreachable LLM surfaces as
 「服务器未配置 LLM,transform 模式不可用」 instead of a degraded result
 (the 「降级输出」 chip wiring is still shared with the rewrite path —
 transforms send `degraded: false` today).

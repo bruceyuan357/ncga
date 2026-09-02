@@ -34,16 +34,62 @@ class _SilentHandler(WSGIRequestHandler):
         return
 
 
+_ISOLATED_ENV = (
+    "NCGA_AUTH_TOKEN", "NCGA_DATA_KEY", "XDG_DATA_HOME",
+    "LLM_API_KEY", "DEEPSEEK_API_KEY", "LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL", "LLM_STREAM",
+    # Anything a dev's .env could set that changes where App() stores data or
+    # how the test server throttles — all restored after the fixture.
+    "NCGA_QUALITY_STORE", "NCGA_FEEDBACK_STORE",
+    "NCGA_RATE_LIMIT_PER_MIN", "NCGA_BATCH_RATE_LIMIT_PER_MIN", "NCGA_DAILY_LLM_CAP_PER_IP",
+)
+
+
+def _isolate_env() -> tuple[str, dict[str, str | None]]:
+    """Point the app at a throwaway data dir with auth off; return (tmpdir, saved env).
+
+    Every fixture that constructs App() MUST call this first. App() opens the
+    encrypted quality store on construction; without XDG_DATA_HOME redirected it
+    opens the developer's real one with the fallback keyfile — the exact failure
+    web.py's _LazyApp docstring attributes to a run of store-quarantine incidents.
+    """
+    import tempfile
+
+    saved = {k: os.environ.get(k) for k in _ISOLATED_ENV}
+    tmp = tempfile.mkdtemp(prefix="ncga-pw-")
+    os.environ["NCGA_AUTH_TOKEN"] = ""   # not setdefault: a dev's real token must not leak in
+    os.environ["NCGA_DATA_KEY"] = ""
+    os.environ["XDG_DATA_HOME"] = tmp
+    return tmp, saved
+
+
+def _restore_env(saved: dict[str, str | None]) -> None:
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
+def _serve(app):
+    """Bind `app` on an ephemeral port in a daemon thread; return (base_url, server, thread)."""
+    port = _free_port()
+    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
+    th = threading.Thread(target=server.serve_forever, daemon=True)
+    th.start()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                break
+        except OSError:
+            time.sleep(0.05)
+    return f"http://127.0.0.1:{port}", server, th
+
+
 @pytest.fixture(scope="session")
 def live_app() -> Iterator[str]:
     """Start NCGA on an ephemeral port; yield base URL; clean up after."""
-    # Force auth off + a benign quality-store path (XDG isolation)
-    os.environ.setdefault("NCGA_AUTH_TOKEN", "")
-    os.environ.setdefault("NCGA_DATA_KEY", "")
-    import tempfile
-
-    tmp = tempfile.mkdtemp(prefix="ncga-pw-")
-    os.environ["XDG_DATA_HOME"] = tmp
+    tmp, saved = _isolate_env()
 
     # Inject a fake LLM transport so the wizard / rewrite paths don't hit real network
     from native_chinese_assistant.rewrite import (
@@ -85,23 +131,44 @@ def live_app() -> Iterator[str]:
     client = ChatCompletionsClient(cfg, transport=FakeTransport())
     app = App(rewrite_service=RewriteService(client=client))
 
-    port = _free_port()
-    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
-    th = threading.Thread(target=server.serve_forever, daemon=True)
-    th.start()
-    # Wait for readiness
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                break
-        except OSError:
-            time.sleep(0.05)
-
-    base_url = f"http://127.0.0.1:{port}"
+    base_url, server, th = _serve(app)
     yield base_url
     server.shutdown()
     th.join(timeout=2)
     import shutil
 
     shutil.rmtree(tmp, ignore_errors=True)
+    _restore_env(saved)
+
+
+@pytest.fixture(scope="session")
+def live_app_no_key() -> Iterator[str]:
+    """Start NCGA with NO LLM configured, on its own port.
+
+    The default `live_app` injects a stub client, so `llm_configured` is true
+    there. The honesty fixes (no-key banner, truthful settings line, 503 instead
+    of a fabricated rewrite) only manifest when the server genuinely has no key.
+    """
+    from unittest import mock
+
+    from native_chinese_assistant.rewrite import RewriteService
+    from native_chinese_assistant.web import App
+
+    tmp, saved = _isolate_env()   # same isolation as live_app — this may run FIRST
+    for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY", "NCGA_QUALITY_STORE"):
+        os.environ.pop(key, None)
+    # config=None would call load_llm_config() → load_dotenv(), pulling the
+    # developer's ./.env into os.environ for the whole session. Never load it.
+    with mock.patch("native_chinese_assistant.rewrite.load_llm_config", return_value=None):
+        service = RewriteService(config=None)
+    assert service.client is None, "no-key fixture must not end up with a client"
+    app = App(rewrite_service=service)
+
+    base_url, server, th = _serve(app)
+    yield base_url
+    server.shutdown()
+    th.join(timeout=2)
+    import shutil
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    _restore_env(saved)
