@@ -409,10 +409,15 @@
     if (submitButton.classList.contains("loading")) return;
     const blocked = needsVarietyChoice();
     submitButton.disabled = blocked;
-    if (cmdbarRewrite) cmdbarRewrite.disabled = blocked;
     const why = blocked ? "先在左边挑一个方言风格" : "";
     submitButton.title = why;
-    if (cmdbarRewrite) cmdbarRewrite.title = why;
+    // Off the workbench this button navigates (去重写台) — it must never be
+    // disabled there, whatever the dialect state.
+    const onWorkbench = document.body.getAttribute("data-route") === "workbench";
+    if (cmdbarRewrite) {
+      cmdbarRewrite.disabled = onWorkbench && blocked;
+      cmdbarRewrite.title = onWorkbench ? why : "";
+    }
     const hint = document.getElementById("submit-hint");
     if (hint) hint.textContent = why;
   }
@@ -907,6 +912,7 @@
       "aria-label",
       route === "workbench" ? currentSubmitLabel() : "前往重写台",
     );
+    syncSubmitEnabled();
 
     // v3 reform: route changes materialize from the current presentation state.
     // The Web Animations API keeps this transition cancellable, while reduced-
@@ -1247,6 +1253,7 @@
         }
         textInput.value = item.original;
         targetSelect.value = item.target_variety;
+        syncSubmitEnabled();
         updateCharCount();
         updateVarietyCard();
         applyBackgroundFor(item.target_variety);
@@ -1348,6 +1355,7 @@
   function useVariety(v) {
     if (!targetSelect.querySelector(`option[value="${CSS.escape(v)}"]`)) return;
     targetSelect.value = v;
+    syncSubmitEnabled();
     updateVarietyCard();
     applyBackgroundFor(v);
     if (VARIETIES[v] && VARIETIES[v].trial) {
@@ -1460,6 +1468,7 @@
     syncSettingsUI();
     updateBgModePill();
     targetSelect.value = modalCurrentVariety;
+    syncSubmitEnabled();
     updateVarietyCard();
     applyBackgroundFor(modalCurrentVariety);
     closeLandmarkModal();
@@ -1538,6 +1547,7 @@
         textInput.value = item.original || "";
         if (item.target_variety && targetSelect.querySelector(`option[value="${CSS.escape(item.target_variety)}"]`)) {
           targetSelect.value = item.target_variety;
+        syncSubmitEnabled();
         }
         lastResult = { ...item, rewritten_text: item.rewritten || "" };
         renderResult(item.rewritten || "", item.target_variety);
@@ -1688,8 +1698,6 @@
     if (degradedTag) degradedTag.hidden = true;
     updateModelTag("");
     resetRateUI();
-    closeCompare();
-    closeExplain();
     copyButton.disabled = true;
     speakButton.disabled = true;
     downloadButton.disabled = true;
@@ -1704,7 +1712,6 @@
     if (compareOtherButton) compareOtherButton.disabled = true;
     if (rateButton) rateButton.disabled = true;
     lastResult = null;
-    if (compareMode) toggleCompare();
   }
 
   function clearAll({ dropDraft = true } = {}) {
@@ -1720,6 +1727,11 @@
       try { localStorage.removeItem(DRAFT_LS_KEY); } catch (_) {}
     }
     clearResultSurface();
+    // View-mode resets live here, not in clearResultSurface: an explicit 清空
+    // should close panels; a failed request should not.
+    closeCompare();
+    closeExplain();
+    if (compareMode) toggleCompare();
     setStatus(STATUS_TEXT.idle, "hint");
     updateCharCount();
     renderRound2Versions();
@@ -2334,6 +2346,9 @@
     } catch (err) {
       if (err.name !== "AbortError") {
         setStatus(STATUS_TEXT.error(err.message), "error");
+        // Same rule as rewriteText: partially streamed text must not sit
+        // under an error reading as if the error produced it.
+        clearResultSurface();
       }
     } finally {
       if (rewriteAbortController === myController) {
