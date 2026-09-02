@@ -261,3 +261,42 @@ def test_explicit_theme_choice_overrides_the_system(live_app, browser, os_scheme
     )
     assert paper.startswith("20" if expect_dark else "244")
     ctx.close()
+
+
+# --------------------------------------------------------------------------
+# Review round 2 — regressions the first fix pass introduced
+# --------------------------------------------------------------------------
+
+
+def test_navigation_cta_is_never_disabled_off_the_workbench(live_app, page):
+    """Off the workbench #cmdbar-rewrite is the 去重写台 navigation button.
+    Gating it on 'no dialect chosen' made the app-wide primary CTA dead in
+    the default state (fresh user on #daily could not reach the workbench)."""
+    for route in ("daily", "atlas", "settings", "history"):
+        page.goto(f"{live_app}/#{route}", wait_until="domcontentloaded")
+        page.wait_for_timeout(800)
+        assert page.locator("#cmdbar-rewrite").is_enabled(), route
+    page.click("#cmdbar-rewrite")
+    page.wait_for_function("() => location.hash === '#workbench'", timeout=5_000)
+
+
+def test_atlas_use_variety_enables_submit(live_app, page):
+    """Programmatic dialect selection (用它重写, 放回重写台, pin, restore) bypasses
+    the change event; the submit gate must still be re-evaluated."""
+    page.goto(f"{live_app}/#atlas", wait_until="domcontentloaded")
+    page.wait_for_selector("[data-act='use']", timeout=10_000)
+    page.locator("[data-act='use']").first.click()
+    page.wait_for_function("() => location.hash === '#workbench'", timeout=5_000)
+    _wait_for_presets(page)
+    assert page.locator("#target_variety").input_value() != ""
+    assert page.locator("#submit-button").is_enabled()
+
+
+def test_submit_hint_is_a_description_not_part_of_the_name(live_app, page):
+    """The hint span used to live INSIDE the button, so name-from-content
+    made the accessible name '立即重写 先在左边挑一个方言风格'."""
+    _goto_workbench(page, live_app)
+    name = page.evaluate("() => document.getElementById('submit-button').textContent.trim()")
+    assert name == "立即重写"
+    assert page.locator("#submit-button").get_attribute("aria-describedby") == "submit-hint"
+    assert page.locator("#submit-hint").count() == 1

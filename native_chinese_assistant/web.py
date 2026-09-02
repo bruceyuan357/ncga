@@ -30,6 +30,9 @@ from native_chinese_assistant.transform import MODE_METADATA, TransformService, 
 
 logger = logging.getLogger("ncga.web")
 
+# Rendered verbatim by the Chinese UI — one constant, not eleven literals.
+RATE_LIMITED_MESSAGE = "请求太频繁了，稍等片刻再试。"
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = (BASE_DIR / "static").resolve()
 
@@ -672,6 +675,27 @@ class App:
         svc = RewriteService(config=llm_config_for_user_key(key), quality_store=None)
         return svc, TransformService(client=svc.client), True
 
+    def _llm_preflight(
+        self, environ: dict, ip: str, start_response: Callable, endpoint: str, *, units: int = 1
+    ) -> tuple[RewriteService, TransformService, bool, list[bytes] | None]:
+        """Resolve services, refuse keyless requests, then charge the daily cap.
+
+        Order is the whole point: a request with no LLM behind it is a 503
+        that spends nothing, so it must be answered BEFORE the cap is charged
+        (the cap is never refunded). Every handler that will call the LLM goes
+        through here — not a copy of it.
+
+        Returns (rewrite_svc, transform_svc, byok, error_response). When
+        error_response is not None the caller returns it immediately.
+        """
+        svc, tsvc, byok = self._services_for(environ)
+        if svc.client is None:
+            return svc, tsvc, byok, json_response(
+                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
+            )
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, endpoint, units=units)
+        return svc, tsvc, byok, cap_err
+
     def _check_daily_cap_byok(
         self, environ: dict, ip: str, start_response: Callable, endpoint: str, *, units: int = 1
     ) -> list[bytes] | None:
@@ -695,7 +719,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         key = _user_llm_key(environ)
         if key is None:
@@ -826,7 +850,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
 
         payload, err = self._read_json_body(environ, start_response)
@@ -853,19 +877,11 @@ class App:
         if len(text) > MAX_INPUT_CHARS * 4:  # before normalize, hard cap on raw payload size
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
-        # Order matters, and it is the same rule the batch handler states for
-        # item validation: reject BEFORE charging, because the cap is never
-        # refunded. So: body/field validation above (413/400, free) → no-key
-        # 503 (free) → daily cap (charged only for a request that will actually
-        # reach the LLM).
-        svc, _, byok = self._services_for(environ)
-        if svc.client is None:
-            return json_response(
-                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
-            )
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite")
-        if cap_err is not None:
-            return cap_err
+        # Validation above (413/400) is free; the pre-flight refuses keyless
+        # requests for free; only then is the cap charged.
+        svc, _, byok, err = self._llm_preflight(environ, ip, start_response, "rewrite")
+        if err is not None:
+            return err
 
         try:
             import time as _time
@@ -892,16 +908,13 @@ class App:
     def handle_explain(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Take {original, rewritten, target_variety} and return {summary, points[]}."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "explain")
-        if cap_err is not None:
-            return cap_err
         # Reuse the same rate limiter — explain is also LLM-backed and costs money.
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=explain", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
 
         payload, err = self._read_json_body(environ, start_response)
@@ -926,8 +939,12 @@ class App:
                 {"error": "`original` and `rewritten` must be strings."},
             )
 
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "explain")
+        if err is not None:
+            return err
         try:
-            svc, _, _ = self._services_for(environ)
             data = svc.explain(original, rewritten, target)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
@@ -949,9 +966,6 @@ class App:
           * No persistence (no PII storage)
         """
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "characterize")
-        if cap_err is not None:
-            return cap_err
         if not self.characterize_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=characterize", ip)
             return json_response(
@@ -972,8 +986,12 @@ class App:
                 "400 Bad Request",
                 {"error": "`recipient` and `mood` must be strings."},
             )
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "characterize")
+        if err is not None:
+            return err
         try:
-            svc, _, _ = self._services_for(environ)
             data = svc.characterize(recipient, mood)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
@@ -999,14 +1017,13 @@ class App:
             cache_warm = False
         if not cache_warm:
             # Generation costs ~10 LLM calls (one per variety); count honestly.
-            cap_err = self._check_daily_cap_byok(
+            svc, _, _, err = self._llm_preflight(
                 environ, ip, start_response, "phrase-of-the-day", units=10
             )
-            if cap_err is not None:
-                return cap_err
+            if err is not None:
+                return err
 
         try:
-            svc, _, _ = self._services_for(environ)
             data = get_phrase_of_the_day(svc)
         except RewriteError as exc:
             return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
@@ -1073,7 +1090,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1097,19 +1114,11 @@ class App:
         ):  # parity with /api/rewrite — reject pre-stream instead of erroring mid-stream
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
-        # Order matters, and it is the same rule the batch handler states for
-        # item validation: reject BEFORE charging, because the cap is never
-        # refunded. So: body/field validation above (413/400, free) → no-key
-        # 503 (free) → daily cap (charged only for a request that will actually
-        # reach the LLM).
-        svc, _, byok = self._services_for(environ)
-        if svc.client is None:
-            return json_response(
-                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
-            )
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite-stream")
-        if cap_err is not None:
-            return cap_err
+        # Validation above (413/400) is free; the pre-flight refuses keyless
+        # requests for free; only then is the cap charged.
+        svc, _, byok, err = self._llm_preflight(environ, ip, start_response, "rewrite-stream")
+        if err is not None:
+            return err
 
         start_response(
             "200 OK",
@@ -1133,15 +1142,12 @@ class App:
     def handle_rate(self, environ: dict, start_response: Callable) -> list[bytes]:
         """Rate the 'native-ness' of a rewritten text: small LLM call, returns {score, reason}."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rate")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=rate", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1161,8 +1167,12 @@ class App:
             return json_response(
                 start_response, "400 Bad Request", {"error": "`rewritten` must be a string."}
             )
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "rate")
+        if err is not None:
+            return err
         try:
-            svc, _, _ = self._services_for(environ)
             data = svc.rate_quality(
                 rewritten,
                 target,
@@ -1178,18 +1188,15 @@ class App:
         """Cycle 23: non-streaming transform (polish/translate/summarize/explain).
 
         Mirrors handle_rewrite's guard order. Unlike rewrite there is no
-        heuristic fallback — an unreachable LLM is a 503, not a degraded 200.
+        fallback of any kind — an unreachable LLM is a 503, not a degraded 200.
         """
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "transform")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=transform", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1208,8 +1215,12 @@ class App:
             return json_response(start_response, "400 Bad Request", {"error": "`text` must be a string."})
         if len(text) > MAX_INPUT_CHARS * 4:  # before normalize, hard cap on raw payload size
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "transform")
+        if err is not None:
+            return err
         try:
-            _, tsvc, _ = self._services_for(environ)
             result = tsvc.transform(text, mode)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
@@ -1220,15 +1231,12 @@ class App:
     def handle_transform_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint for transforms. Same event shape as /api/rewrite-stream."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "transform-stream")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=transform-stream", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1249,6 +1257,11 @@ class App:
             len(text) > MAX_INPUT_CHARS * 4
         ):  # same raw cap as non-streaming — 400 now, not a mid-stream error event
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "transform-stream")
+        if err is not None:
+            return err
         start_response(
             "200 OK",
             _security_headers(
@@ -1259,7 +1272,6 @@ class App:
                 ]
             ),
         )
-        _, tsvc, _ = self._services_for(environ)
         return _sse_iter_transform_stream(tsvc, text, mode)
 
     def handle_rate_transform(self, environ: dict, start_response: Callable) -> list[bytes]:
@@ -1267,15 +1279,12 @@ class App:
         bucket (mode:<key>, "transform") so the stats page gets the same Welford
         treatment as dialect buckets. No Reflexion for modes (v1: measure only)."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rate-transform")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=rate-transform", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1295,8 +1304,12 @@ class App:
             return json_response(
                 start_response, "400 Bad Request", {"error": "`transformed` must be a non-empty string."}
             )
+        # Validation above (400/413) is free; refuse keyless requests for free;
+        # only then charge the cap.
+        svc, tsvc, byok, err = self._llm_preflight(environ, ip, start_response, "rate-transform")
+        if err is not None:
+            return err
         try:
-            _, tsvc, byok = self._services_for(environ)
             data = tsvc.rate(transformed, mode, original=original)
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
@@ -1317,7 +1330,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Batch rate limit exceeded. Please wait."},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1374,19 +1387,12 @@ class App:
                 )
         # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
         # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
-        # Pre-flight BEFORE charging up to items*varieties (400) units for rows
-        # that would all fail — the same rule web.py already states for item
-        # validation: reject before charging, because the cap is not refunded.
-        svc, _, byok = self._services_for(environ)
-        if svc.client is None:
-            return json_response(
-                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
-            )
-        cap_err = self._check_daily_cap_byok(
+        # Pre-flight BEFORE charging up to items*varieties (400) units.
+        svc, _, byok, err = self._llm_preflight(
             environ, ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
         )
-        if cap_err is not None:
-            return cap_err
+        if err is not None:
+            return err
 
         start_response(
             "200 OK",
@@ -1434,7 +1440,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         return json_response(start_response, "200 OK", {"buckets": self.quality_store.stats_snapshot()})
 
@@ -1455,7 +1461,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "请求太频繁了，稍等片刻再试。"},
+                {"error": RATE_LIMITED_MESSAGE},
             )
         store = self.quality_store
         snapshot = store.stats_snapshot() if store is not None else []

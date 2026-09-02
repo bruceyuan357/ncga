@@ -276,7 +276,9 @@ class TransformEndpointTests(unittest.TestCase):
             app, "POST", "/api/transform", json.dumps({"text": "abc", "mode": "polish"}).encode()
         )
         self.assertEqual(status, "503 Service Unavailable")
-        self.assertIn("No LLM provider", json.loads(body)["error"])
+        from native_chinese_assistant.rewrite import NO_LLM_MESSAGE
+
+        self.assertEqual(json.loads(body)["error"], NO_LLM_MESSAGE)
 
     def test_transform_modes_listing(self):
         app = _make_app(_build_client(_llm_json_raw("x"))[0])

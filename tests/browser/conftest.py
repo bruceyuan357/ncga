@@ -34,7 +34,14 @@ class _SilentHandler(WSGIRequestHandler):
         return
 
 
-_ISOLATED_ENV = ("NCGA_AUTH_TOKEN", "NCGA_DATA_KEY", "XDG_DATA_HOME", "LLM_API_KEY", "DEEPSEEK_API_KEY")
+_ISOLATED_ENV = (
+    "NCGA_AUTH_TOKEN", "NCGA_DATA_KEY", "XDG_DATA_HOME",
+    "LLM_API_KEY", "DEEPSEEK_API_KEY", "LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL", "LLM_STREAM",
+    # Anything a dev's .env could set that changes where App() stores data or
+    # how the test server throttles — all restored after the fixture.
+    "NCGA_QUALITY_STORE", "NCGA_FEEDBACK_STORE",
+    "NCGA_RATE_LIMIT_PER_MIN", "NCGA_BATCH_RATE_LIMIT_PER_MIN", "NCGA_DAILY_LLM_CAP_PER_IP",
+)
 
 
 def _isolate_env() -> tuple[str, dict[str, str | None]]:
@@ -142,14 +149,19 @@ def live_app_no_key() -> Iterator[str]:
     there. The honesty fixes (no-key banner, truthful settings line, 503 instead
     of a fabricated rewrite) only manifest when the server genuinely has no key.
     """
+    from unittest import mock
+
     from native_chinese_assistant.rewrite import RewriteService
     from native_chinese_assistant.web import App
 
     tmp, saved = _isolate_env()   # same isolation as live_app — this may run FIRST
-    for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY"):
+    for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY", "NCGA_QUALITY_STORE"):
         os.environ.pop(key, None)
-    service = RewriteService(config=None)
-    service._client = None  # belt and braces: .env on the dev box must not leak in
+    # config=None would call load_llm_config() → load_dotenv(), pulling the
+    # developer's ./.env into os.environ for the whole session. Never load it.
+    with mock.patch("native_chinese_assistant.rewrite.load_llm_config", return_value=None):
+        service = RewriteService(config=None)
+    assert service.client is None, "no-key fixture must not end up with a client"
     app = App(rewrite_service=service)
 
     base_url, server, th = _serve(app)

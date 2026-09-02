@@ -411,7 +411,7 @@ class ChatCompletionsClientTests(unittest.TestCase):
 
     def test_persistent_empty_stream_still_raises_after_bonus_retry(self) -> None:
         """If the non-streaming fallback also fails, the error propagates after
-        one bonus attempt (3 calls total) — heuristic degradation takes over."""
+        one bonus attempt (3 calls total) — then the error propagates."""
         empty_sse = b"data: [DONE]\n\n"
         client, transport = _build_client(empty_sse, streaming=True)
         with self.assertRaises(RewriteError):
@@ -537,6 +537,66 @@ class RewriteServiceTests(unittest.TestCase):
         result = service.rewrite("好的", VarietyPreset.CANTONESE_WRITTEN)
         self.assertEqual(result.rewritten_text, "好嘅")
         self.assertFalse(result.degraded)
+
+    def test_stream_success_is_not_logged_as_failed_when_consumer_breaks_on_done(self) -> None:
+        """Regression: the `completed` flag was set AFTER the loop, but the SSE
+        consumer breaks on the done event while the generator is suspended at
+        yield — so the flag never flipped and every successful stream logged
+        failed=True. The flag must be set before the done tuple is yielded."""
+
+        class StubClient:
+            config = LLMConfig(
+                provider="deepseek", api_key="k", model="m", base_url="https://x",
+                streaming=True, ca_bundle=None, skip_ssl_verify=False, timeout_seconds=5.0,
+            )
+
+            def rewrite_stream(self, *_args, **_kwargs):
+                yield "好", "好", False, None
+                yield "", "好", True, {"degraded": False, "warning": ""}
+
+        service = RewriteService(client=StubClient())
+        with self.assertLogs("ncga.rewrite", level="INFO") as cm:
+            for _delta, _partial, done, _meta in service.rewrite_stream("你好", VarietyPreset.DONGBEI_MANDARIN):
+                if done:
+                    break  # mimic _sse_iter_rewrite_stream: return on done, never resume
+        line = [m for m in cm.output if "rewrite_request" in m][-1]
+        self.assertIn("failed=False", line)
+
+    def test_nonstream_failure_still_logs_request(self) -> None:
+        """Symmetry with the stream path: a failed rewrite() must emit its
+        latency line (the removed except-branch used to)."""
+        bad = json.dumps({"choices": [{"message": {"content": "garbage"}}]}).encode("utf-8")
+        client, _ = _build_client(bad)
+        service = RewriteService(client=client)
+        with self.assertLogs("ncga.rewrite", level="INFO") as cm, self.assertRaises(RewriteError):
+            service.rewrite("好的", VarietyPreset.CANTONESE_WRITTEN)
+        self.assertTrue(any("rewrite_request" in m and "failed=True" in m for m in cm.output))
+
+    def test_daily_phrase_does_not_cache_an_all_error_card(self) -> None:
+        """Regression: with the fallback gone, a keyless/flaky server produced
+        '__error__' for all 10 varieties and _save_cache persisted that as
+        today's card for 26h — the landing page stayed broken even after the
+        operator added a key. Serve the errors; never cache them."""
+        import tempfile
+        from pathlib import Path
+
+        from native_chinese_assistant import daily_phrase
+
+        tmp = Path(tempfile.mkdtemp(prefix="ncga-phrase-"))
+        cache = tmp / "phrase.json"
+        bad = json.dumps({"choices": [{"message": {"content": "garbage"}}]}).encode("utf-8")
+        failing_service = RewriteService(client=_build_client(bad)[0])
+        with mock.patch.object(daily_phrase, "_cache_path", return_value=cache):
+            first = daily_phrase.get_phrase_of_the_day(failing_service)
+            self.assertTrue(all(str(t).startswith("__error__") for t in first["translations"].values()))
+            self.assertFalse(cache.exists(), "an all-error card must not be persisted")
+
+            # Operator fixes the key: the very next request must succeed, not
+            # replay the poisoned card.
+            good_service = RewriteService(client=_build_client(_llm_json("好"))[0])
+            second = daily_phrase.get_phrase_of_the_day(good_service)
+            self.assertFalse(any(str(t).startswith("__error__") for t in second["translations"].values()))
+            self.assertTrue(cache.exists(), "a card with real translations IS cached")
 
     def test_service_propagates_client_error(self) -> None:
         """A failing LLM call surfaces as an error rather than silently
@@ -849,7 +909,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(status, "503 Service Unavailable")
 
     def test_explain_endpoint_503_without_llm(self) -> None:
-        """Without an LLM client, explain must 503 (heuristic can't explain)."""
+        """Without an LLM client, explain must 503 with the shared no-key message."""
         # Bypass .env so the result doesn't depend on the local DEEPSEEK_API_KEY.
         with mock.patch("native_chinese_assistant.rewrite.load_llm_config", return_value=None):
             service = RewriteService(config=None)
@@ -869,7 +929,7 @@ class WebAppTests(unittest.TestCase):
         )
         self.assertEqual(status, "503 Service Unavailable")
         payload = json.loads(body.decode("utf-8"))
-        self.assertIn("LLM", payload["error"])
+        self.assertEqual(payload["error"], NO_LLM_MESSAGE)
 
     def test_explain_endpoint_rejects_missing_fields(self) -> None:
         app = App(rewrite_service=RewriteService(config=None))
@@ -3340,6 +3400,16 @@ class TestBYOK(unittest.TestCase):
                 status, _, payload = call_app(app, "POST", endpoint, body=body)
                 self.assertEqual(status, "503 Service Unavailable", endpoint)
                 self.assertEqual(json.loads(payload)["error"], NO_LLM_MESSAGE)
+        # The pre-flight is shared by every LLM handler (review round 2 found
+        # transform/explain still charging first). Same rule, same proof.
+        for endpoint, payload in (
+            ("/api/transform", {"text": "你好", "mode": "polish"}),
+            ("/api/explain", {"original": "你好", "rewritten": "你好", "target_variety": "standard_putonghua"}),
+        ):
+            for _ in range(3):
+                status, _, out = call_app(app, "POST", endpoint, body=json.dumps(payload).encode())
+                self.assertEqual(status, "503 Service Unavailable", endpoint)
+                self.assertEqual(json.loads(out)["error"], NO_LLM_MESSAGE, endpoint)
         # Batch pre-flights before charging items*varieties units.
         batch = json.dumps(
             {"items": ["你好", "再见"], "target_varieties": ["standard_putonghua", "dongbei_mandarin"]}

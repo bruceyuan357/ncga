@@ -726,19 +726,6 @@ body[data-version="v2"] .kbd-hint { background: rgba(0, 0, 0, 0.18); }
 .card-head-title > i { color: var(--accent); font-size: 1rem; }
 .card-head-tools { display: inline-flex; gap: 0.35rem; align-items: center; }
 
-.landmark-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.72rem;
-  border-radius: 999px;
-  background: rgba(200, 62, 42, 0.12);
-  border: 1px solid rgba(184, 152, 101, 0.32);
-  color: var(--accent);
-  font-weight: 600;
-}
-.landmark-tag i { font-size: 0.8em; }
 
 .char-count {
   font-family: var(--mono);
@@ -5586,7 +5573,6 @@ body[data-v3="on"] .card-head h2 {
 }
 
 body[data-v3="on"] .char-count,
-body[data-v3="on"] .landmark-tag,
 body[data-v3="on"] .degraded-tag,
 body[data-v3="on"] .model-tag {
   color: var(--r2-ink-soft);
@@ -6432,7 +6418,6 @@ body[data-v3="on"] .card-head h2 {
 body[data-v3="on"] .card-head-title i { color: var(--at-jade); }
 
 body[data-v3="on"] .char-count,
-body[data-v3="on"] .landmark-tag,
 body[data-v3="on"] .degraded-tag,
 body[data-v3="on"] .model-tag {
   color: var(--at-ink-soft);
@@ -7698,8 +7683,12 @@ html[data-theme="dark"] .ncga-check::before { color: #14181a; }
    follow the resolved theme. Without this they stay light-on-dark.
    Scoped to the v3 skin via :has() — every token override above is v3-only,
    so flipping native chrome on v1/v2 would give dark scrollbars on a cream
-   page (or light ones on v2's ink). */
-:root { color-scheme: light; }
+   page (or light ones on v2's ink). No bare :root default — that overrode the
+   page's <meta name="color-scheme" content="dark light"> and forced v2's
+   near-black skin onto light native chrome. */
+html:has(> body[data-version="v1"]) { color-scheme: light; }
+html:has(> body[data-version="v2"]) { color-scheme: dark; }
+html:has(> body[data-v3="on"]) { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]):has(> body[data-v3="on"]) { color-scheme: dark; }
 }

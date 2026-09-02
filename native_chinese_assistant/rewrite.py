@@ -41,7 +41,7 @@ LLM_RETRIES = 1  # retry once on parse failure with stricter instruction
 # Chinese-language UI, and the frontend renders `warning` / error strings verbatim.
 # Leaking an English exception string into that UI is a bug, not a detail.
 NO_LLM_MESSAGE = (
-    "尚未配置 API Key，方言改写不可用。"
+    "尚未配置 API Key，AI 功能不可用。"
     "请在「设置 → API 密钥」粘贴你的 DeepSeek Key，或在服务器 .env 中设置 DEEPSEEK_API_KEY。"
 )
 
@@ -467,7 +467,7 @@ def extract_streamed_content(response: Any) -> str:
         # that don't form valid UTF-8. Without this guard, UnicodeDecodeError
         # leaks past the caller, which only catches `RewriteError`. Wrap so
         # the failure-mapping is uniform — caller sees RewriteError and falls
-        # back to the heuristic.
+        # up as an error.
         try:
             line = raw_line.decode("utf-8").strip()
         except UnicodeDecodeError as exc:
@@ -1235,14 +1235,20 @@ class RewriteService:
         # No heuristic fallback: it returned the original text with a dialect
         # banner glued on, which reads like a real rewrite but isn't one. An
         # honest error beats a fake result — same contract as explain/rate.
-        result = self._client.rewrite(
-            normalized,
-            target,
-            scenario=scenario,
-            glossary_lines=glossary_lines,
-        )
-        self._log_request(target, started, degraded=result.degraded)
-        return result
+        completed = False
+        try:
+            result = self._client.rewrite(
+                normalized,
+                target,
+                scenario=scenario,
+                glossary_lines=glossary_lines,
+            )
+            completed = True
+            return result
+        finally:
+            # Symmetric with rewrite_stream: a failed request still gets its
+            # latency line, or operators only ever see stream failures.
+            self._log_request(target, started, degraded=False, failed=not completed)
 
     def rate_quality(
         self,
@@ -1308,10 +1314,14 @@ class RewriteService:
                 scenario=scenario,
                 glossary_lines=glossary_lines,
             ):
+                if done:
+                    # Mark BEFORE yielding: the consumer returns on this event
+                    # and closes the generator at the yield, so nothing after
+                    # it would run.
+                    completed = True
                 yield delta, partial, done, meta
                 if done:
                     break
-            completed = True
         finally:
             # Log on failure too — the old except-branch did, and losing the
             # latency of a request that died mid-stream is the worst time to.
