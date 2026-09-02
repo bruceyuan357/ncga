@@ -33,7 +33,7 @@ cp .env.example .env          # then put a DeepSeek API key in DEEPSEEK_API_KEY=
 python app.py                 # http://127.0.0.1:8000
 ```
 
-No key? It still runs — falls back to an offline heuristic rewriter and says so.
+No key? The UI says so up front (banner + settings) and rewrite endpoints return 503 with a Chinese message — there is no offline fallback.
 
 ## What's safe to share
 

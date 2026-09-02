@@ -132,7 +132,7 @@
           <span>关于</span>
           <kbd>7</kbd>
         </a>
-        <a href="/quality" class="nav-item nav-item-external" data-route="quality">
+        <a href="/quality" class="nav-item nav-item-external">
           <i class="fas fa-chart-line" aria-hidden="true"></i>
           <span>质量看板</span>
           <i class="fas fa-arrow-up-right-from-square nav-external-icon" aria-hidden="true"></i>
@@ -344,13 +344,14 @@
                     <option value="" disabled selected>选择方言风格…</option>
                   </select>
                 </div>
-                <button id="submit-button" type="submit" class="btn-rewrite" aria-label="立即重写">
+                <button id="submit-button" type="submit" class="btn-rewrite" aria-describedby="submit-hint">
                   <span class="btn-spinner" aria-hidden="true">
                     <span></span><span></span><span></span><span></span>
                     <span></span><span></span><span></span><span></span>
                   </span>
                   <i class="fas fa-wand-magic-sparkles btn-icon" aria-hidden="true"></i>
                   <span class="button-label">立即重写</span>
+                  <span id="submit-hint" class="visually-hidden"></span>
                 </button>
               </div>
             </form>
@@ -675,7 +676,7 @@
                 <i class="fas fa-trash-can" aria-hidden="true"></i> 清除 Key
               </button>
             </div>
-            <p class="settings-hint" id="byok-status">未配置 — 当前使用服务器默认密钥。</p>
+            <p class="settings-hint" id="byok-status">正在检查密钥状态…</p>
           </article>
 
           <article class="settings-card">

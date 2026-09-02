@@ -86,9 +86,12 @@
 
   async function _probeServerKey() {
     try {
-      const res = await _origFetch("/api/healthz", { credentials: "same-origin" });
-      const data = await res.json();
-      SERVER_LLM_CONFIGURED = !!data.llm_configured;
+      const res = await fetch("/api/healthz");
+      const data = res.ok ? await res.json() : null;
+      // Only a real boolean is an answer. Anything else — error page, missing
+      // field, older server — is "don't know", never "no key".
+      SERVER_LLM_CONFIGURED =
+        data && typeof data.llm_configured === "boolean" ? data.llm_configured : null;
     } catch (_) {
       // Unreachable server is not the same as "no key" — leave it unknown so
       // the settings line says "checking" instead of accusing the operator.
@@ -407,9 +410,11 @@
     const blocked = needsVarietyChoice();
     submitButton.disabled = blocked;
     if (cmdbarRewrite) cmdbarRewrite.disabled = blocked;
-    const why = blocked ? "先在左边挑一个方言风格" : currentSubmitLabel();
+    const why = blocked ? "先在左边挑一个方言风格" : "";
     submitButton.title = why;
     if (cmdbarRewrite) cmdbarRewrite.title = why;
+    const hint = document.getElementById("submit-hint");
+    if (hint) hint.textContent = why;
   }
 
   function setBusy(isBusy) {
@@ -933,6 +938,9 @@
 
   function bindRouter() {
     navItems.forEach((n) => {
+      // Only hash routes belong to the SPA router. A real href (the /quality
+      // dashboard) must be left to the browser, or the link is dead.
+      if (!ROUTES.includes(n.dataset.route)) return;
       n.addEventListener("click", (e) => {
         e.preventDefault();
         location.hash = n.dataset.route;
@@ -1570,7 +1578,7 @@
       updateVarietyCard();
       applyBackgroundFor(draft.target_variety);
     }
-    if (draft.scenario) {
+    if (draft.scenario && SCENARIOS[draft.scenario]) {
       SETTINGS.scenario = draft.scenario;
       saveSettings();
       renderScenarioChips();
@@ -1685,11 +1693,18 @@
     copyButton.disabled = true;
     speakButton.disabled = true;
     downloadButton.disabled = true;
+    // Favourite: disable AND visually un-star, or a failed rewrite shows an
+    // empty result that still reads as 已收藏.
     favoriteBtn.disabled = true;
+    favoriteBtn.classList.remove("is-favorite");
+    favoriteBtn.setAttribute("aria-pressed", "false");
+    if (favoriteLabel) favoriteLabel.textContent = "收藏";
+    favoriteBtn.querySelector("i").className = "far fa-star";
     if (explainButton) explainButton.disabled = true;
     if (compareOtherButton) compareOtherButton.disabled = true;
     if (rateButton) rateButton.disabled = true;
     lastResult = null;
+    if (compareMode) toggleCompare();
   }
 
   function clearAll({ dropDraft = true } = {}) {
@@ -1704,27 +1719,8 @@
     if (dropDraft) {
       try { localStorage.removeItem(DRAFT_LS_KEY); } catch (_) {}
     }
-    resultEl.textContent = "";
+    clearResultSurface();
     setStatus(STATUS_TEXT.idle, "hint");
-    warningEl.textContent = "";
-    copyButton.disabled = true;
-    speakButton.disabled = true;
-    downloadButton.disabled = true;
-    favoriteBtn.disabled = true;
-    favoriteBtn.classList.remove("is-favorite");
-    favoriteBtn.setAttribute("aria-pressed", "false");
-    if (favoriteLabel) favoriteLabel.textContent = "收藏";
-    favoriteBtn.querySelector("i").className = "far fa-star";
-    if (explainButton) explainButton.disabled = true;
-    if (compareOtherButton) compareOtherButton.disabled = true;
-    closeCompare();
-    closeExplain();
-    resultStats.hidden = true;
-    if (degradedTag) degradedTag.hidden = true;
-    updateModelTag("");
-    resetRateUI();
-    lastResult = null;
-    if (compareMode) toggleCompare();
     updateCharCount();
     renderRound2Versions();
   }
@@ -1844,6 +1840,7 @@
         const v = btn.dataset.scenario;
         SETTINGS.scenario = v;
         saveSettings();
+        autosaveDraft();
         $$(".scenario-chip", scenarioChipsContainer).forEach((b) => {
           const a = b.dataset.scenario === v;
           b.classList.toggle("is-active", a);
@@ -1874,7 +1871,15 @@
       if (err.name === "AbortError") throw err;
       return null;  // network error — fall back
     }
-    if (!res.ok || !res.body) return null;
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data && data.error) message = data.error;
+      } catch (_) { /* non-JSON error body — keep the status line */ }
+      throw new Error(message);
+    }
+    if (!res.body) return null;
     const ct = res.headers.get("Content-Type") || "";
     if (!ct.includes("text/event-stream")) {
       return null;  // unexpected — fall back
@@ -3984,6 +3989,7 @@
     targetSelect.addEventListener("change", () => {
       const v = targetSelect.value;
       syncSubmitEnabled();
+      autosaveDraft();
       updateVarietyCard();
       applyBackgroundFor(v);
       const meta = VARIETIES[v];
@@ -4053,9 +4059,7 @@
       // Default background after presets are loaded.
       applyBackgroundFor(varietyOrder[0]);
       updateVarietyCard();
-      syncSubmitEnabled();
       clearAll({ dropDraft: false });   // boot init — must not eat a saved draft
-      restoreDraft();
       renderAtlas();
       renderHistory();
       // Init-race fix: on a direct first load of #batch the router rendered the
@@ -4068,6 +4072,11 @@
       setStatus(STATUS_TEXT.loadFail, "error");
     })
     .finally(() => {
+      // Run on BOTH branches: with presets missing the draft's text still
+      // restores (the variety is skipped — not in VARIETIES) and the CTA is
+      // correctly disabled over an empty <select>.
+      restoreDraft();
+      syncSubmitEnabled();
       // Cycle 9 fix: boot screen MUST hide regardless of init success.
       setTimeout(() => bootScreen?.classList.add("hidden"), 600);
     });

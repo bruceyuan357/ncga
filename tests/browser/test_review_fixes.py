@@ -159,8 +159,12 @@ def test_idle_status_is_a_hint_not_an_error(live_app, page):
 def test_draft_is_restored_after_reload(live_app, page):
     _goto_workbench(page, live_app)
     page.fill("#text", "草稿应该活下来。")
+    page.wait_for_timeout(900)  # let the text-only autosave settle FIRST…
+    # …then choose the dialect. Autosave used to listen only to the textarea,
+    # so a dialect picked after the debounce window was never persisted and
+    # this test only passed by landing inside the window.
     page.select_option("#target_variety", "dongbei_mandarin")
-    page.wait_for_timeout(900)  # debounced autosave
+    page.wait_for_timeout(900)
 
     page.reload(wait_until="domcontentloaded")
     _wait_for_presets(page)
@@ -198,6 +202,12 @@ def test_quality_dashboard_is_reachable_from_the_nav(live_app, page):
     _goto_workbench(page, live_app)
     link = page.locator("nav a[href='/quality']")
     assert link.count() == 1
+    # Counting the link proved nothing: the SPA router used to preventDefault
+    # every .nav-item click and route an unknown hash to the workbench. Click it.
+    with page.expect_navigation(wait_until="domcontentloaded"):
+        link.click()
+    assert page.url.endswith("/quality")
+    assert "质量看板" in page.content()
 
 
 def test_offpage_primary_button_reads_as_navigation(live_app, page):

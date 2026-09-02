@@ -34,16 +34,55 @@ class _SilentHandler(WSGIRequestHandler):
         return
 
 
+_ISOLATED_ENV = ("NCGA_AUTH_TOKEN", "NCGA_DATA_KEY", "XDG_DATA_HOME", "LLM_API_KEY", "DEEPSEEK_API_KEY")
+
+
+def _isolate_env() -> tuple[str, dict[str, str | None]]:
+    """Point the app at a throwaway data dir with auth off; return (tmpdir, saved env).
+
+    Every fixture that constructs App() MUST call this first. App() opens the
+    encrypted quality store on construction; without XDG_DATA_HOME redirected it
+    opens the developer's real one with the fallback keyfile — the exact failure
+    web.py's _LazyApp docstring attributes to a run of store-quarantine incidents.
+    """
+    import tempfile
+
+    saved = {k: os.environ.get(k) for k in _ISOLATED_ENV}
+    tmp = tempfile.mkdtemp(prefix="ncga-pw-")
+    os.environ["NCGA_AUTH_TOKEN"] = ""   # not setdefault: a dev's real token must not leak in
+    os.environ["NCGA_DATA_KEY"] = ""
+    os.environ["XDG_DATA_HOME"] = tmp
+    return tmp, saved
+
+
+def _restore_env(saved: dict[str, str | None]) -> None:
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
+def _serve(app):
+    """Bind `app` on an ephemeral port in a daemon thread; return (base_url, server, thread)."""
+    port = _free_port()
+    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
+    th = threading.Thread(target=server.serve_forever, daemon=True)
+    th.start()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                break
+        except OSError:
+            time.sleep(0.05)
+    return f"http://127.0.0.1:{port}", server, th
+
+
 @pytest.fixture(scope="session")
 def live_app() -> Iterator[str]:
     """Start NCGA on an ephemeral port; yield base URL; clean up after."""
-    # Force auth off + a benign quality-store path (XDG isolation)
-    os.environ.setdefault("NCGA_AUTH_TOKEN", "")
-    os.environ.setdefault("NCGA_DATA_KEY", "")
-    import tempfile
-
-    tmp = tempfile.mkdtemp(prefix="ncga-pw-")
-    os.environ["XDG_DATA_HOME"] = tmp
+    tmp, saved = _isolate_env()
 
     # Inject a fake LLM transport so the wizard / rewrite paths don't hit real network
     from native_chinese_assistant.rewrite import (
@@ -85,26 +124,14 @@ def live_app() -> Iterator[str]:
     client = ChatCompletionsClient(cfg, transport=FakeTransport())
     app = App(rewrite_service=RewriteService(client=client))
 
-    port = _free_port()
-    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
-    th = threading.Thread(target=server.serve_forever, daemon=True)
-    th.start()
-    # Wait for readiness
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                break
-        except OSError:
-            time.sleep(0.05)
-
-    base_url = f"http://127.0.0.1:{port}"
+    base_url, server, th = _serve(app)
     yield base_url
     server.shutdown()
     th.join(timeout=2)
     import shutil
 
     shutil.rmtree(tmp, ignore_errors=True)
+    _restore_env(saved)
 
 
 @pytest.fixture(scope="session")
@@ -118,24 +145,18 @@ def live_app_no_key() -> Iterator[str]:
     from native_chinese_assistant.rewrite import RewriteService
     from native_chinese_assistant.web import App
 
+    tmp, saved = _isolate_env()   # same isolation as live_app — this may run FIRST
     for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY"):
         os.environ.pop(key, None)
     service = RewriteService(config=None)
     service._client = None  # belt and braces: .env on the dev box must not leak in
     app = App(rewrite_service=service)
 
-    port = _free_port()
-    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
-    th = threading.Thread(target=server.serve_forever, daemon=True)
-    th.start()
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                break
-        except OSError:
-            time.sleep(0.05)
-
-    yield f"http://127.0.0.1:{port}"
+    base_url, server, th = _serve(app)
+    yield base_url
     server.shutdown()
     th.join(timeout=2)
+    import shutil
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    _restore_env(saved)

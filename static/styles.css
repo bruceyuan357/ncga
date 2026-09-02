@@ -6213,7 +6213,7 @@ body[data-v3="on"] {
   /* 宣纸场:两层暖白纱罩住漆面照片(照片残影 ~5%),最底层兜底纯色 */
   background:
     radial-gradient(ellipse 75% 55% at 86% 0%, rgba(47, 93, 76, 0.055), transparent 62%),
-    linear-gradient(165deg, rgba(247, 243, 234, 0.965) 0%, rgba(var(--at-paper-rgb), 0.935) 45%, rgba(238, 232, 219, 0.96) 100%),
+    linear-gradient(165deg, rgba(var(--at-paper-rgb), 0.965) 0%, rgba(var(--at-paper-rgb), 0.935) 45%, rgba(var(--at-paper-rgb), 0.96) 100%),
     url("/static/assets/summer-lacquer-silk.png") center / cover fixed no-repeat,
     var(--at-paper) !important;
 }
@@ -7626,13 +7626,9 @@ body[data-v3="on"] .landmark-caption { color: var(--at-ink-faint); }
     --success: #6aa588;
 
     color: var(--at-ink);
-    /* The light skin paints a cream paper gradient over a lacquer photo; in
-       dark the same photo needs an ink wash instead of a paper wash. */
-    background:
-      radial-gradient(ellipse 75% 55% at 86% 0%, rgba(106, 165, 136, 0.07), transparent 62%),
-      linear-gradient(165deg, rgba(18, 22, 24, 0.955) 0%, rgba(20, 24, 26, 0.935) 45%, rgba(14, 17, 19, 0.96) 100%),
-      url("/static/assets/summer-lacquer-silk.png") center / cover fixed no-repeat,
-      #14181a;
+    /* The body background is painted by the light rule's !important
+       declaration, which now reads every stop from --at-paper-rgb — so the
+       token flip above is what re-themes it. No override here could win. */
   }
 
   /* Landmark photography is the page backdrop; at full strength it blows out a
@@ -7688,11 +7684,8 @@ html[data-theme="dark"] body[data-v3="on"] {
   --success: #6aa588;
 
   color: var(--at-ink);
-  background:
-    radial-gradient(ellipse 75% 55% at 86% 0%, rgba(106, 165, 136, 0.07), transparent 62%),
-    linear-gradient(165deg, rgba(18, 22, 24, 0.955) 0%, rgba(20, 24, 26, 0.935) 45%, rgba(14, 17, 19, 0.96) 100%),
-    url("/static/assets/summer-lacquer-silk.png") center / cover fixed no-repeat,
-    #14181a;
+  /* Body background: see the media-query block — painted by the token-driven
+     !important rule, not overridable here. */
 }
 
 html[data-theme="dark"] body[data-v3="on"] .bg-image,
@@ -7702,10 +7695,13 @@ html[data-theme="dark"] body[data-v3="on"] .v3-hero-photo {
 html[data-theme="dark"] .ncga-check::before { color: #14181a; }
 
 /* Native controls (scrollbars, the dialect <select>'s popup, focus rings)
-   follow the resolved theme. Without this they stay light-on-dark. */
+   follow the resolved theme. Without this they stay light-on-dark.
+   Scoped to the v3 skin via :has() — every token override above is v3-only,
+   so flipping native chrome on v1/v2 would give dark scrollbars on a cream
+   page (or light ones on v2's ink). */
 :root { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) { color-scheme: dark; }
+  html:not([data-theme="light"]):has(> body[data-v3="on"]) { color-scheme: dark; }
 }
-html[data-theme="dark"] { color-scheme: dark; }
+html[data-theme="dark"]:has(> body[data-v3="on"]) { color-scheme: dark; }
 html[data-theme="light"] { color-scheme: light; }

@@ -2731,7 +2731,7 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertEqual(s2, "200 OK")
         s3, _, body = call_app(app, "GET", "/api/quality-stats")
         self.assertEqual(s3, "429 Too Many Requests")
-        self.assertIn("Rate limit", json.loads(body)["error"])
+        self.assertIn("请求太频繁", json.loads(body)["error"])
 
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:
@@ -3326,12 +3326,38 @@ class TestBYOK(unittest.TestCase):
         )
         self.assertEqual(status, "401 Unauthorized")
 
+    def test_keyless_503_does_not_consume_daily_cap(self) -> None:
+        """A request that can only 503 must not be charged against the daily
+        LLM cap. With cap=1, every keyless call is a 503 — never a 429 — so
+        the user keeps seeing the message that tells them how to fix it."""
+        os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "1"
+        self._blank_server_key()
+        app = App(rewrite_service=RewriteService(config=None))
+        app.rewrite_service._client = None
+        body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode()
+        for endpoint in ("/api/rewrite", "/api/rewrite-stream"):
+            for _ in range(3):
+                status, _, payload = call_app(app, "POST", endpoint, body=body)
+                self.assertEqual(status, "503 Service Unavailable", endpoint)
+                self.assertEqual(json.loads(payload)["error"], NO_LLM_MESSAGE)
+        # Batch pre-flights before charging items*varieties units.
+        batch = json.dumps(
+            {"items": ["你好", "再见"], "target_varieties": ["standard_putonghua", "dongbei_mandarin"]}
+        ).encode()
+        for _ in range(2):
+            status, _, _ = call_app(app, "POST", "/api/rewrite-batch", body=batch)
+            self.assertEqual(status, "503 Service Unavailable")
+
     def test_byok_bypasses_operator_daily_cap(self) -> None:
         os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "1"
         os.environ["LLM_STREAM"] = "false"
         self._blank_server_key()
         user_key = "sk-" + "u" * 40
-        app = App(rewrite_service=RewriteService(config=None))
+        # The operator path must have a working client: a keyless server now
+        # 503s without charging (see test_keyless_503_does_not_consume_daily_cap),
+        # so it could never demonstrate that the cap is consumed at all.
+        operator_client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=operator_client))
         body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode()
 
         from native_chinese_assistant.rewrite import UrllibTransport
@@ -3340,10 +3366,10 @@ class TestBYOK(unittest.TestCase):
             return FakeStreamResponse(_llm_json("ok"))
 
         with mock.patch.object(UrllibTransport, "post", fake_post):
-            # Operator path: no server key, so the rewrite itself 503s — but the
-            # daily unit is still consumed, so the second call hits the cap.
+            # Operator path: first call succeeds and consumes the single daily
+            # unit; the second hits the cap.
             s1, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
-            self.assertEqual(s1, "503 Service Unavailable")
+            self.assertEqual(s1, "200 OK")
             s2, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
             self.assertEqual(s2, "429 Too Many Requests")
             # BYOK path: cap skipped entirely — the user funds their own calls.

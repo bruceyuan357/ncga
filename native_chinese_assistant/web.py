@@ -695,7 +695,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         key = _user_llm_key(environ)
         if key is None:
@@ -821,15 +821,12 @@ class App:
 
     def handle_rewrite(self, environ: dict, start_response: Callable) -> list[bytes]:
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
 
         payload, err = self._read_json_body(environ, start_response)
@@ -856,11 +853,24 @@ class App:
         if len(text) > MAX_INPUT_CHARS * 4:  # before normalize, hard cap on raw payload size
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
+        # Order matters, and it is the same rule the batch handler states for
+        # item validation: reject BEFORE charging, because the cap is never
+        # refunded. So: body/field validation above (413/400, free) → no-key
+        # 503 (free) → daily cap (charged only for a request that will actually
+        # reach the LLM).
+        svc, _, byok = self._services_for(environ)
+        if svc.client is None:
+            return json_response(
+                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
+            )
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite")
+        if cap_err is not None:
+            return cap_err
+
         try:
             import time as _time
 
             t0 = _time.perf_counter()
-            svc, _, byok = self._services_for(environ)
             result = svc.rewrite(
                 text, target, scenario=scenario, glossary_lines=glossary_lines
             )
@@ -891,7 +901,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
 
         payload, err = self._read_json_body(environ, start_response)
@@ -1058,15 +1068,12 @@ class App:
     def handle_rewrite_stream(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
         """SSE endpoint. Streams partial rewrite text as the LLM emits tokens."""
         ip = client_ip(environ)
-        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite-stream")
-        if cap_err is not None:
-            return cap_err
         if not self.rate_limiter.allow(ip):
             logger.info("rate_limited ip=%s endpoint=rewrite-stream", ip)
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1090,13 +1097,19 @@ class App:
         ):  # parity with /api/rewrite — reject pre-stream instead of erroring mid-stream
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
+        # Order matters, and it is the same rule the batch handler states for
+        # item validation: reject BEFORE charging, because the cap is never
+        # refunded. So: body/field validation above (413/400, free) → no-key
+        # 503 (free) → daily cap (charged only for a request that will actually
+        # reach the LLM).
         svc, _, byok = self._services_for(environ)
-        # Fail before opening the stream: a 503 with a readable reason beats a
-        # 200 event-stream whose first event is an error.
         if svc.client is None:
             return json_response(
                 start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
             )
+        cap_err = self._check_daily_cap_byok(environ, ip, start_response, "rewrite-stream")
+        if cap_err is not None:
+            return cap_err
 
         start_response(
             "200 OK",
@@ -1128,7 +1141,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1176,7 +1189,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1215,7 +1228,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1262,7 +1275,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         payload, err = self._read_json_body(environ, start_response)
         if err is not None:
@@ -1361,19 +1374,19 @@ class App:
                 )
         # Cycle 18 v2: daily-cap accounting AFTER we know the cell count. Each cell is
         # one LLM call; charge the counter the full fan-out so batch can't bypass the cap.
+        # Pre-flight BEFORE charging up to items*varieties (400) units for rows
+        # that would all fail — the same rule web.py already states for item
+        # validation: reject before charging, because the cap is not refunded.
+        svc, _, byok = self._services_for(environ)
+        if svc.client is None:
+            return json_response(
+                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
+            )
         cap_err = self._check_daily_cap_byok(
             environ, ip, start_response, "rewrite-batch", units=len(items) * len(varieties)
         )
         if cap_err is not None:
             return cap_err
-
-        svc, _, byok = self._services_for(environ)
-        # Same pre-flight as the single-rewrite stream: without a key every one
-        # of these rows would fail, so say so once instead of 100 times.
-        if svc.client is None:
-            return json_response(
-                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
-            )
 
         start_response(
             "200 OK",
@@ -1421,7 +1434,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         return json_response(start_response, "200 OK", {"buckets": self.quality_store.stats_snapshot()})
 
@@ -1442,7 +1455,7 @@ class App:
             return json_response(
                 start_response,
                 "429 Too Many Requests",
-                {"error": "Rate limit exceeded. Please slow down."},
+                {"error": "请求太频繁了，稍等片刻再试。"},
             )
         store = self.quality_store
         snapshot = store.stats_snapshot() if store is not None else []

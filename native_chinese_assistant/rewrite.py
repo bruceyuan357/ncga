@@ -1300,16 +1300,22 @@ class RewriteService:
         started = time.perf_counter()
         if self._client is None:
             raise RewriteError(NO_LLM_MESSAGE)
-        for delta, partial, done, meta in self._client.rewrite_stream(
-            normalized,
-            target,
-            scenario=scenario,
-            glossary_lines=glossary_lines,
-        ):
-            yield delta, partial, done, meta
-            if done:
-                break
-        self._log_request(target, started, degraded=False)
+        completed = False
+        try:
+            for delta, partial, done, meta in self._client.rewrite_stream(
+                normalized,
+                target,
+                scenario=scenario,
+                glossary_lines=glossary_lines,
+            ):
+                yield delta, partial, done, meta
+                if done:
+                    break
+            completed = True
+        finally:
+            # Log on failure too — the old except-branch did, and losing the
+            # latency of a request that died mid-stream is the worst time to.
+            self._log_request(target, started, degraded=False, failed=not completed)
 
     def explain(
         self,
@@ -1381,13 +1387,16 @@ class RewriteService:
             "glossary_suggestions": glossary,
         }
 
-    def _log_request(self, target: VarietyPreset, started: float, *, degraded: bool) -> None:
+    def _log_request(
+        self, target: VarietyPreset, started: float, *, degraded: bool, failed: bool = False
+    ) -> None:
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
-        provider = self._config.provider if self._config else "heuristic"
+        provider = self._config.provider if self._config else "none"
         logger.info(
-            "rewrite_request target=%s latency_ms=%s degraded=%s provider=%s",
+            "rewrite_request target=%s latency_ms=%s degraded=%s failed=%s provider=%s",
             target.value,
             duration_ms,
             degraded,
+            failed,
             provider,
         )
