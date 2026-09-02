@@ -24,9 +24,9 @@ What makes it different:
 - **BYOK.** Paste your own DeepSeek key in Settings and every feature runs on
   your account. No sign-up, no token from the operator — the key never leaves
   your browser except straight upstream to DeepSeek.
-- **Honest degradation.** If the LLM flakes, the app falls back to a heuristic
-  rewrite and *says so* (degraded flag in the UI and API) instead of silently
-  serving you a worse result.
+- **Honest failure.** If the LLM is unreachable, the app says so — a clear
+  error in the UI and a 503 from the API — instead of quietly handing you a
+  worse result dressed up as a real one.
 - **Near-zero dependencies.** The backend is Python standard library — the only
   runtime packages are `certifi` (TLS roots) and `cryptography` (at-rest
   encryption). Clone, add a key, run `python app.py`.
@@ -43,7 +43,7 @@ MIT licensed. Self-hosted. Your history never leaves your browser.
 I built this because translating into dialect is not the same as translating
 into English — the failure mode is "technically correct, obviously a
 foreigner". The whole architecture is built around catching that: golden
-sets, an anchored judge, per-variety model routing, and a heuristic fallback
+sets, an anchored judge, per-variety model routing, and honest error reporting
 that admits when it's degraded. Happy to answer anything about the eval
 protocol or the BYOK design.
 

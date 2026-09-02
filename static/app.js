@@ -67,6 +67,40 @@
     }
   }
 
+  // Whether the SERVER has an LLM key. null = not probed yet. Never assume:
+  // the UI used to hardcode "using the server's default key", which was a lie
+  // whenever the operator hadn't set one, and the user only discovered it
+  // after spending a rewrite on a fabricated result.
+  let SERVER_LLM_CONFIGURED = null;
+
+  function _aiAvailable() {
+    return !!_getByokKey() || SERVER_LLM_CONFIGURED === true;
+  }
+
+  // Persistent, non-blocking notice shown while no key is reachable at all.
+  function _renderNoKeyBanner() {
+    const el = document.getElementById("no-key-banner");
+    if (!el) return;
+    el.hidden = _aiAvailable() || SERVER_LLM_CONFIGURED === null;
+  }
+
+  async function _probeServerKey() {
+    try {
+      const res = await fetch("/api/healthz");
+      const data = res.ok ? await res.json() : null;
+      // Only a real boolean is an answer. Anything else — error page, missing
+      // field, older server — is "don't know", never "no key".
+      SERVER_LLM_CONFIGURED =
+        data && typeof data.llm_configured === "boolean" ? data.llm_configured : null;
+    } catch (_) {
+      // Unreachable server is not the same as "no key" — leave it unknown so
+      // the settings line says "checking" instead of accusing the operator.
+      SERVER_LLM_CONFIGURED = null;
+    }
+    _renderNoKeyBanner();
+    return SERVER_LLM_CONFIGURED;
+  }
+
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";
     if (url.startsWith("/api/")) {
@@ -204,7 +238,7 @@
   const HISTORY_MAX = 50;
 
   const STATUS_TEXT = {
-    idle: '<i class="fas fa-info-circle" aria-hidden="true"></i> 选择方言风格并点击"立即重写"',
+    idle: '<i class="fas fa-info-circle" aria-hidden="true"></i> 写点什么，挑个方言，然后点「立即重写」',
     loading: '<i class="fas fa-circle-notch" aria-hidden="true"></i> 正在揉成地道的味儿…',
     success: (variety, script) =>
       `<i class="fas fa-check-circle" aria-hidden="true"></i> 重写完成！风味：${escapeHtml(variety)} · 字形：${escapeHtml(script)}`,
@@ -268,6 +302,7 @@
 
   const DEFAULT_SETTINGS = {
     bgMode: "rotate",
+    theme: "auto",     // auto = follow prefers-color-scheme; light | dark force it
     fontScale: "1",
     highlight: "on",
     version: "v3",     // M1: v3「随四时」 is now the default (was v2 墨韵)
@@ -354,7 +389,7 @@
   }
 
   function setStatus(html, type) {
-    statusEl.classList.remove("success", "error");
+    statusEl.classList.remove("success", "error", "hint");
     if (type) statusEl.classList.add(type);
     statusEl.innerHTML = html;
   }
@@ -363,6 +398,23 @@
   function currentSubmitLabel() {
     if (activeMode === DIALECT_MODE) return "立即重写";
     return TRANSFORM_MODES[activeMode]?.label || "立即处理";
+  }
+
+  // In dialect mode the rewrite needs a variety; transform modes don't.
+  function needsVarietyChoice() {
+    return activeMode === DIALECT_MODE && !targetSelect.value;
+  }
+
+  function syncSubmitEnabled() {
+    if (submitButton.classList.contains("loading")) return;
+    const blocked = needsVarietyChoice();
+    submitButton.disabled = blocked;
+    if (cmdbarRewrite) cmdbarRewrite.disabled = blocked;
+    const why = blocked ? "先在左边挑一个方言风格" : "";
+    submitButton.title = why;
+    if (cmdbarRewrite) cmdbarRewrite.title = why;
+    const hint = document.getElementById("submit-hint");
+    if (hint) hint.textContent = why;
   }
 
   function setBusy(isBusy) {
@@ -374,6 +426,7 @@
         : currentSubmitLabel();
     }
     submitButton.classList.toggle("loading", isBusy);
+    if (!isBusy) syncSubmitEnabled();
   }
 
   function countChars(text) { return Array.from(text || "").length; }
@@ -848,7 +901,7 @@
     pageSubtitle.textContent = t[1];
     const cmdbarRewriteLabel = $("#cmdbar-rewrite-label");
     if (cmdbarRewriteLabel) {
-      cmdbarRewriteLabel.textContent = route === "workbench" ? currentSubmitLabel() : "开始改写";
+      cmdbarRewriteLabel.textContent = route === "workbench" ? currentSubmitLabel() : "去重写台";
     }
     cmdbarRewrite.setAttribute(
       "aria-label",
@@ -885,6 +938,9 @@
 
   function bindRouter() {
     navItems.forEach((n) => {
+      // Only hash routes belong to the SPA router. A real href (the /quality
+      // dashboard) must be left to the browser, or the link is dead.
+      if (!ROUTES.includes(n.dataset.route)) return;
       n.addEventListener("click", (e) => {
         e.preventDefault();
         location.hash = n.dataset.route;
@@ -959,6 +1015,15 @@
       );
     });
     applyFontScale(SETTINGS.fontScale);
+    applyTheme(SETTINGS.theme);
+  }
+
+  // "auto" removes the attribute so the prefers-color-scheme media query
+  // decides; an explicit choice stamps data-theme and always wins.
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === "light" || theme === "dark") root.setAttribute("data-theme", theme);
+    else root.removeAttribute("data-theme");
   }
 
   function bindSettings() {
@@ -971,6 +1036,7 @@
           SETTINGS[key] = btn.dataset.value;
           saveSettings();
           if (key === "version") applyVersion(SETTINGS.version);
+          if (key === "theme") applyTheme(SETTINGS.theme);
           if (key === "fontScale") applyFontScale(SETTINGS.fontScale);
           if (key === "bgMode") {
             updateBgModePill();
@@ -1012,6 +1078,7 @@
       saveSettings();
       syncSettingsUI();
       applyVersion(SETTINGS.version);
+      applyTheme(SETTINGS.theme);
       applyFontScale(SETTINGS.fontScale);
       updateBgModePill();
       applyBackgroundFor(targetSelect.value || varietyOrder[0]);
@@ -1029,16 +1096,26 @@
     function _renderByokStatus(state, detail) {
       if (!byokStatus) return;
       const has = !!_getByokKey();
+      byokStatus.classList.remove("is-warning");
       if (state === "testing") {
         byokStatus.textContent = "正在测试连接…";
       } else if (state === "ok") {
         byokStatus.textContent = `已启用自带 Key（测试通过${detail ? `，${detail}` : ""}）。所有 AI 功能将使用你的 Key。`;
       } else if (state === "fail") {
+        byokStatus.classList.add("is-warning");
         byokStatus.textContent = `Key 已保存，但测试未通过：${detail || "上游拒绝了该 Key"}`;
+      } else if (has) {
+        byokStatus.textContent = "已启用自带 Key。所有 AI 功能将使用你的 Key。";
+      } else if (SERVER_LLM_CONFIGURED === true) {
+        byokStatus.textContent = "未配置自带 Key — 当前使用服务器上配置的密钥。";
+      } else if (SERVER_LLM_CONFIGURED === false) {
+        // Previously hardcoded to claim a server key existed. It often doesn't,
+        // and the user only found out after burning a rewrite on a fake result.
+        byokStatus.classList.add("is-warning");
+        byokStatus.textContent =
+          "未配置 — 服务器也没有配置密钥，AI 功能当前不可用。请粘贴你的 DeepSeek Key。";
       } else {
-        byokStatus.textContent = has
-          ? "已启用自带 Key。所有 AI 功能将使用你的 Key。"
-          : "未配置 — 当前使用服务器默认密钥。";
+        byokStatus.textContent = "正在检查密钥状态…";
       }
     }
 
@@ -1046,6 +1123,11 @@
       // Never pre-fill the stored key back into the input — shoulder-surfing
       // guard. Presence is communicated via the status line instead.
       _renderByokStatus();
+      // The server probe may resolve after settings render; let boot re-run this.
+      window.__ncgaRefreshByokStatus = () => {
+        _renderByokStatus();
+        _renderNoKeyBanner();
+      };
 
       byokToggle?.addEventListener("click", () => {
         const showing = byokInput.type === "text";
@@ -1073,6 +1155,7 @@
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.ok) {
             _renderByokStatus("ok", data.latency_ms ? `延迟 ${data.latency_ms}ms` : "");
+            _renderNoKeyBanner();
             showToast("Key 可用，已启用自带 Key", "fa-circle-check");
           } else {
             _renderByokStatus("fail", data.error || `HTTP ${res.status}`);
@@ -1086,7 +1169,13 @@
         try { localStorage.removeItem(_BYOK_LS_KEY); } catch (_) { /* blocked */ }
         byokInput.value = "";
         _renderByokStatus();
-        showToast("已清除自带 Key，改回服务器默认密钥", "fa-trash-can");
+        _renderNoKeyBanner();
+        showToast(
+          SERVER_LLM_CONFIGURED === true
+            ? "已清除自带 Key，改回服务器密钥"
+            : "已清除自带 Key — 服务器未配置密钥，AI 功能将不可用",
+          "fa-trash-can",
+        );
       });
     }
   }
@@ -1467,6 +1556,56 @@
     });
   }
 
+  const DRAFT_LS_KEY = "ncga.draft.v1";
+
+  // The 存草稿 button wrote this key and NOTHING ever read it back — the toast
+  // promised "草稿已留在这台设备" but the draft was unrecoverable. Restore on
+  // boot, and autosave so a stray navigation doesn't cost the user their text.
+  function restoreDraft() {
+    let draft;
+    try {
+      draft = JSON.parse(localStorage.getItem(DRAFT_LS_KEY) || "null");
+    } catch (_) {
+      return;
+    }
+    if (!draft || typeof draft.text !== "string") return;
+    // Never clobber something the user has already typed this session.
+    if ((textInput.value || "").trim()) return;
+    if (!draft.text.trim()) return;
+    textInput.value = draft.text;
+    if (draft.target_variety && VARIETIES[draft.target_variety]) {
+      targetSelect.value = draft.target_variety;
+      updateVarietyCard();
+      applyBackgroundFor(draft.target_variety);
+    }
+    if (draft.scenario && SCENARIOS[draft.scenario]) {
+      SETTINGS.scenario = draft.scenario;
+      saveSettings();
+      renderScenarioChips();
+    }
+    updateCharCount();
+    syncSubmitEnabled();
+  }
+
+  let _draftTimer = null;
+  function autosaveDraft() {
+    clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(() => {
+      try {
+        if (!(textInput.value || "").trim()) {
+          localStorage.removeItem(DRAFT_LS_KEY);
+          return;
+        }
+        localStorage.setItem(DRAFT_LS_KEY, JSON.stringify({
+          text: textInput.value || "",
+          target_variety: targetSelect.value || "",
+          scenario: SETTINGS.scenario || DEFAULT_SCENARIO,
+          ts: Date.now(),
+        }));
+      } catch (_) { /* quota / private mode — autosave is best-effort */ }
+    }, 500);
+  }
+
   function saveRound2Draft() {
     const draft = {
       text: textInput.value || "",
@@ -1539,7 +1678,36 @@
     compareToggle.classList.toggle("primary-icon", compareMode);
   }
 
-  function clearAll() {
+  // Reset only the RESULT side (leaves the user's input alone). Used when a
+  // rewrite fails: an error must not sit next to a stale result and its stats,
+  // which together read as though the error produced that output.
+  function clearResultSurface() {
+    resultEl.textContent = "";
+    warningEl.textContent = "";
+    resultStats.hidden = true;
+    if (degradedTag) degradedTag.hidden = true;
+    updateModelTag("");
+    resetRateUI();
+    closeCompare();
+    closeExplain();
+    copyButton.disabled = true;
+    speakButton.disabled = true;
+    downloadButton.disabled = true;
+    // Favourite: disable AND visually un-star, or a failed rewrite shows an
+    // empty result that still reads as 已收藏.
+    favoriteBtn.disabled = true;
+    favoriteBtn.classList.remove("is-favorite");
+    favoriteBtn.setAttribute("aria-pressed", "false");
+    if (favoriteLabel) favoriteLabel.textContent = "收藏";
+    favoriteBtn.querySelector("i").className = "far fa-star";
+    if (explainButton) explainButton.disabled = true;
+    if (compareOtherButton) compareOtherButton.disabled = true;
+    if (rateButton) rateButton.disabled = true;
+    lastResult = null;
+    if (compareMode) toggleCompare();
+  }
+
+  function clearAll({ dropDraft = true } = {}) {
     // Cycle 18: don't silently nuke a draft. If there's input or a result, confirm.
     const hasInput = (textInput.value || "").trim().length > 0;
     const hasResult = (resultEl.textContent || "").trim().length > 0;
@@ -1548,27 +1716,11 @@
       if (!ok) return;
     }
     textInput.value = "";
-    resultEl.textContent = "";
-    setStatus(STATUS_TEXT.idle);
-    warningEl.textContent = "";
-    copyButton.disabled = true;
-    speakButton.disabled = true;
-    downloadButton.disabled = true;
-    favoriteBtn.disabled = true;
-    favoriteBtn.classList.remove("is-favorite");
-    favoriteBtn.setAttribute("aria-pressed", "false");
-    if (favoriteLabel) favoriteLabel.textContent = "收藏";
-    favoriteBtn.querySelector("i").className = "far fa-star";
-    if (explainButton) explainButton.disabled = true;
-    if (compareOtherButton) compareOtherButton.disabled = true;
-    closeCompare();
-    closeExplain();
-    resultStats.hidden = true;
-    if (degradedTag) degradedTag.hidden = true;
-    updateModelTag("");
-    resetRateUI();
-    lastResult = null;
-    if (compareMode) toggleCompare();
+    if (dropDraft) {
+      try { localStorage.removeItem(DRAFT_LS_KEY); } catch (_) {}
+    }
+    clearResultSurface();
+    setStatus(STATUS_TEXT.idle, "hint");
     updateCharCount();
     renderRound2Versions();
   }
@@ -1688,6 +1840,7 @@
         const v = btn.dataset.scenario;
         SETTINGS.scenario = v;
         saveSettings();
+        autosaveDraft();
         $$(".scenario-chip", scenarioChipsContainer).forEach((b) => {
           const a = b.dataset.scenario === v;
           b.classList.toggle("is-active", a);
@@ -1718,7 +1871,15 @@
       if (err.name === "AbortError") throw err;
       return null;  // network error — fall back
     }
-    if (!res.ok || !res.body) return null;
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data && data.error) message = data.error;
+      } catch (_) { /* non-JSON error body — keep the status line */ }
+      throw new Error(message);
+    }
+    if (!res.body) return null;
     const ct = res.headers.get("Content-Type") || "";
     if (!ct.includes("text/event-stream")) {
       return null;  // unexpected — fall back
@@ -1980,6 +2141,11 @@
       // Don't display abort errors to user — those are intentional cancellations
       if (err.name !== "AbortError") {
         setStatus(STATUS_TEXT.error(err.message), "error");
+        // A failed rewrite must not leave the previous result (or its stats)
+        // on screen next to an error — that reads as if the error produced it.
+        clearResultSurface();
+        // The most common failure is "no key". Point at the fix.
+        if (!_aiAvailable()) _renderNoKeyBanner();
       }
     } finally {
       // Only clear busy if we're still the active controller
@@ -2040,10 +2206,14 @@
     cmdbarRewrite.setAttribute("aria-label", currentSubmitLabel());
     if (mode === DIALECT_MODE) {
       const meta = VARIETIES[targetSelect.value];
-      setStatus(meta && meta.trial ? STATUS_TEXT.trialNotice(meta.label) : STATUS_TEXT.idle);
+      setStatus(
+        meta && meta.trial ? STATUS_TEXT.trialNotice(meta.label) : STATUS_TEXT.idle,
+        meta && meta.trial ? "" : "hint",
+      );
     } else {
       setStatus(STATUS_TEXT.transformIdle(TRANSFORM_MODES[mode].label));
     }
+    syncSubmitEnabled();
   }
 
   // Boot-time silent refresh: server is the source of truth for labels/order.
@@ -3770,8 +3940,11 @@
   }
 
   function bindWorkbench() {
-    textInput.addEventListener("input", updateCharCount);
-    clearButton.addEventListener("click", clearAll);
+    textInput.addEventListener("input", () => {
+      updateCharCount();
+      autosaveDraft();
+    });
+    clearButton.addEventListener("click", () => clearAll({ dropDraft: true }));
     speakButton.addEventListener("click", speakResult);
     // Cycle 23: submit 走模式分发（方言 → rewriteText，transform → transformText）
     form.addEventListener("submit", runWorkbench);
@@ -3815,13 +3988,15 @@
 
     targetSelect.addEventListener("change", () => {
       const v = targetSelect.value;
+      syncSubmitEnabled();
+      autosaveDraft();
       updateVarietyCard();
       applyBackgroundFor(v);
       const meta = VARIETIES[v];
       if (meta && meta.trial) {
         setStatus(STATUS_TEXT.trialNotice(meta.label));
       } else {
-        setStatus(STATUS_TEXT.idle);
+        setStatus(STATUS_TEXT.idle, "hint");
       }
     });
 
@@ -3872,12 +4047,19 @@
   syncRound2Compare();
   renderRound2Versions();
 
+  _probeServerKey().then(() => {
+    // Settings may already be rendered; re-render its status line with the truth.
+    if (typeof window.__ncgaRefreshByokStatus === "function") {
+      window.__ncgaRefreshByokStatus();
+    }
+  });
+
   Promise.all([loadPresets(), loadScenarios()])
     .then(() => {
       // Default background after presets are loaded.
       applyBackgroundFor(varietyOrder[0]);
       updateVarietyCard();
-      clearAll();
+      clearAll({ dropDraft: false });   // boot init — must not eat a saved draft
       renderAtlas();
       renderHistory();
       // Init-race fix: on a direct first load of #batch the router rendered the
@@ -3890,6 +4072,11 @@
       setStatus(STATUS_TEXT.loadFail, "error");
     })
     .finally(() => {
+      // Run on BOTH branches: with presets missing the draft's text still
+      // restores (the variety is skipped — not in VARIETIES) and the CTA is
+      // correctly disabled over an empty <select>.
+      restoreDraft();
+      syncSubmitEnabled();
       // Cycle 9 fix: boot screen MUST hide regardless of init success.
       setTimeout(() => bootScreen?.classList.add("hidden"), 600);
     });

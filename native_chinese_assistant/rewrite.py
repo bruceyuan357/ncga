@@ -1,8 +1,8 @@
-"""Rewrite service: LLM client + heuristic fallback.
+"""Rewrite service: LLM client.
 
 Public surface kept stable for tests:
   validate_text, parse_variety, MAX_INPUT_CHARS, load_dotenv, load_llm_config,
-  default_ca_bundle, extract_streamed_content, HeuristicRewriter, RewriteService,
+  default_ca_bundle, extract_streamed_content, RewriteService,
   ChatCompletionsClient, RewriteError, RewriteResult, LLMConfig.
 """
 
@@ -35,6 +35,15 @@ logger = logging.getLogger("ncga.rewrite")
 MAX_INPUT_CHARS = 1200
 MAX_OUTPUT_CHARS = 1600  # input + breathing room; matches "input + 200" prompt rule with margin
 LLM_RETRIES = 1  # retry once on parse failure with stricter instruction
+
+
+# Every user-facing message from this module is Chinese: the whole product is a
+# Chinese-language UI, and the frontend renders `warning` / error strings verbatim.
+# Leaking an English exception string into that UI is a bug, not a detail.
+NO_LLM_MESSAGE = (
+    "尚未配置 API Key，方言改写不可用。"
+    "请在「设置 → API 密钥」粘贴你的 DeepSeek Key，或在服务器 .env 中设置 DEEPSEEK_API_KEY。"
+)
 
 
 class RewriteError(Exception):
@@ -73,7 +82,7 @@ class RewriteResult:
     target_variety: VarietyPreset
     script: Script
     warning: str | None = None
-    degraded: bool = False  # True if heuristic fallback was used (UI surfaces this prominently)
+    degraded: bool = False  # reserved: no code path sets this now that the fake-result fallback is gone
 
     def as_dict(self) -> dict[str, Any]:
         # asdict serializes enums via their .value when they subclass str — both Script & VarietyPreset do.
@@ -404,7 +413,7 @@ def llm_config_for_user_key(user_key: str) -> LLMConfig:
 def _build_llm_config(api_key: str) -> LLMConfig:
     provider = os.environ.get("LLM_PROVIDER", "deepseek").strip().lower()
     default_base_url = "https://api.deepseek.com" if provider == "deepseek" else "https://api.openai.com/v1"
-    default_model = "deepseek-chat" if provider == "deepseek" else "gpt-4.1-mini"
+    default_model = "deepseek-v4-flash" if provider == "deepseek" else "gpt-4.1-mini"
     base_url = os.environ.get("LLM_BASE_URL", default_base_url).strip()
     model = os.environ.get("LLM_MODEL", default_model).strip()
     streaming = env_flag("LLM_STREAM", True)
@@ -1183,83 +1192,6 @@ class ChatCompletionsClient:
         return {"summary": summary, "points": points}
 
 
-# ---------- heuristic fallback ----------
-
-
-class HeuristicRewriter:
-    REPLACEMENTS: dict[VarietyPreset, list[tuple[str, str]]] = {
-        VarietyPreset.STANDARD_PUTONGHUA: [("挺", "很"), ("贼", "特别")],
-        VarietyPreset.BEIJING_MANDARIN: [("非常", "特"), ("朋友", "哥们儿"), ("真的", "真")],
-        VarietyPreset.DONGBEI_MANDARIN: [("非常", "老"), ("特别", "老"), ("不错", "挺带劲")],
-        VarietyPreset.SICHUAN_CHONGQING_MANDARIN: [("很", "蛮"), ("特别", "巴适得很")],
-        VarietyPreset.JIANGHUAI_OR_LOWER_YANGTZE_MANDARIN: [("很", "蛮"), ("可以", "蛮可以")],
-        VarietyPreset.GUANGDONG_MANDARIN: [("一起", "一齐"), ("厉害", "犀利")],
-        VarietyPreset.SHANGHAI_MANDARIN_STYLE: [("马上", "立刻"), ("安排", "弄好")],
-        VarietyPreset.CANTONESE_WRITTEN: [
-            ("什么", "咩"),
-            ("是不是", "係唔係"),
-            ("很", "好"),
-            ("的", "嘅"),
-        ],
-        VarietyPreset.HOKKIEN_WRITTEN: [("我们", "咱"), ("真的", "真个")],
-        VarietyPreset.MINNAN_WRITTEN: [("我们", "阮"), ("你", "汝")],
-    }
-
-    PREFIXES: dict[VarietyPreset, str] = {
-        VarietyPreset.BEIJING_MANDARIN: "给你捯饬成北京味儿：",
-        VarietyPreset.DONGBEI_MANDARIN: "给你整成东北那股劲儿：",
-        VarietyPreset.SICHUAN_CHONGQING_MANDARIN: "给你顺成川渝这边更自然的说法：",
-        VarietyPreset.JIANGHUAI_OR_LOWER_YANGTZE_MANDARIN: "给你改成江淮一带更顺口的说法：",
-        VarietyPreset.GUANGDONG_MANDARIN: "给你改成广东人讲普通话更自然的味道：",
-        VarietyPreset.SHANGHAI_MANDARIN_STYLE: "给你理成上海这边更利落的说法：",
-        VarietyPreset.CANTONESE_WRITTEN: "帮你改成书面上都顺眼嘅广东话：",
-        VarietyPreset.HOKKIEN_WRITTEN: "帮你顺成带台湾腔、读起来较自然个写法：",
-        VarietyPreset.MINNAN_WRITTEN: "帮你顺成带闽南味、读起来较自然个写法：",
-    }
-
-    @staticmethod
-    def _looks_chinese(text: str) -> bool:
-        # Cycle 20: heuristic fallback's replacement maps and prefix banners
-        # only make sense for Chinese input. Non-CJK input (English, Japanese
-        # kana, etc.) would otherwise come out as "给你整成东北那股劲儿:very
-        # good", which is worse than admitting we can't translate offline.
-        # >= 30% CJK chars => Chinese.
-        if not text:
-            return False
-        cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
-        return cjk / len(text) >= 0.3
-
-    def rewrite(self, text: str, target: VarietyPreset, reason: str | None = None) -> RewriteResult:
-        metadata = PRESET_METADATA[target]
-        rewritten = text
-        warning_reason = reason or "No LLM provider is configured."
-        # Cycle 20: be honest rather than mispronounce. If input isn't Chinese,
-        # the prefix-prepend trick produces "<Chinese banner><English text>"
-        # which is silly. Surface a clear warning and pass text through.
-        if not self._looks_chinese(text):
-            return RewriteResult(
-                rewritten_text=text,
-                target_variety=target,
-                script=metadata.script,
-                warning=(
-                    f"离线兜底模式无法翻译非中文内容。{warning_reason} 请稍后重试,或确认 LLM 服务可用。"
-                ),
-                degraded=True,
-            )
-        for source, replacement in self.REPLACEMENTS.get(target, []):
-            rewritten = rewritten.replace(source, replacement)
-        if rewritten == text and target != VarietyPreset.STANDARD_PUTONGHUA:
-            rewritten = f"{self.PREFIXES.get(target, '帮你改写成更自然的说法：')}{text}"
-        warning = f"Using local heuristic fallback. {warning_reason} {metadata.fallback_warning}"
-        return RewriteResult(
-            rewritten_text=rewritten,
-            target_variety=target,
-            script=metadata.script,
-            warning=warning,
-            degraded=True,
-        )
-
-
 # ---------- service ----------
 
 
@@ -1279,7 +1211,6 @@ class RewriteService:
         else:
             self._config = config if config is not None else load_llm_config()
             self._client = ChatCompletionsClient(self._config) if self._config else None
-        self._fallback = HeuristicRewriter()
         self.quality_store = quality_store  # if None, ratings not persisted; else rate_quality records them
 
     @property
@@ -1299,24 +1230,19 @@ class RewriteService:
         normalized = validate_text(text)
         started = time.perf_counter()
         if self._client is None:
-            result = self._fallback.rewrite(normalized, target, reason="No LLM provider is configured.")
-            self._log_request(target, started, degraded=True)
-            return result
+            raise RewriteError(NO_LLM_MESSAGE)
 
-        try:
-            result = self._client.rewrite(
-                normalized,
-                target,
-                scenario=scenario,
-                glossary_lines=glossary_lines,
-            )
-            self._log_request(target, started, degraded=result.degraded)
-            return result
-        except RewriteError as exc:
-            logger.warning("LLM rewrite failed; using heuristic fallback: %s", exc)
-            result = self._fallback.rewrite(normalized, target, reason=str(exc))
-            self._log_request(target, started, degraded=True)
-            return result
+        # No heuristic fallback: it returned the original text with a dialect
+        # banner glued on, which reads like a real rewrite but isn't one. An
+        # honest error beats a fake result — same contract as explain/rate.
+        result = self._client.rewrite(
+            normalized,
+            target,
+            scenario=scenario,
+            glossary_lines=glossary_lines,
+        )
+        self._log_request(target, started, degraded=result.degraded)
+        return result
 
     def rate_quality(
         self,
@@ -1362,8 +1288,10 @@ class RewriteService:
         {"degraded": bool, "warning": str | None} matching non-streaming
         rewrite()'s contract (review fix P3). Caller should still check
         partial_text is non-empty at done (failure signal).
-        Falls back gracefully: if no LLM configured, uses heuristic and emits
-        one chunk — flagged degraded=True instead of impersonating a real result.
+
+        Raises RewriteError if no LLM is configured or the stream fails —
+        the heuristic fallback is gone, so callers surface a real error
+        instead of a banner-prefixed copy of the user's own input.
 
         Review fix P2: threads glossary, mirroring rewrite(). Previously it
         was silently dropped on this (primary) path.
@@ -1371,11 +1299,8 @@ class RewriteService:
         normalized = validate_text(text)
         started = time.perf_counter()
         if self._client is None:
-            result = self._fallback.rewrite(normalized, target, reason="No LLM provider is configured.")
-            self._log_request(target, started, degraded=True)
-            yield result.rewritten_text, result.rewritten_text, False, None
-            yield "", result.rewritten_text, True, {"degraded": True, "warning": result.warning}
-            return
+            raise RewriteError(NO_LLM_MESSAGE)
+        completed = False
         try:
             for delta, partial, done, meta in self._client.rewrite_stream(
                 normalized,
@@ -1386,13 +1311,11 @@ class RewriteService:
                 yield delta, partial, done, meta
                 if done:
                     break
-            self._log_request(target, started, degraded=False)
-        except RewriteError as exc:
-            logger.warning("LLM stream failed; falling back to heuristic: %s", exc)
-            result = self._fallback.rewrite(normalized, target, reason=str(exc))
-            self._log_request(target, started, degraded=True)
-            yield result.rewritten_text, result.rewritten_text, False, None
-            yield "", result.rewritten_text, True, {"degraded": True, "warning": result.warning}
+            completed = True
+        finally:
+            # Log on failure too — the old except-branch did, and losing the
+            # latency of a request that died mid-stream is the worst time to.
+            self._log_request(target, started, degraded=False, failed=not completed)
 
     def explain(
         self,
@@ -1464,13 +1387,16 @@ class RewriteService:
             "glossary_suggestions": glossary,
         }
 
-    def _log_request(self, target: VarietyPreset, started: float, *, degraded: bool) -> None:
+    def _log_request(
+        self, target: VarietyPreset, started: float, *, degraded: bool, failed: bool = False
+    ) -> None:
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
-        provider = self._config.provider if self._config else "heuristic"
+        provider = self._config.provider if self._config else "none"
         logger.info(
-            "rewrite_request target=%s latency_ms=%s degraded=%s provider=%s",
+            "rewrite_request target=%s latency_ms=%s degraded=%s failed=%s provider=%s",
             target.value,
             duration_ms,
             degraded,
+            failed,
             provider,
         )

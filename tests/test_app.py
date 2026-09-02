@@ -21,8 +21,8 @@ from native_chinese_assistant.presets import (
 )
 from native_chinese_assistant.rewrite import (
     MAX_INPUT_CHARS,
+    NO_LLM_MESSAGE,
     ChatCompletionsClient,
-    HeuristicRewriter,
     LLMConfig,
     RewriteError,
     RewriteService,
@@ -273,16 +273,19 @@ class MultiLanguageInputTests(unittest.TestCase):
         user_msg = next(m for m in body["messages"] if m["role"] == "user")
         self.assertIn("おはようございます", user_msg["content"])
 
-    def test_heuristic_refuses_non_chinese_input(self) -> None:
-        # Cycle 20: prepending a Chinese banner to English ("给你整成...:very
-        # good") is worse than admitting offline mode can't help.
-        from native_chinese_assistant.rewrite import HeuristicRewriter
-
-        result = HeuristicRewriter().rewrite("This is a very good day.", VarietyPreset.DONGBEI_MANDARIN)
-        self.assertEqual(result.rewritten_text, "This is a very good day.")
-        self.assertTrue(result.degraded)
-        self.assertIn("非中文", result.warning or "")
-        self.assertNotIn("给你", result.rewritten_text)
+    def test_rewrite_without_llm_raises_instead_of_faking(self) -> None:
+        """The heuristic fallback used to return the user's own text with a
+        dialect banner glued on — a non-rewrite that rendered as a real result.
+        Now an unconfigured service raises, in Chinese."""
+        service = RewriteService(config=None)
+        service._client = None
+        with self.assertRaises(RewriteError) as ctx:
+            service.rewrite("这个朋友真的非常不错。", VarietyPreset.DONGBEI_MANDARIN)
+        message = str(ctx.exception)
+        self.assertEqual(message, NO_LLM_MESSAGE)
+        # Chinese UI => Chinese error. No English leaking into the banner.
+        self.assertNotIn("heuristic", message.lower())
+        self.assertNotIn("给你整成", message)
 
 
 class ScenarioParsingTests(unittest.TestCase):
@@ -511,23 +514,22 @@ class RewriteServiceTests(unittest.TestCase):
         os.environ.clear()
         os.environ.update(self.original_env)
 
-    def test_heuristic_rewriter_returns_script_and_warning(self) -> None:
-        result = HeuristicRewriter().rewrite("这个朋友真的非常不错。", VarietyPreset.BEIJING_MANDARIN)
-        self.assertEqual(result.script, Script.SIMPLIFIED)
-        self.assertIn("warning", result.as_dict())
-        self.assertTrue(result.rewritten_text)
-        self.assertTrue(result.degraded)
+    def test_no_llm_message_is_chinese_and_actionable(self) -> None:
+        # It is rendered verbatim in the UI, so it must be Chinese and must
+        # tell the user where to fix it.
+        self.assertTrue(any("\u4e00" <= ch <= "\u9fff" for ch in NO_LLM_MESSAGE))
+        self.assertNotIn("Using local heuristic fallback", NO_LLM_MESSAGE)
+        self.assertNotIn("No LLM provider is configured", NO_LLM_MESSAGE)
+        self.assertIn("API Key", NO_LLM_MESSAGE)
+        self.assertIn("设置", NO_LLM_MESSAGE)
 
-    def test_service_falls_back_without_llm(self) -> None:
+    def test_service_raises_without_llm(self) -> None:
         for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY", "LLM_MODEL", "LLM_PROVIDER"):
             os.environ.pop(key, None)
         service = RewriteService(config=None)
-        service._client = None  # force fallback even if dotenv re-injected
-        result = service.rewrite("我们一起去吃饭吧。", VarietyPreset.CANTONESE_WRITTEN)
-        self.assertEqual(result.target_variety, VarietyPreset.CANTONESE_WRITTEN)
-        self.assertEqual(result.script, Script.TRADITIONAL)
-        self.assertTrue(result.warning)
-        self.assertTrue(result.degraded)
+        service._client = None  # ensure no client even if dotenv re-injected
+        with self.assertRaises(RewriteError):
+            service.rewrite("我们一起去吃饭吧。", VarietyPreset.CANTONESE_WRITTEN)
 
     def test_service_uses_injected_client(self) -> None:
         client, _ = _build_client(_llm_json("好嘅"))
@@ -536,25 +538,25 @@ class RewriteServiceTests(unittest.TestCase):
         self.assertEqual(result.rewritten_text, "好嘅")
         self.assertFalse(result.degraded)
 
-    def test_service_falls_back_when_client_raises(self) -> None:
+    def test_service_propagates_client_error(self) -> None:
+        """A failing LLM call surfaces as an error rather than silently
+        degrading into a banner-prefixed copy of the input."""
         bad = json.dumps({"choices": [{"message": {"content": "garbage"}}]}).encode("utf-8")
         client, _ = _build_client(bad)
         service = RewriteService(client=client)
-        with self.assertLogs("ncga.rewrite", level="WARNING"):
-            result = service.rewrite("好的", VarietyPreset.CANTONESE_WRITTEN)
-        self.assertTrue(result.degraded)
-        self.assertIn("heuristic", result.warning or "")
+        with self.assertRaises(RewriteError):
+            service.rewrite("好的", VarietyPreset.CANTONESE_WRITTEN)
 
     def test_load_dotenv_sets_missing_values(self) -> None:
         with tempfile.NamedTemporaryFile("w+", delete=False) as handle:
-            handle.write("LLM_PROVIDER=deepseek\nLLM_MODEL=deepseek-chat\nLLM_STREAM=true\n")
+            handle.write("LLM_PROVIDER=deepseek\nLLM_MODEL=deepseek-v4-flash\nLLM_STREAM=true\n")
             path = handle.name
         try:
             for k in ("LLM_PROVIDER", "LLM_MODEL", "LLM_STREAM"):
                 os.environ.pop(k, None)
             load_dotenv(path)
             self.assertEqual(os.environ["LLM_PROVIDER"], "deepseek")
-            self.assertEqual(os.environ["LLM_MODEL"], "deepseek-chat")
+            self.assertEqual(os.environ["LLM_MODEL"], "deepseek-v4-flash")
             self.assertEqual(os.environ["LLM_STREAM"], "true")
         finally:
             os.unlink(path)
@@ -621,13 +623,6 @@ class RewriteServiceTests(unittest.TestCase):
         with self.assertRaises(RewriteError) as ctx:
             next(gen)
         self.assertIn("UTF-8", str(ctx.exception))
-
-    def test_heuristic_rewriter_includes_real_failure_reason(self) -> None:
-        result = HeuristicRewriter().rewrite(
-            "你好", VarietyPreset.BEIJING_MANDARIN, reason="LLM request failed."
-        )
-        self.assertIn("LLM request failed.", result.warning)
-
 
 # ---------------- preset options shape ----------------
 
@@ -1911,10 +1906,10 @@ class StreamingRewriteEndpointTests(unittest.TestCase):
         system_prompt = sent["messages"][0]["content"]
         self.assertIn("拼车 → 搭子车", system_prompt)
 
-    def test_stream_done_event_flags_degraded_fallback(self) -> None:
-        """Review fix P3: when the LLM fails mid-stream, the heuristic fallback
-        must arrive flagged degraded=true in the done event — previously the
-        flag was dropped and the frontend hardcoded degraded:false."""
+    def test_stream_failure_emits_error_event_not_fake_result(self) -> None:
+        """A mid-stream LLM failure must surface as an SSE error event. It used
+        to arrive as a `done` event carrying the heuristic's banner text, which
+        the UI rendered as a genuine rewrite."""
         client, _ = _build_client(b"not an sse stream at all", streaming=True)
         app = App(rewrite_service=RewriteService(client=client))
         status, _, body = call_app(
@@ -1925,8 +1920,20 @@ class StreamingRewriteEndpointTests(unittest.TestCase):
         )
         self.assertEqual(status, "200 OK")
         text = body.decode("utf-8")
-        self.assertIn("event: done", text)
-        self.assertIn('"degraded": true', text)
+        self.assertIn("event: error", text)
+        self.assertNotIn("给你整成东北那股劲儿", text)
+
+    def test_stream_without_key_returns_503_before_opening_stream(self) -> None:
+        app = App(rewrite_service=RewriteService(config=None))
+        app.rewrite_service._client = None
+        status, _, body = call_app(
+            app,
+            "POST",
+            "/api/rewrite-stream",
+            body=json.dumps({"text": "你好", "target_variety": "dongbei_mandarin"}).encode("utf-8"),
+        )
+        self.assertEqual(status, "503 Service Unavailable")
+        self.assertEqual(json.loads(body.decode("utf-8"))["error"], NO_LLM_MESSAGE)
 
 
 class RateEndpointTests(unittest.TestCase):
@@ -2724,7 +2731,7 @@ class SecurityCycle13Tests(unittest.TestCase):
         self.assertEqual(s2, "200 OK")
         s3, _, body = call_app(app, "GET", "/api/quality-stats")
         self.assertEqual(s3, "429 Too Many Requests")
-        self.assertIn("Rate limit", json.loads(body)["error"])
+        self.assertIn("请求太频繁", json.loads(body)["error"])
 
     # --- X-Forwarded-For gate ---
     def test_xff_not_trusted_by_default(self) -> None:
@@ -3319,12 +3326,38 @@ class TestBYOK(unittest.TestCase):
         )
         self.assertEqual(status, "401 Unauthorized")
 
+    def test_keyless_503_does_not_consume_daily_cap(self) -> None:
+        """A request that can only 503 must not be charged against the daily
+        LLM cap. With cap=1, every keyless call is a 503 — never a 429 — so
+        the user keeps seeing the message that tells them how to fix it."""
+        os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "1"
+        self._blank_server_key()
+        app = App(rewrite_service=RewriteService(config=None))
+        app.rewrite_service._client = None
+        body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode()
+        for endpoint in ("/api/rewrite", "/api/rewrite-stream"):
+            for _ in range(3):
+                status, _, payload = call_app(app, "POST", endpoint, body=body)
+                self.assertEqual(status, "503 Service Unavailable", endpoint)
+                self.assertEqual(json.loads(payload)["error"], NO_LLM_MESSAGE)
+        # Batch pre-flights before charging items*varieties units.
+        batch = json.dumps(
+            {"items": ["你好", "再见"], "target_varieties": ["standard_putonghua", "dongbei_mandarin"]}
+        ).encode()
+        for _ in range(2):
+            status, _, _ = call_app(app, "POST", "/api/rewrite-batch", body=batch)
+            self.assertEqual(status, "503 Service Unavailable")
+
     def test_byok_bypasses_operator_daily_cap(self) -> None:
         os.environ["NCGA_DAILY_LLM_CAP_PER_IP"] = "1"
         os.environ["LLM_STREAM"] = "false"
         self._blank_server_key()
         user_key = "sk-" + "u" * 40
-        app = App(rewrite_service=RewriteService(config=None))
+        # The operator path must have a working client: a keyless server now
+        # 503s without charging (see test_keyless_503_does_not_consume_daily_cap),
+        # so it could never demonstrate that the cap is consumed at all.
+        operator_client, _ = _build_client(_llm_json("ok"))
+        app = App(rewrite_service=RewriteService(client=operator_client))
         body = json.dumps({"text": "你好", "target_variety": "standard_putonghua"}).encode()
 
         from native_chinese_assistant.rewrite import UrllibTransport
@@ -3333,8 +3366,8 @@ class TestBYOK(unittest.TestCase):
             return FakeStreamResponse(_llm_json("ok"))
 
         with mock.patch.object(UrllibTransport, "post", fake_post):
-            # Operator path: first call consumes the single daily unit (heuristic
-            # fallback, no key), second call hits the cap.
+            # Operator path: first call succeeds and consumes the single daily
+            # unit; the second hits the cap.
             s1, _, _ = call_app(app, "POST", "/api/rewrite", body=body)
             self.assertEqual(s1, "200 OK")
             s2, _, _ = call_app(app, "POST", "/api/rewrite", body=body)

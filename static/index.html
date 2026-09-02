@@ -20,6 +20,11 @@
           var fs = (s && s.fontScale) || "1";
           document.documentElement.setAttribute("data-version", v);
           document.documentElement.style.setProperty("--font-scale", fs);
+          // Theme before paint, or a dark-mode user gets a cream flash.
+          var th = (s && s.theme) || "auto";
+          if (th === "light" || th === "dark") {
+            document.documentElement.setAttribute("data-theme", th);
+          }
         } catch (e) { /* ignore — fall back to defaults */ }
         // v3「随四时」: 按月份给 <html> 写 data-season,与 app.js currentSeason() 同算法。
         try {
@@ -126,6 +131,11 @@
           <i class="fas fa-circle-info" aria-hidden="true"></i>
           <span>关于</span>
           <kbd>7</kbd>
+        </a>
+        <a href="/quality" class="nav-item nav-item-external">
+          <i class="fas fa-chart-line" aria-hidden="true"></i>
+          <span>质量看板</span>
+          <i class="fas fa-arrow-up-right-from-square nav-external-icon" aria-hidden="true"></i>
         </a>
       </nav>
 
@@ -334,13 +344,14 @@
                     <option value="" disabled selected>选择方言风格…</option>
                   </select>
                 </div>
-                <button id="submit-button" type="submit" class="btn-rewrite">
+                <button id="submit-button" type="submit" class="btn-rewrite" aria-describedby="submit-hint">
                   <span class="btn-spinner" aria-hidden="true">
                     <span></span><span></span><span></span><span></span>
                     <span></span><span></span><span></span><span></span>
                   </span>
                   <i class="fas fa-wand-magic-sparkles btn-icon" aria-hidden="true"></i>
                   <span class="button-label">立即重写</span>
+                  <span id="submit-hint" class="visually-hidden"></span>
                 </button>
               </div>
             </form>
@@ -364,10 +375,6 @@
               <div class="card-head-title">
                 <i class="fas fa-feather-pointed" aria-hidden="true"></i>
                 <h2>重写结果</h2>
-                <span class="landmark-tag" id="landmark-tag" hidden>
-                  <i class="fas fa-location-dot" aria-hidden="true"></i>
-                  <span id="landmark-name">—</span>
-                </span>
                 <span class="degraded-tag" id="degraded-tag" hidden title="此次回退到本地启发式重写">
                   <i class="fas fa-triangle-exclamation" aria-hidden="true"></i> 已降级
                 </span>
@@ -393,9 +400,15 @@
               </div>
             </header>
 
+            <div class="no-key-banner" id="no-key-banner" role="status" hidden>
+              <i class="fas fa-key" aria-hidden="true"></i>
+              <span>还没有可用的 API Key，AI 功能暂不可用。</span>
+              <a href="#settings" class="no-key-banner-link">去设置里粘贴你的 DeepSeek Key →</a>
+            </div>
+
             <div class="status-row">
-              <p id="status" class="status" aria-live="polite">
-                <i class="fas fa-info-circle" aria-hidden="true"></i> 选择方言风格并点击"立即重写"
+              <p id="status" class="status hint" aria-live="polite">
+                <i class="fas fa-info-circle" aria-hidden="true"></i> 写点什么，挑个方言，然后点「立即重写」
               </p>
             </div>
             <p id="warning" class="warning" aria-live="polite"></p>
@@ -406,6 +419,11 @@
                 <span>地</span><span>道</span><span>中</span><span>文</span>
               </div>
             </div>
+
+            <p class="landmark-caption" id="landmark-tag" hidden>
+              <i class="fas fa-image" aria-hidden="true"></i>
+              背景照片：<span id="landmark-name">—</span>
+            </p>
 
             <div class="result-stats" id="result-stats" hidden>
               <div class="result-stat">
@@ -494,7 +512,7 @@
             <a href="#history">查看全部</a>
           </header>
           <div class="round2-version-list" id="round2-version-list"></div>
-          <button type="button" class="round2-new-version" id="round2-new-version">
+          <button type="button" class="round2-new-version" id="round2-new-version" aria-label="新建版本">
             <i class="fas fa-plus" aria-hidden="true"></i>
             <span>新建版本</span>
           </button>
@@ -544,7 +562,7 @@
               </div>
               <div class="batch-config-group">
                 <label class="batch-toggle">
-                  <input type="checkbox" id="batch-score-toggle">
+                  <input type="checkbox" class="ncga-check" id="batch-score-toggle">
                   <span>开启质量评分（每条额外耗 1 次 LLM）</span>
                 </label>
               </div>
@@ -573,7 +591,7 @@
               <span class="batch-toolbar-info" id="batch-toolbar-info">—</span>
               <div class="batch-toolbar-actions">
                 <label class="history-filter" title="导出时只导出每行被标记的赢家方言">
-                  <input type="checkbox" id="batch-winners-only">
+                  <input type="checkbox" class="ncga-check" id="batch-winners-only">
                   <i class="fas fa-crown" aria-hidden="true"></i> 只导赢家
                 </label>
                 <button type="button" class="ghost-btn" id="batch-export-csv">
@@ -618,7 +636,7 @@
           <div class="history-tools">
             <input type="search" id="history-search" placeholder="搜索原文 / 结果 / 方言…" class="search-input" aria-label="搜索历史">
             <label class="history-filter">
-              <input type="checkbox" id="history-favorites-only"> 只看收藏
+              <input type="checkbox" class="ncga-check" id="history-favorites-only"> 只看收藏
             </label>
             <button type="button" class="ghost-btn" id="history-export">
               <i class="fas fa-file-export" aria-hidden="true"></i> 导出全部
@@ -658,7 +676,7 @@
                 <i class="fas fa-trash-can" aria-hidden="true"></i> 清除 Key
               </button>
             </div>
-            <p class="settings-hint" id="byok-status">未配置 — 当前使用服务器默认密钥。</p>
+            <p class="settings-hint" id="byok-status">正在检查密钥状态…</p>
           </article>
 
           <article class="settings-card">
@@ -670,6 +688,16 @@
               <button type="button" data-value="off">关闭背景</button>
             </div>
             <p class="settings-hint">在「方言图鉴」页面点选某张地标即可设为该方言的固定背景。</p>
+          </article>
+
+          <article class="settings-card">
+            <header><i class="fas fa-circle-half-stroke" aria-hidden="true"></i> 主题</header>
+            <p>浅色纸面还是深色墨面。「跟随系统」会用你系统的深色/浅色设置。</p>
+            <div class="seg-control" data-setting="theme">
+              <button type="button" data-value="auto" class="is-active">跟随系统</button>
+              <button type="button" data-value="light">浅色</button>
+              <button type="button" data-value="dark">深色</button>
+            </div>
           </article>
 
           <article class="settings-card">

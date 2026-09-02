@@ -5678,7 +5678,7 @@ body[data-v3="on"] textarea,
 body[data-v3="on"] .result,
 body[data-v3="on"] .result-compare-orig {
   color: var(--r2-ink);
-  background: rgba(255, 253, 246, 0.42);
+  background: rgba(var(--at-raised-rgb), 0.42);
   border: 1px solid var(--r2-rule);
   border-radius: 8px;
   box-shadow: inset 0 1px 7px rgba(76, 65, 43, 0.035);
@@ -5761,7 +5761,7 @@ body[data-v3="on"] .form-row {
 body[data-v3="on"] .select-wrap select {
   min-height: 46px;
   color: var(--r2-ink);
-  background: rgba(255, 253, 246, 0.68);
+  background: rgba(var(--at-raised-rgb), 0.68);
   border-color: var(--r2-rule);
   border-radius: 8px;
 }
@@ -5838,7 +5838,7 @@ body[data-v3="on"] .result-foot {
 body[data-v3="on"] .ghost-btn,
 body[data-v3="on"] .icon-btn {
   color: var(--r2-ink-soft);
-  background: rgba(255, 253, 246, 0.25);
+  background: rgba(var(--at-raised-rgb), 0.25);
   border-color: var(--r2-rule);
   border-radius: 7px;
 }
@@ -6181,8 +6181,10 @@ body[data-v3="on"][data-route="daily"] .cmdbar {
 body[data-v3="on"] {
   /* —— 墨斋色板 —— */
   --at-paper: #f4efe4;          /* 宣纸场 */
+  --at-paper-rgb: 244, 239, 228;   /* 同色 RGB 三元组,供半透明纱罩使用 */
   --at-paper-deep: #ece5d5;
   --at-raised: #fbf8ef;         /* 案上纸(卡面) */
+  --at-raised-rgb: 255, 253, 246;  /* 同色的 RGB 三元组,供半透明表面使用 */
   --at-sunk: #f0e9d9;           /* 凹陷纸(井/槽) */
   --at-ink: #242b25;            /* 墨(偏绿的黑) */
   --at-ink-soft: #57615a;
@@ -6202,7 +6204,7 @@ body[data-v3="on"] {
 
   /* —— 接入既有变量系统:朱砂成为 v3 唯一 accent —— */
   --ui-accent: var(--at-vermilion);
-  --ui-accent-soft: color-mix(in srgb, var(--at-vermilion) 8%, #fdfaf1);
+  --ui-accent-soft: color-mix(in srgb, var(--at-vermilion) 8%, var(--at-raised));
   --gold: #8f7c53;              /* 茶金退居次要,不再抢戏 */
   --gold-soft: color-mix(in srgb, #8f7c53 70%, var(--at-ink));
 
@@ -6211,7 +6213,7 @@ body[data-v3="on"] {
   /* 宣纸场:两层暖白纱罩住漆面照片(照片残影 ~5%),最底层兜底纯色 */
   background:
     radial-gradient(ellipse 75% 55% at 86% 0%, rgba(47, 93, 76, 0.055), transparent 62%),
-    linear-gradient(165deg, rgba(247, 243, 234, 0.965) 0%, rgba(244, 239, 228, 0.935) 45%, rgba(238, 232, 219, 0.96) 100%),
+    linear-gradient(165deg, rgba(var(--at-paper-rgb), 0.965) 0%, rgba(var(--at-paper-rgb), 0.935) 45%, rgba(var(--at-paper-rgb), 0.96) 100%),
     url("/static/assets/summer-lacquer-silk.png") center / cover fixed no-repeat,
     var(--at-paper) !important;
 }
@@ -6313,7 +6315,7 @@ body[data-v3="on"] .v3-hero-meta {
 body[data-v3="on"] .v3-hero-meta-solar {
   border: 1px solid rgba(47, 93, 76, 0.42);
   color: var(--at-jade-deep);
-  background: rgba(251, 248, 239, 0.55);
+  background: rgba(var(--at-raised-rgb), 0.55);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -6344,7 +6346,7 @@ body[data-v3="on"] .v3-hero-verse {
 /* ============ 顶栏(cmdbar):纸上瓷白瓷钮 + 朱砂主钮 ============ */
 body[data-v3="on"] .round2-command-search {
   color: var(--at-ink-soft);
-  background: rgba(251, 248, 239, 0.88);
+  background: rgba(var(--at-raised-rgb), 0.88);
   border: 1px solid var(--at-rule);
   border-radius: 12px;
   box-shadow: var(--at-shadow-sm);
@@ -6360,7 +6362,7 @@ body[data-v3="on"] .round2-command-search kbd {
 body[data-v3="on"] .round2-command-search:hover,
 body[data-v3="on"] .round2-command-search:focus-visible {
   color: var(--at-ink);
-  background: #fdfbf3;
+  background: var(--at-raised);
   border-color: rgba(47, 93, 76, 0.45);
   box-shadow: var(--at-shadow-md);
   transform: translateY(-1px);
@@ -6368,7 +6370,7 @@ body[data-v3="on"] .round2-command-search:focus-visible {
 
 body[data-v3="on"] .cmd-btn.round2-save-draft {
   color: var(--at-ink-soft);
-  background: rgba(251, 248, 239, 0.88);
+  background: rgba(var(--at-raised-rgb), 0.88);
   border: 1px solid var(--at-rule);
   box-shadow: var(--at-shadow-sm);
   backdrop-filter: blur(14px);
@@ -6377,7 +6379,7 @@ body[data-v3="on"] .cmd-btn.round2-save-draft {
 }
 body[data-v3="on"] .cmd-btn.round2-save-draft:hover {
   color: var(--at-jade-deep);
-  background: #fdfbf3;
+  background: var(--at-raised);
   border-color: rgba(47, 93, 76, 0.45);
   transform: translateY(-1px);
 }
@@ -6434,7 +6436,7 @@ body[data-v3="on"] .landmark-tag,
 body[data-v3="on"] .degraded-tag,
 body[data-v3="on"] .model-tag {
   color: var(--at-ink-soft);
-  background: rgba(251, 248, 239, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
   font-variant-numeric: tabular-nums;
 }
@@ -6498,7 +6500,7 @@ body[data-v3="on"] .result,
 body[data-v3="on"] .result-compare-orig,
 body[data-v3="on"] .select-wrap select {
   color: var(--at-ink);
-  background: rgba(255, 253, 246, 0.62);
+  background: rgba(var(--at-raised-rgb), 0.62);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
   box-shadow: inset 0 1px 6px rgba(33, 69, 58, 0.04);
@@ -6519,7 +6521,7 @@ body[data-v3="on"] textarea::placeholder { color: var(--at-ink-faint); opacity: 
 
 body[data-v3="on"] .mic-btn {
   color: var(--at-jade);
-  background: rgba(251, 248, 239, 0.92);
+  background: rgba(var(--at-raised-rgb), 0.92);
   border: 1px solid var(--at-rule);
 }
 
@@ -6566,7 +6568,7 @@ body[data-v3="on"] .result-foot { border-top-color: var(--at-rule); }
 body[data-v3="on"] .ghost-btn,
 body[data-v3="on"] .icon-btn {
   color: var(--at-ink-soft);
-  background: rgba(255, 253, 246, 0.5);
+  background: rgba(var(--at-raised-rgb), 0.5);
   border: 1px solid var(--at-rule);
   border-radius: 8px;
   transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease-out;
@@ -6858,7 +6860,7 @@ body[data-v3="on"][data-route="daily"] .daily-phrase-translations-title {
 }
 body[data-v3="on"][data-route="daily"] .daily-phrase-translations-title i { color: var(--at-jade); }
 body[data-v3="on"][data-route="daily"] .daily-phrase-translations-open li {
-  background: rgba(255, 253, 246, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease-out;
@@ -6876,7 +6878,7 @@ body[data-v3="on"][data-route="daily"] .daily-phrase-translations-open li > stro
 
 /* 保存的方言句(弹窗列表)同色 */
 body[data-v3="on"][data-route="daily"] .saved-phrases-row {
-  background: rgba(255, 253, 246, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
 }
 body[data-v3="on"][data-route="daily"] .saved-phrases-row:hover { border-color: rgba(47, 93, 76, 0.42); }
@@ -6949,7 +6951,7 @@ body[data-v3="on"] .seg-control button:hover:not(.is-active) { color: var(--at-j
 body[data-v3="on"][data-route="settings"] .seg-control button.is-active,
 body[data-v3="on"] .seg-control button.is-active {
   color: var(--at-vermilion);
-  background: #fdfbf3;
+  background: var(--at-raised);
   box-shadow: var(--at-shadow-sm);
 }
 body[data-v3="on"] .seg-control button:active { transform: scale(0.97); }
@@ -6963,7 +6965,7 @@ body[data-v3="on"][data-route="settings"] input[type="password"],
 body[data-v3="on"][data-route="settings"] textarea,
 body[data-v3="on"][data-route="settings"] select {
   color: var(--at-ink);
-  background: rgba(255, 253, 246, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
   box-shadow: inset 0 1px 4px rgba(33, 69, 58, 0.04);
@@ -6987,7 +6989,7 @@ body[data-v3="on"] .byok-toggle:hover {
 
 /* 设置里的质量桶 / 数据按钮:发丝边纸件 */
 body[data-v3="on"] .quality-bucket {
-  background: rgba(255, 253, 246, 0.6);
+  background: rgba(var(--at-raised-rgb), 0.6);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
 }
@@ -7103,7 +7105,7 @@ body[data-v3="on"] .batch-header p { color: var(--at-ink-soft); }
 
 body[data-v3="on"] .search-input {
   color: var(--at-ink);
-  background: rgba(255, 253, 246, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -7174,7 +7176,7 @@ body[data-v3="on"] .drawer-head h3 { letter-spacing: 0.04em; }
 body[data-v3="on"] .compare-hint { color: var(--at-ink-faint); }
 body[data-v3="on"] .compare-chip.is-active { background: var(--at-jade); color: #f8f3e3; }
 body[data-v3="on"] .compare-col {
-  background: rgba(255, 253, 246, 0.72);
+  background: rgba(var(--at-raised-rgb), 0.72);
   border: 1px solid var(--at-rule);
   border-radius: 10px;
 }
@@ -7242,10 +7244,10 @@ body[data-v3="on"] .bg-image {
 body[data-v3="on"] .bg-vignette {
   background:
     linear-gradient(180deg,
-      rgba(244, 239, 228, 0.52) 0%,
-      rgba(244, 239, 228, 0.27) 26%,
-      rgba(244, 239, 228, 0.21) 58%,
-      rgba(244, 239, 228, 0.36) 100%);
+      rgba(var(--at-paper-rgb), 0.52) 0%,
+      rgba(var(--at-paper-rgb), 0.27) 26%,
+      rgba(var(--at-paper-rgb), 0.21) 58%,
+      rgba(var(--at-paper-rgb), 0.36) 100%);
 }
 
 /* 5) 纸纹颗粒保留,改软光模式,不再糊住照片 */
@@ -7254,10 +7256,10 @@ body[data-v3="on"] .bg-grain { opacity: 0.16; mix-blend-mode: soft-light; }
 /* 6) 刊头:左纸右景——纸晕从左侧铺开给墨字托底,向右渐隐 */
 body[data-v3="on"] .v3-hero {
   background: linear-gradient(100deg,
-    rgba(244, 239, 228, 0.94) 0%,
-    rgba(244, 239, 228, 0.76) 30%,
-    rgba(244, 239, 228, 0.36) 58%,
-    rgba(244, 239, 228, 0) 80%);
+    rgba(var(--at-paper-rgb), 0.94) 0%,
+    rgba(var(--at-paper-rgb), 0.76) 30%,
+    rgba(var(--at-paper-rgb), 0.36) 58%,
+    rgba(var(--at-paper-rgb), 0) 80%);
 }
 
 /* ============================================================
@@ -7426,10 +7428,10 @@ body[data-v3="on"] .round2-version-empty { color: rgba(241, 236, 222, 0.68); }
 body[data-v3="on"] .batch-header,
 body[data-v3="on"] .page-section-head {
   background: linear-gradient(100deg,
-    rgba(244, 239, 228, 0.90) 0%,
-    rgba(244, 239, 228, 0.66) 55%,
-    rgba(244, 239, 228, 0.28) 85%,
-    rgba(244, 239, 228, 0) 100%);
+    rgba(var(--at-paper-rgb), 0.90) 0%,
+    rgba(var(--at-paper-rgb), 0.66) 55%,
+    rgba(var(--at-paper-rgb), 0.28) 85%,
+    rgba(var(--at-paper-rgb), 0) 100%);
   border-radius: var(--at-r-lg);
   padding: 8px 20px 10px 14px;
   margin-left: -14px;
@@ -7445,5 +7447,261 @@ body[data-v3="on"] .about-foot {
   padding: 7px 20px;
   border: 0;
   border-radius: 999px;
-  background: rgba(244, 239, 228, 0.82);
+  background: rgba(var(--at-paper-rgb), 0.82);
 }
+
+/* ============================================================================
+   REVIEW FIXES — new components + dark mode
+   ============================================================================ */
+
+/* ---- #7: the at-rest hint is guidance, not an error --------------------------
+   `.status i` inherits --accent (vermilion), so the idle "pick a dialect"
+   line rendered with a red icon and read as a failure before the user had
+   done anything. `.hint` gives it a neutral, quieter tone. */
+.status.hint {
+  color: var(--ink-muted);
+}
+.status.hint i {
+  color: var(--ink-muted);
+  opacity: 0.75;
+}
+body[data-v3="on"] .status.hint {
+  color: var(--at-ink-faint);
+  background: transparent;
+  border-color: transparent;
+}
+body[data-v3="on"] .status.hint i { color: var(--at-ink-faint); }
+
+/* ---- #2: persistent notice when no API key is reachable -------------------- */
+.no-key-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.no-key-banner > i { color: var(--warning); flex: none; }
+.no-key-banner-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.no-key-banner-link:hover { border-bottom-color: currentColor; }
+
+/* Settings status line: warn tone when AI is genuinely unavailable. */
+.settings-hint.is-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* ---- #5: landmark name is decoration, not result metadata ------------------
+   It used to sit in the result card's title row beside the 已降级 status chip,
+   styled identically, so it read as a fact about the rewrite. Now a muted
+   caption that says what it actually is. */
+.landmark-caption {
+  margin: 8px 2px 0;
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+  opacity: 0.8;
+}
+.landmark-caption i { margin-right: 5px; opacity: 0.7; }
+body[data-v3="on"] .landmark-caption { color: var(--at-ink-faint); }
+
+/* ---- #6: quality dashboard link in the sidebar ----------------------------- */
+.nav-item-external { position: relative; }
+.nav-external-icon {
+  margin-left: auto;
+  font-size: 0.62em;
+  opacity: 0.5;
+}
+.sidebar.is-collapsed .nav-external-icon { display: none; }
+
+/* ---- #8: real checkboxes, not bare OS squares ------------------------------
+   These were the only unstyled native controls left among custom pills and
+   rendered as hard black squares. */
+.ncga-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0 7px 0 0;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: -2px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--panel-elevated);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.ncga-check::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  transform: scale(0);
+  transform-origin: center;
+  transition: transform 0.12s ease-in-out;
+  box-shadow: inset 1em 1em currentColor;
+  color: #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+.ncga-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.ncga-check:checked::before { transform: scale(1); }
+.ncga-check:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+.ncga-check:hover:not(:checked) { border-color: var(--accent); }
+
+/* ============================================================================
+   #8: DARK MODE
+   ----------------------------------------------------------------------------
+   There was none: 7,400 lines of CSS with zero prefers-color-scheme, so a
+   text tool people use at night was a permanently bright cream page.
+
+   v3 (the default skin) derives every surface from two token layers —
+   --at-* (墨斋 palette) and --s3-* (seasonal) — and remaps the legacy
+   --ink/--panel/--line tokens from them. Redefining those layers therefore
+   re-themes the whole app without touching component rules.
+
+   Three states, per the usual contract:
+     :root                         → light (defined above, untouched)
+     prefers-color-scheme: dark    → dark, unless the user forced light
+     [data-theme="dark"|"light"]   → explicit user choice always wins
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body[data-v3="on"] {
+    --at-paper: #14181a;
+    --at-paper-rgb: 20, 24, 26;
+    --at-paper-deep: #0f1214;
+    --at-raised: #1c2124;
+    --at-raised-rgb: 28, 33, 36;
+    --at-sunk: #101416;
+    --at-ink: #e9e4d6;
+    --at-ink-soft: #b3b8b0;
+    --at-ink-faint: #7f867e;
+    --at-jade: #6aa588;
+    --at-jade-deep: #4f8a68;
+    --at-jade-bright: #8ec4a5;
+    --at-vermilion: #e2705a;
+    --at-vermilion-deep: #c0452f;
+    --at-rail: #0d1113;
+    --at-rail-deep: #080b0c;
+    --at-rule: rgba(233, 228, 214, 0.14);
+    --at-rule-strong: rgba(233, 228, 214, 0.26);
+    --at-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 3px 10px rgba(0, 0, 0, 0.4);
+    --at-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 38px rgba(0, 0, 0, 0.5);
+    --at-shadow-lg: 0 28px 68px rgba(0, 0, 0, 0.62), 0 5px 16px rgba(0, 0, 0, 0.45);
+
+    --s3-bg: #14181a;
+    --s3-bg-soft: #1c2124;
+    --s3-text: #e9e4d6;
+    --s3-text-soft: #b3b8b0;
+    --s3-rule: rgba(233, 228, 214, 0.14);
+    --s3-hero-tint: rgba(140, 190, 165, 0.05);
+
+    --ui-surface: rgba(28, 33, 36, 0.88);
+    --ui-surface-solid: #1c2124;
+    --ui-surface-muted: #171b1e;
+    --ui-border: rgba(233, 228, 214, 0.13);
+    --ui-border-strong: rgba(233, 228, 214, 0.24);
+    --ui-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 34px rgba(0, 0, 0, 0.45);
+    --ui-shadow-float: 0 18px 50px rgba(0, 0, 0, 0.6);
+
+    --warning: #e2705a;
+    --success: #6aa588;
+
+    color: var(--at-ink);
+    /* The body background is painted by the light rule's !important
+       declaration, which now reads every stop from --at-paper-rgb — so the
+       token flip above is what re-themes it. No override here could win. */
+  }
+
+  /* Landmark photography is the page backdrop; at full strength it blows out a
+     dark UI. Damp it so text keeps its contrast. */
+  html:not([data-theme="light"]) body[data-v3="on"] .bg-image,
+  html:not([data-theme="light"]) body[data-v3="on"] .v3-hero-photo {
+    filter: brightness(0.55) saturate(0.85);
+  }
+
+  html:not([data-theme="light"]) .ncga-check::before { color: #14181a; }
+}
+
+/* Explicit dark choice — same declarations, no media dependency. */
+html[data-theme="dark"] body[data-v3="on"] {
+  --at-paper: #14181a;
+  --at-paper-rgb: 20, 24, 26;
+  --at-paper-deep: #0f1214;
+  --at-raised: #1c2124;
+  --at-raised-rgb: 28, 33, 36;
+  --at-sunk: #101416;
+  --at-ink: #e9e4d6;
+  --at-ink-soft: #b3b8b0;
+  --at-ink-faint: #7f867e;
+  --at-jade: #6aa588;
+  --at-jade-deep: #4f8a68;
+  --at-jade-bright: #8ec4a5;
+  --at-vermilion: #e2705a;
+  --at-vermilion-deep: #c0452f;
+  --at-rail: #0d1113;
+  --at-rail-deep: #080b0c;
+  --at-rule: rgba(233, 228, 214, 0.14);
+  --at-rule-strong: rgba(233, 228, 214, 0.26);
+  --at-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 3px 10px rgba(0, 0, 0, 0.4);
+  --at-shadow-md: 0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 38px rgba(0, 0, 0, 0.5);
+  --at-shadow-lg: 0 28px 68px rgba(0, 0, 0, 0.62), 0 5px 16px rgba(0, 0, 0, 0.45);
+
+  --s3-bg: #14181a;
+  --s3-bg-soft: #1c2124;
+  --s3-text: #e9e4d6;
+  --s3-text-soft: #b3b8b0;
+  --s3-rule: rgba(233, 228, 214, 0.14);
+  --s3-hero-tint: rgba(140, 190, 165, 0.05);
+
+  --ui-surface: rgba(28, 33, 36, 0.88);
+  --ui-surface-solid: #1c2124;
+  --ui-surface-muted: #171b1e;
+  --ui-border: rgba(233, 228, 214, 0.13);
+  --ui-border-strong: rgba(233, 228, 214, 0.24);
+  --ui-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 34px rgba(0, 0, 0, 0.45);
+  --ui-shadow-float: 0 18px 50px rgba(0, 0, 0, 0.6);
+
+  --warning: #e2705a;
+  --success: #6aa588;
+
+  color: var(--at-ink);
+  /* Body background: see the media-query block — painted by the token-driven
+     !important rule, not overridable here. */
+}
+
+html[data-theme="dark"] body[data-v3="on"] .bg-image,
+html[data-theme="dark"] body[data-v3="on"] .v3-hero-photo {
+  filter: brightness(0.55) saturate(0.85);
+}
+html[data-theme="dark"] .ncga-check::before { color: #14181a; }
+
+/* Native controls (scrollbars, the dialect <select>'s popup, focus rings)
+   follow the resolved theme. Without this they stay light-on-dark.
+   Scoped to the v3 skin via :has() — every token override above is v3-only,
+   so flipping native chrome on v1/v2 would give dark scrollbars on a cream
+   page (or light ones on v2's ink). */
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]):has(> body[data-v3="on"]) { color-scheme: dark; }
+}
+html[data-theme="dark"]:has(> body[data-v3="on"]) { color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
