@@ -19,6 +19,7 @@ from native_chinese_assistant.feedback import QualityStore
 from native_chinese_assistant.presets import parse_scenario, preset_options, scenario_options
 from native_chinese_assistant.rewrite import (
     MAX_INPUT_CHARS,
+    NO_LLM_MESSAGE,
     RewriteError,
     RewriteService,
     llm_config_for_user_key,
@@ -746,7 +747,11 @@ class App:
             ("GET", "/api/scenarios"): lambda env, sr: json_response(
                 sr, "200 OK", {"scenarios": scenario_options()}
             ),
-            ("GET", "/api/healthz"): lambda env, sr: json_response(sr, "200 OK", {"status": "ok"}),
+            ("GET", "/api/healthz"): lambda env, sr: json_response(
+                sr,
+                "200 OK",
+                {"status": "ok", "llm_configured": self.rewrite_service.client is not None},
+            ),
             ("GET", "/api/quality-stats"): self.handle_quality_stats,
             ("GET", "/api/quality-dashboard"): self.handle_quality_dashboard,
             ("GET", "/quality"): lambda env, sr: static_response(
@@ -865,6 +870,10 @@ class App:
                 )
         except ValueError as exc:
             return json_response(start_response, "400 Bad Request", {"error": str(exc)})
+        except RewriteError as exc:
+            # No heuristic fallback any more: a rewrite that can't run is an
+            # error, not a 200 carrying the user's own text back to them.
+            return json_response(start_response, "503 Service Unavailable", {"error": str(exc)})
 
         data = result.as_dict()
         data["effective_scenario"] = scenario.value
@@ -1081,6 +1090,14 @@ class App:
         ):  # parity with /api/rewrite — reject pre-stream instead of erroring mid-stream
             return json_response(start_response, "400 Bad Request", {"error": "Text too long."})
 
+        svc, _, byok = self._services_for(environ)
+        # Fail before opening the stream: a 503 with a readable reason beats a
+        # 200 event-stream whose first event is an error.
+        if svc.client is None:
+            return json_response(
+                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
+            )
+
         start_response(
             "200 OK",
             _security_headers(
@@ -1091,7 +1108,6 @@ class App:
                 ]
             ),
         )
-        svc, _, byok = self._services_for(environ)
         return _sse_iter_rewrite_stream(
             svc,
             text,
@@ -1351,6 +1367,14 @@ class App:
         if cap_err is not None:
             return cap_err
 
+        svc, _, byok = self._services_for(environ)
+        # Same pre-flight as the single-rewrite stream: without a key every one
+        # of these rows would fail, so say so once instead of 100 times.
+        if svc.client is None:
+            return json_response(
+                start_response, "503 Service Unavailable", {"error": NO_LLM_MESSAGE}
+            )
+
         start_response(
             "200 OK",
             _security_headers(
@@ -1361,7 +1385,6 @@ class App:
                 ]
             ),
         )
-        svc, _, byok = self._services_for(environ)
         return _sse_iter_batch(
             svc,
             items,
@@ -1754,8 +1777,8 @@ def _sse_iter_rewrite_stream(service, text, target, scenario, glossary_lines=Non
 
     Review fixes P2+P3: glossary_lines now actually threads into the LLM call
     (the old docstring admitted it didn't), and the done event carries the
-    same degraded/warning fields as non-streaming /api/rewrite so heuristic
-    fallbacks are no longer presented as genuine LLM results.
+    same degraded/warning fields as non-streaming /api/rewrite. A failure
+    surfaces as an SSE `error` event — never as a fabricated result.
 
     `on_result(variety_value, degraded, latency_ms)` — optional telemetry tap,
     fired once on the done event (dashboard counters ride on it).

@@ -105,3 +105,37 @@ def live_app() -> Iterator[str]:
     import shutil
 
     shutil.rmtree(tmp, ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
+def live_app_no_key() -> Iterator[str]:
+    """Start NCGA with NO LLM configured, on its own port.
+
+    The default `live_app` injects a stub client, so `llm_configured` is true
+    there. The honesty fixes (no-key banner, truthful settings line, 503 instead
+    of a fabricated rewrite) only manifest when the server genuinely has no key.
+    """
+    from native_chinese_assistant.rewrite import RewriteService
+    from native_chinese_assistant.web import App
+
+    for key in ("LLM_API_KEY", "DEEPSEEK_API_KEY"):
+        os.environ.pop(key, None)
+    service = RewriteService(config=None)
+    service._client = None  # belt and braces: .env on the dev box must not leak in
+    app = App(rewrite_service=service)
+
+    port = _free_port()
+    server = make_server("127.0.0.1", port, app, handler_class=_SilentHandler)
+    th = threading.Thread(target=server.serve_forever, daemon=True)
+    th.start()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                break
+        except OSError:
+            time.sleep(0.05)
+
+    yield f"http://127.0.0.1:{port}"
+    server.shutdown()
+    th.join(timeout=2)
